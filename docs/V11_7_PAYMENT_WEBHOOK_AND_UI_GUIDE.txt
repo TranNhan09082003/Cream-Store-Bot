@@ -1,0 +1,72 @@
+CREAM STORE BOT V11.7 PAYMENT + UI UPDATE
+==========================================
+
+Mục tiêu của bản này:
+1. Sửa phần webhook PayOS để bot có thể tự đánh dấu đã thanh toán ngay khi PayOS gửi POST webhook
+2. Giữ dashboard chạy chung port với webhook
+3. Cập nhật giao diện QR thanh toán theo style mới giống ảnh mẫu
+4. Không đụng data/, database schema, hay bắt xóa DB
+
+FILE TRONG BUNDLE
+-----------------
+- src/utils/paymentQrUi.js
+- src/services/paymentWebhookHelpers.js
+- src/services/webhookServer.js
+- src/services/paymentService.integration-example.js
+
+VÌ SAO ẢNH CỦA BẠN CHƯA TỰ NHẬN TIỀN?
+------------------------------------
+- Trang /payments/payos/return và /payments/payos/cancel chỉ là page người dùng nhìn thấy sau checkout
+- Việc tự xác nhận thanh toán phải đi qua:
+  POST /webhooks/payos
+- Nếu webhook không map được orderCode -> order trong DB, bot sẽ không cập nhật đơn
+
+BẢN NÀY SỬA GÌ?
+---------------
+- Webhook server mới sẽ:
+  1) nhận payload PayOS
+  2) đọc data.orderCode
+  3) tìm order theo payment_code hoặc order_code
+  4) set payment_status = PAID
+  5) nếu status đang PENDING_PAYMENT thì chuyển sang PROCESSING
+  6) ghi audit log vào staff_logs nếu bảng có sẵn
+
+ENV NÊN CÓ
+----------
+PUBLIC_BASE_URL=http://node.sang0023.io.vn:2753
+HTTP_PORT=2753
+PAYOS_WEBHOOK_PATH=/webhooks/payos
+PAYOS_RETURN_PATH=/payments/payos/return
+PAYOS_CANCEL_PATH=/payments/payos/cancel
+
+DASHBOARD_ENABLED=true
+DASHBOARD_TOKEN=mot_chuoi_bi_mat_dai
+
+CÁCH CẬP NHẬT
+-------------
+1. Backup source hiện tại.
+2. Giải nén ZIP này.
+3. Copy đè các file vào project hiện tại.
+4. Trong paymentService.js hiện tại, tích hợp buildCreamStorePaymentQrView theo file example.
+5. Restart bot:
+   npm start
+
+LINK KIỂM TRA
+-------------
+Webhook health:
+  http://node.sang0023.io.vn:2753/webhooks/payos
+
+Return:
+  http://node.sang0023.io.vn:2753/payments/payos/return
+
+Cancel:
+  http://node.sang0023.io.vn:2753/payments/payos/cancel
+
+Dashboard:
+  http://node.sang0023.io.vn:2753/dashboard?token=YOUR_TOKEN
+
+LƯU Ý QUAN TRỌNG
+----------------
+- Bản này chỉ sửa nền tảng webhook và UI QR.
+- Nếu paymentService hiện tại của bạn đang tạo paymentCode riêng, hãy chắc chắn nó khớp với order_code hoặc cột payment_code trong DB.
+- Nếu muốn bot gửi ngay thông báo vào Discord khi vừa nhận tiền, bạn cần giữ flow hiện tại của bạn ở chỗ đọc order sau khi payment_status đổi thành PAID rồi edit/gửi message trong ticket.

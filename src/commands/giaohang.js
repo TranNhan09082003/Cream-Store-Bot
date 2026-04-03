@@ -1,0 +1,113 @@
+import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { config } from '../config.js';
+import { getGuildConfig } from '../services/guildConfigService.js';
+import { getOrderByCode, markOrderCompleted, saveDelivery, ensureOrderExpiry } from '../services/orderService.js';
+import { sendCompletedTicketFlow, updateOrderLogMessage } from '../services/notificationService.js';
+import { applyCustomerRoles } from '../services/roleService.js';
+import { emitStaffLog } from '../services/staffLogService.js';
+import { assertStaffCapability } from '../utils/permissions.js';
+import {
+  buildCredentialEmbeds,
+  buildDeliveryClaimComponents,
+  buildDeliveryCredentialEmbeds,
+  buildDeliveryLogText,
+  buildDeliveryLoginComponents,
+  buildDeliveryNoticeEmbed,
+} from '../utils/embeds.js';
+
+export const data = new SlashCommandBuilder()
+  .setName('giaohang')
+  .setDescription('Gửi DM giao hàng cho khách. Tự đồng bộ đơn sang hoàn thành nếu đủ điều kiện.')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+  .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CR_123456').setRequired(true))
+  .addStringOption((option) => option.setName('gmail').setDescription('Gmail giao cho khách, nếu đơn cần tài khoản').setRequired(false))
+  .addStringOption((option) => option.setName('mat_khau').setDescription('Mật khẩu Gmail giao cho khách').setRequired(false))
+  .addStringOption((option) => option.setName('profile').setDescription('Profile hoặc slot được cấp').setRequired(false))
+  .addStringOption((option) => option.setName('pin').setDescription('PIN profile nếu có').setRequired(false))
+  .addStringOption((option) => option.setName('link_dang_nhap').setDescription('Link login dịch vụ').setRequired(false))
+  .addStringOption((option) => option.setName('luu_y').setDescription('Điều khoản/lưu ý gửi kèm cho khách').setRequired(false).setMaxLength(1800))
+  .addBooleanOption((option) => option.setName('gui_truc_tiep').setDescription('Bật để DM thẳng email/mật khẩu').setRequired(false));
+
+export async function execute(interaction) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!assertStaffCapability(member, guildConfig, 'SHIP')) {
+    await interaction.reply({ content: '⚠️ Chỉ shipper/manager mới được dùng lệnh này.', ephemeral: true });
+    return;
+  }
+
+  const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
+  const credentialEmail = interaction.options.getString('gmail');
+  const credentialPassword = interaction.options.getString('mat_khau');
+  const credentialProfile = interaction.options.getString('profile');
+  const credentialPin = interaction.options.getString('pin');
+  const deliveryLoginUrl = interaction.options.getString('link_dang_nhap') ?? config.defaultLoginUrl;
+  const claimNotes = interaction.options.getString('luu_y') ?? config.defaultDeliveryTerms;
+  const sendDirect = interaction.options.getBoolean('gui_truc_tiep') ?? true;
+
+  let order = getOrderByCode(orderCode);
+  if (!order) {
+    await interaction.reply({ content: '⚠️ Không tìm thấy mã đơn này.', ephemeral: true });
+    return;
+  }
+
+  if (interaction.channelId && order.ticket_channel_id && interaction.channelId !== order.ticket_channel_id) {
+    await interaction.reply({ content: `⚠️ Đơn \`${order.order_code}\` thuộc ticket khác. Hãy dùng lệnh trong <#${order.ticket_channel_id}> để tránh giao sai.`, ephemeral: true });
+    return;
+  }
+
+  if (order.status !== 'COMPLETED') {
+    if (order.total_amount > 0 && !['PAID', 'FREE'].includes(order.payment_status)) {
+      await interaction.reply({ content: '⚠️ Đơn chưa thanh toán xong nên bot chưa thể tự đồng bộ sang hoàn thành khi giao hàng.', ephemeral: true });
+      return;
+    }
+    order = markOrderCompleted(order.order_code, interaction.user.id, config.feedbackTimeoutHours) ?? order;
+    await updateOrderLogMessage(interaction.guild, order);
+    await sendCompletedTicketFlow({ guild: interaction.guild, order, actorId: interaction.user.id, supportId: interaction.user.id });
+    await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'ORDER_COMPLETE_AUTO', detail: 'Tự đồng bộ hoàn thành trong /giaohang', relatedOrderCode: order.order_code });
+  }
+
+  const customer = await interaction.client.users.fetch(order.customer_id).catch(() => null);
+  if (!customer) {
+    await interaction.reply({ content: '⚠️ Không fetch được tài khoản khách hàng.', ephemeral: true });
+    return;
+  }
+
+  const dmChannel = await customer.createDM().catch(() => null);
+  if (!dmChannel) {
+    await interaction.reply({ content: '⚠️ Không mở được DM với khách. Hãy yêu cầu khách bật tin nhắn riêng rồi chạy lại lệnh.', ephemeral: true });
+    return;
+  }
+
+  const shouldShowClaimButton = Boolean(credentialEmail && credentialPassword) && !sendDirect;
+  let dmMessage = null;
+  const persist = (messageId = null) => saveDelivery(order.order_code, interaction.user.id, credentialEmail, credentialPassword, credentialProfile, credentialPin, deliveryLoginUrl, claimNotes, dmChannel.id, messageId);
+  const storedOrder = persist(null);
+
+  if (Boolean(credentialEmail && credentialPassword) && sendDirect) {
+    dmMessage = await dmChannel.send({ embeds: buildDeliveryCredentialEmbeds(storedOrder), components: buildDeliveryLoginComponents(storedOrder) }).catch(() => null);
+    if (!dmMessage) {
+      await interaction.reply({ content: '⚠️ Không gửi được DM giao hàng cho khách hàng.', ephemeral: true });
+      return;
+    }
+    persist(dmMessage.id);
+  } else {
+    dmMessage = await dmChannel.send({ embeds: [buildDeliveryNoticeEmbed(storedOrder)], components: shouldShowClaimButton ? buildDeliveryClaimComponents(order.order_code) : [] }).catch(() => null);
+    if (!dmMessage) {
+      await interaction.reply({ content: '⚠️ Không gửi được DM cho khách hàng.', ephemeral: true });
+      return;
+    }
+    persist(dmMessage.id);
+    if (!shouldShowClaimButton && credentialEmail && credentialPassword) {
+      await dmChannel.send({ embeds: buildCredentialEmbeds({ ...storedOrder, credential_email: credentialEmail, credential_password: credentialPassword, claim_notes: claimNotes }) }).catch(() => null);
+    }
+  }
+
+  const ticketChannel = await interaction.guild.channels.fetch(order.ticket_channel_id).catch(() => null);
+  if (ticketChannel?.isTextBased()) await ticketChannel.send(buildDeliveryLogText(order)).catch(() => null);
+
+  await applyCustomerRoles(interaction.guild, order.customer_id);
+  await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'DELIVERY_SENT', detail: sendDirect ? 'Gửi trực tiếp qua DM' : 'Gửi DM với nút nhận Gmail', relatedOrderCode: order.order_code });
+
+  await interaction.reply({ content: `✅ Đã gửi DM giao hàng cho khách của đơn ${order.order_code} và đồng bộ trạng thái hoàn thành.`, ephemeral: true });
+}

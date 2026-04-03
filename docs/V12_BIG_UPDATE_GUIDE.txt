@@ -1,0 +1,84 @@
+CREAM STORE BOT V12 BIG UPDATE
+==============================
+
+Mục tiêu của bản v12:
+- FIX gấp lỗi bot không nhận được mã đơn hàng cũ trong database
+- Không xóa dữ liệu cũ
+- Giữ nguyên DB hiện tại
+- Tăng độ chính xác khi match webhook PayOS -> order
+- Gộp luôn UI QR mới và UI thanh toán sau /oder
+
+FIX CHÍNH TRONG BẢN NÀY
+-----------------------
+1. Matcher mới cho mã đơn:
+   - exact payment_code
+   - exact order_code
+   - fallback đổi CR_ <-> VB_
+   - fallback đọc mã từ description/reference
+   - fallback match digits nếu chỉ có duy nhất 1 ứng viên
+
+2. Webhook PayOS:
+   - log rõ hơn
+   - trả matched_by
+   - tự sync payment_code nếu cột có sẵn
+
+3. Script backfill an toàn:
+   - scripts/backfill-payment-codes.js
+   - chỉ gán payment_code = order_code cho các đơn đang thiếu
+   - không xóa dữ liệu
+
+4. UI:
+   - paymentQrUi.js
+   - paymentUiV118.js
+
+FILE TRONG BUNDLE
+-----------------
+- src/services/paymentOrderMatcher.js
+- src/services/paymentWebhookHelpers.js
+- src/services/webhookServer.js
+- src/utils/paymentQrUi.js
+- src/utils/paymentUiV118.js
+- scripts/backfill-payment-codes.js
+
+CÁCH UPDATE AN TOÀN
+-------------------
+1. Backup source hiện tại.
+2. Giải nén ZIP này.
+3. Copy đè file vào project hiện tại.
+4. Nếu DB của bạn có cột payment_code, chạy một lần:
+   node scripts/backfill-payment-codes.js
+5. Restart bot:
+   npm start
+
+ENV NÊN CÓ
+----------
+PUBLIC_BASE_URL=http://node.sang0023.io.vn:2753
+HTTP_PORT=2753
+PAYOS_WEBHOOK_PATH=/webhooks/payos
+PAYOS_RETURN_PATH=/payments/payos/return
+PAYOS_CANCEL_PATH=/payments/payos/cancel
+
+VÌ SAO BẢN NÀY HỢP VỚI DB CŨ?
+----------------------------
+- Không xóa data/
+- Không drop bảng
+- Không migrate phá dữ liệu
+- Chỉ cố gắng match mềm hơn với đơn cũ
+
+KIỂM TRA SAU KHI UPDATE
+-----------------------
+1. Chạy webhook health:
+   /webhooks/payos
+
+2. Nếu có cột payment_code:
+   node scripts/backfill-payment-codes.js
+
+3. Thử một giao dịch thật / test
+4. Xem log:
+   [WEBHOOK] Đã nhận tiền cho ... bằng ...
+
+LƯU Ý
+-----
+Nếu paymentService.js hoặc /oder.js hiện tại của bạn vẫn đang dùng paymentCode khác hoàn toàn order_code,
+thì vẫn nên chỉnh runtime để paymentCode = order_code cho đơn mới.
+Bản v12 này sẽ cứu tốt nhất cho dữ liệu cũ và giảm fail match tối đa.

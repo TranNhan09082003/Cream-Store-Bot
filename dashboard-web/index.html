@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Hệ thống quản lý tài khoản dịch vụ số - Premium UI V3">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Cream Store | Premium Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Plus Jakarta Sans for headings, Inter for tabular data -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+    /* Password Gate */
+    .password-gate{position:fixed;inset:0;z-index:99999;background:#09090b;display:flex;align-items:center;justify-content:center}
+    .password-box{background:rgba(20,20,25,0.7);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.05);border-radius:24px;padding:48px 40px;width:100%;max-width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);animation:fadeInUp .5s ease-out forwards}
+    .password-logo{font-size:48px;margin-bottom:16px;line-height:1;filter:drop-shadow(0 0 20px rgba(139, 92, 246, 0.5))}
+    .password-box h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:#fff;margin:0 0 8px;letter-spacing:-0.03em}
+    .password-box p{font-size:14px;color:#a1a1aa;margin:0 0 32px}
+    .password-input-row{display:flex;gap:12px;position:relative}
+    .password-input-row input{flex:1;padding:14px 20px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:15px;outline:none;transition:all 0.3s}
+    .password-input-row input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.2)}
+    .gate-btn{padding:0 24px;background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;transition:all 0.3s;display:flex;align-items:center;justify-content:center}
+    .gate-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(99,102,241,0.4)}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes gate-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+    
+    /* Splash Screen Loader (Inline to prevent flash) */
+    .global-loader {position:fixed;inset:0;z-index:999999;background:rgba(9, 9, 11, 0.9);backdrop-filter:blur(24px);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s ease;}
+    .g-spinner {width:60px;height:60px;border:4px solid rgba(99,102,241,0.2);border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px;box-shadow:0 0 20px rgba(99,102,241,0.5);}
+    .g-text {font-family:'Plus Jakarta Sans',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:8px;}
+    .g-sub {font-size:14px;color:#94a3b8;margin-bottom:24px;letter-spacing:0.02em;}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    </style>
+</head>
+<body>
+
+<!-- GLOBAL LOADER -->
+<div id="global-loader" class="global-loader" style="display:none; opacity: 0;">
+    <div class="g-spinner"></div>
+    <div class="g-text">Đang đồng bộ dữ liệu...</div>
+    <div class="g-sub">Updating from Discord Bot AI</div>
+</div>
+
+<!-- PASSWORD GATE -->
+<div id="password-gate" class="password-gate" style="display:none">
+    <div class="password-box">
+        <div class="password-logo">🔐</div>
+        <h2>Cream Store V3</h2>
+        <p>Hệ thống Quản Trị Đặc Quyền</p>
+        <div class="password-input-row">
+            <input type="password" id="gate-password" placeholder="Nhập mật khẩu truy cập..." onkeydown="if(event.key==='Enter') checkPassword()" autofocus>
+            <button class="gate-btn" onclick="checkPassword()">→</button>
+        </div>
+        <div id="gate-error" style="display:none;color:#ef4444;font-size:13px;margin-top:16px;font-weight:500;">❌ Mật khẩu sai, thử lại!</div>
+    </div>
+</div>
+
+<div class="app-layout">
+    <!-- BÊN TRÁI: SIDEBAR -->
+    <aside class="app-sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="brand-text">Cream Store<span>.V3</span></div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-label">QUẢN LÝ CHÍNH</div>
+            <button class="nav-btn active" id="nav-accounts" onclick="switchView('accounts')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                Tài Khoản Dịch Vụ
+            </button>
+            <button class="nav-btn" id="nav-customers" onclick="switchView('customers')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                Khách Hàng Tương Tác
+            </button>
+            
+            <div class="nav-spacer"></div>
+            
+            <div class="nav-label">CÔNG CỤ HỆ THỐNG</div>
+            <button class="nav-btn" onclick="openAddModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Tạo Đơn Hàng Mới
+            </button>
+            <button class="nav-btn" onclick="exportData()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Xuất Back-up (JSON)
+            </button>
+            <button class="nav-btn" onclick="document.getElementById('import-file-input').click()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Phục Hồi Dữ Liệu
+            </button>
+            <input type="file" id="import-file-input" accept=".json" onchange="importData(event)" style="display:none;">
+        </nav>
+
+        <div class="sidebar-user">
+            <div class="admin-avatar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </div>
+            <div class="admin-info">
+                <div class="admin-name">Administrator</div>
+                <div class="admin-role">Full Access</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- BÊN PHẢI: TRUNG TÂM -->
+    <main class="app-main">
+        <header class="app-header">
+            <div class="header-search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="global-search" placeholder="Tìm kiếm nhanh mã đơn, email, Discord ID..." oninput="handleGlobalSearch()">
+            </div>
+            
+            <div class="header-tools">
+                <div id="notification-wrapper" style="position:relative;">
+                    <button class="tool-btn" id="btn-notification" onclick="toggleNotificationPanel(event)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                        <span class="bell-badge" id="bell-badge" style="display:none">0</span>
+                    </button>
+                    <div class="notification-panel" id="notification-panel">
+                        <div class="notification-panel-header">
+                            <h3>Lịch Trình Cảnh Báo</h3>
+                            <span id="notification-count-text">0 cảnh báo</span>
+                        </div>
+                        <div id="notification-list">
+                            <div class="notification-empty">Không có thông báo mới</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Add order button right in header for quick access -->
+                <button class="btn btn-primary" onclick="openAddModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Tạo Đơn Hàng
+                </button>
+            </div>
+        </header>
+
+        <div class="main-scroll">
+            <!-- GÓC NHÌN: TÀI KHOẢN -->
+            <div id="view-accounts" class="view-section">
+                <!-- Thống kê Header -->
+                <div class="dashboard-stats">
+                    <div class="stat-card" onclick="setFilter('all')">
+                        <div class="stat-icon bg-indigo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Tổng Tài Khoản</div>
+                            <div class="stat-value" id="stat-total-num">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" onclick="setFilter('active')">
+                        <div class="stat-icon bg-emerald"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Hoạt Động Tốt</div>
+                            <div class="stat-value text-emerald" id="stat-active-num">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" onclick="setFilter('warning')">
+                        <div class="stat-icon bg-amber"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Cần Gia Hạn (<7d)</div>
+                            <div class="stat-value text-amber" id="stat-warning-num">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" onclick="setFilter('expired')">
+                        <div class="stat-icon bg-rose"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Đã Hết Hạn</div>
+                            <div class="stat-value text-rose" id="stat-expired-num">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Biểu Đồ Tăng Trưởng Doanh Thu</h3>
+                    </div>
+                    <canvas id="revenueChart" style="max-height: 250px; width: 100%;"></canvas>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header-controls">
+                        <div class="tabs-group" id="filter-tabs">
+                            <button class="tab-btn active" data-filter="all" onclick="setFilter('all')">Tất Cả <span class="badge" id="tab-count-all">0</span></button>
+                            <button class="tab-btn" data-filter="active" onclick="setFilter('active')">Hoạt Động <span class="badge" id="tab-count-active">0</span></button>
+                            <button class="tab-btn" data-filter="warning" onclick="setFilter('warning')">Sắp Hết <span class="badge" id="tab-count-warning">0</span></button>
+                            <button class="tab-btn" data-filter="expired" onclick="setFilter('expired')">Hết Hạn <span class="badge" id="tab-count-expired">0</span></button>
+                        </div>
+                        <div class="filter-tools">
+                            <select class="control-select" id="service-filter-select" onchange="handleServiceFilter()">
+                                <option value="all">🌐 Mọi Dịch Vụ</option>
+                                <option value="netflix">🎬 Netflix</option>
+                                <option value="spotify">🎵 Spotify</option>
+                                <option value="youtube">▶️ YouTube</option>
+                                <option value="discord">💙 Discord Nitro</option>
+                                <option value="other">📦 Khác</option>
+                            </select>
+                            <select class="control-select" id="sort-select" onchange="handleSort()">
+                                <option value="newest">Ngày tạo: Mới nhất</option>
+                                <option value="oldest">Ngày tạo: Cũ nhất</option>
+                                <option value="expiry-asc">Hạn: Gần nhất (Sắp hết)</option>
+                                <option value="expiry-desc">Hạn: Xa nhất</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="accounts-grid-area">
+                        <!-- Header mờ cho Grid -->
+                        <div class="acc-grid-header">
+                            <span>Sản phẩm & Khách hàng</span>
+                            <span>Trạng thái & Lịch trình</span>
+                        </div>
+                        <div class="acc-grid-wrapper" id="accounts-tbody">
+                            <!-- Data injected by JS -->
+                        </div>
+                        <div class="empty-state" id="empty-state" style="display: none;">
+                            <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div>
+                            <h3>Không tìm thấy dữ liệu</h3>
+                            <p>Hãy thử thay đổi bộ lọc hoặc thêm giao dịch mới.</p>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- /view-accounts -->
+
+            <!-- GÓC NHÌN: KHÁCH HÀNG -->
+            <div id="view-customers" class="view-section" style="display: none;">
+                <div class="table-container header-customer-area">
+                    <div class="customer-header-inner" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
+                        <div>
+                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px;">Hồ Sơ Khách Hàng</h2>
+                            <p style="color: #a1a1aa; font-size: 14px;">Kho dữ liệu khách hàng VIP tương tác qua Discord.</p>
+                        </div>
+                        <div class="pagination-controls" id="customer-pagination">
+                            <!-- Pagination JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cards-grid customers-grid" id="customers-grid">
+                    <!-- Data injected by JS -->
+                </div>
+                
+                <div class="empty-state" id="customer-empty-state" style="display: none;">
+                    <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
+                    <h3>Bức tường trống vắng</h3>
+                    <p>Khách hàng ẩn danh hoặc chưa có ai nạp tiền.</p>
+                </div>
+            </div> <!-- /view-customers -->
+
+        </div> <!-- /main-scroll -->
+    </main>
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal-account" onclick="closeModalOnOverlay(event, 'modal-account')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="modal-account-title">Khởi Tạo Dịch Vụ Mới</h2>
+            <button class="modal-close" onclick="closeModal('modal-account')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="account-form" onsubmit="handleAccountSubmit(event)">
+                <input type="hidden" id="form-edit-id" value="">
+                
+                <!-- Service Type -->
+                <div class="form-section">
+                    <h3 class="form-section-title">Thông Tin Đăng Nhập</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Dịch Vụ Support</label>
+                            <select id="form-service" onchange="handleServiceChange()" required>
+                                <option value="netflix">Netflix Premium</option>
+                                <option value="spotify">Spotify Premium</option>
+                                <option value="youtube">YouTube Premium</option>
+                                <option value="discord">Discord Nitro</option>
+                                <option value="other">Dịch Vụ Khác</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tài Khoản Đăng Nhập (Email)</label>
+                            <input type="text" id="form-email" placeholder="Nhập email..." required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Mật Khẩu</label>
+                            <input type="password" id="form-password" placeholder="••••••••" required>
+                        </div>
+                        <div class="form-group" id="field-profile-wrap">
+                            <label>Tên Gói / Slot Màn Hình</label>
+                            <input type="text" id="form-profile" placeholder="Màn số 1">
+                        </div>
+                    </div>
+                    <div class="form-row" id="field-pin-wrap">
+                        <div class="form-group">
+                            <label>Mã PIN bảo mật</label>
+                            <input type="text" id="form-pin" placeholder="Ví dụ: 1234">
+                        </div>
+                    </div>
+
+                    <!-- Variable Configs... kept hidden by JS logic -->
+                    <div id="spotify-fields" style="display:none; background:rgba(34, 197, 94, 0.1); padding: 12px; border-radius: 8px; margin-top: 12px; border: 1px solid rgba(34, 197, 94, 0.2)">
+                        <div style="color: #10b981; font-weight: 600; margin-bottom: 8px; font-size: 13px;">Spotify Family Plan Variables</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Email Chủ Gói</label><input type="text" id="form-spotify-owner"></div>
+                            <div class="form-group"><label>Email Thành Viên</label><input type="text" id="form-spotify-member"></div>
+                        </div>
+                    </div>
+
+                    <div id="discord-fields" style="display:none; background:rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 8px; margin-top: 12px; border: 1px solid rgba(99, 102, 241, 0.2)">
+                        <div style="color: #6366f1; font-weight: 600; margin-bottom: 8px; font-size: 13px;">Discord Nitro Google Pay</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>G-Pay (Gmail gia hạn)</label><input type="text" id="form-discord-payment-gmail"></div>
+                            <div class="form-group"><label>Chu Kỳ (Tháng)</label><input type="number" id="form-discord-renewal-cycle" value="2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">Chủ Sở Hữu & Khách Hàng</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Họ & Tên</label>
+                            <input type="text" id="form-customer" placeholder="Vd: Nguyễn Văn A" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Discord ID / Tag (Tùy chọn)</label>
+                            <input type="text" id="form-discord" placeholder="Ví dụ: wibu#1234">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Gmail Contact phụ</label>
+                            <input type="text" id="form-customer-gmail" placeholder="vd@gmail.com">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">Hợp Đồng & Thời Hạn</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Gói thuê (Số tháng)</label>
+                            <input type="number" id="form-months" placeholder="1" min="1" max="24" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Ngày bắt đầu</label>
+                            <input type="date" id="form-start-date" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions" style="margin-top: 32px;">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal('modal-account')">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-account">Lưu Vào Hệ Thống</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Renew Modal -->
+<div class="modal-overlay" id="modal-renew" onclick="closeModalOnOverlay(event, 'modal-renew')">
+    <div class="modal modal-sm" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Gia Hạn Dịch Vụ</h2>
+            <button class="modal-close" onclick="closeModal('modal-renew')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="renew-info" id="renew-info"></div>
+            <form id="renew-form" onsubmit="handleRenewSubmit(event)">
+                <input type="hidden" id="renew-account-id" value="">
+                <div class="form-group">
+                    <label>Bơm thêm bao nhiêu tháng?</label>
+                    <input type="number" id="renew-months" placeholder="Vd: 3" min="1" max="24" required>
+                </div>
+                <div class="form-actions" style="margin-top: 24px;">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal('modal-renew')">Hủy</button>
+                    <button type="submit" class="btn btn-success">Duyệt Gia Hạn</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- History Modal -->
+<div class="modal-overlay" id="modal-history" onclick="closeModalOnOverlay(event, 'modal-history')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 id="history-title">Nhật Trình (History)</h2>
+            <button class="modal-close" onclick="closeModal('modal-history')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="history-stats" id="history-stats"></div>
+            <div class="history-timeline" id="history-timeline"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="modal-delete" onclick="closeModalOnOverlay(event, 'modal-delete')">
+    <div class="modal modal-sm" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2 style="color: #ef4444;">Báo Động Đỏ</h2>
+            <button class="modal-close" onclick="closeModal('modal-delete')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="text-align: center; color: #a1a1aa;">
+                Hành động này sẽ xoá vĩnh viễn dữ liệu tài khoản ra khỏi Database. Bạn chắc chứ?
+                <div id="delete-account-name" style="color: #fff; font-weight: 700; margin: 12px 0;"></div>
+            </div>
+            <input type="hidden" id="delete-account-id" value="">
+            <div class="form-actions" style="margin-top: 24px; justify-content: center;">
+                <button class="btn btn-ghost" onclick="closeModal('modal-delete')">Khoan Đã</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">Đúng, Hãy Xoá!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modal-detail" onclick="closeModalOnOverlay(event, 'modal-detail')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Chi Tiết Giao Dịch</h2>
+            <button class="modal-close" onclick="closeModal('modal-detail')">&times;</button>
+        </div>
+        <div class="modal-body" id="detail-body">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

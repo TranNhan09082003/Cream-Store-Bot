@@ -1,0 +1,28 @@
+Cream Store deploy patch (khong dong vao du lieu)
+
+Da sua trong ban deploy nay:
+- Hien ma don o tin nhac nhac feedback va embed feedback.
+- Chan feedback cho don chua COMPLETED / sai guild.
+- Chan /hoanthanh va +done bi spam lai tren don da hoan thanh.
+- Dong bo log hoan thanh ve 1 action nhat quan hon cho KPI.
+- Fix claim/release slash command de dung chung claimed_by_id va ghi staff_logs dung schema moi.
+- Fix webhook HTTP dung luong verify signature + gate success + amount + dedupe.
+- Fix payment matcher loose fallback co check payment_code.
+- Fix renew tao don moi co payment_code + payos_order_code, luu order_log_message_id.
+- Fix /sua-don chan doi gia sau khi da tao QR/link PayOS de tranh lech so tien.
+- Fix /qr va +qr tranh xac nhan tay lap lai tren don da PAID.
+- Fix /close va /reopen dong bo trang thai ticket trong DB, cap nhat lai order log warranty.
+- Fix mo ticket bao hanh dong bo lai order log sau khi chuyen WARRANTY_OPEN.
+- Fix dong bo PayOS CANCELLED cap nhat order log de dashboard/log khong lech trang thai.
+
+Khong bao gom:
+- data/
+- node_modules/
+- .env
+- cache/runtime logs
+
+Huong dan:
+1. Backup source hien tai.
+2. Giai nen patch nay vao thu muc bot de chep de file source.
+3. KHONG xoa thu muc data va .env hien tai.
+4. Restart bot / PM2 sau khi chep de.

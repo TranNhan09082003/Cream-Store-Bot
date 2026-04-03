@@ -1,0 +1,238 @@
+import { db, nowIso } from '../database/db.js';
+import { syncCustomerStats } from './customerService.js';
+
+export function getOrderByCodeRaw(orderCode) {
+  return db.prepare('SELECT * FROM orders WHERE order_code = ?').get(orderCode) ?? null;
+}
+
+export function getTicketByChannelIdRaw(channelId) {
+  return db.prepare('SELECT * FROM tickets WHERE channel_id = ?').get(channelId) ?? null;
+}
+
+export function updateOrderFieldsRaw(orderCode, payload) {
+  const order = getOrderByCodeRaw(orderCode);
+  if (!order) throw new Error('Không tìm thấy đơn hàng.');
+
+  const nextProduct = payload.product_name ?? order.product_name;
+  const nextQuantity = payload.quantity ?? order.quantity;
+  const nextAmount = payload.total_amount ?? order.total_amount;
+  const nextMonths = payload.duration_months ?? order.duration_months ?? 1;
+
+  let nextExpiry = order.expiry_at;
+  const baseTime = order.delivered_at ?? order.completed_at ?? null;
+
+  if (payload.expiry_at !== undefined) {
+    nextExpiry = payload.expiry_at;
+  } else if (payload.duration_months !== undefined && baseTime) {
+    const dt = new Date(baseTime);
+    dt.setMonth(dt.getMonth() + Number(nextMonths || 1));
+    nextExpiry = dt.toISOString();
+  }
+
+  db.prepare(`
+    UPDATE orders
+    SET product_name = ?,
+        quantity = ?,
+        total_amount = ?,
+        duration_months = ?,
+        expiry_at = ?,
+        updated_at = ?
+    WHERE order_code = ?
+  `).run(
+    nextProduct,
+    nextQuantity,
+    nextAmount,
+    nextMonths,
+    nextExpiry,
+    nowIso(),
+    orderCode,
+  );
+
+  syncCustomerStats(order.guild_id, order.customer_id);
+  return getOrderByCodeRaw(orderCode);
+}
+
+export function assignOrderClaimRaw(orderCode, staffId) {
+  db.prepare(`
+    UPDATE orders
+    SET claim_staff_id = ?,
+        claim_at = ?,
+        claimed_by_id = ?,
+        claimed_at = ?,
+        updated_at = ?
+    WHERE order_code = ?
+  `).run(staffId, nowIso(), staffId, nowIso(), nowIso(), orderCode);
+
+  return getOrderByCodeRaw(orderCode);
+}
+
+export function releaseOrderClaimRaw(orderCode) {
+  db.prepare(`
+    UPDATE orders
+    SET claim_staff_id = NULL,
+        claim_at = NULL,
+        claimed_by_id = NULL,
+        claimed_at = NULL,
+        updated_at = ?
+    WHERE order_code = ?
+  `).run(nowIso(), orderCode);
+
+  return getOrderByCodeRaw(orderCode);
+}
+
+export function insertStaffLogRaw({ guildId, actorId, action, orderCode = null, targetCustomerId = null, beforeJson = null, afterJson = null, detail = null, relatedTicketCode = null }) {
+  const safeDetail = [
+    detail,
+    beforeJson || afterJson ? `before=${beforeJson ?? 'null'} | after=${afterJson ?? 'null'}` : null,
+  ].filter(Boolean).join(' | ') || null;
+
+  try {
+    db.prepare(`
+      INSERT INTO staff_logs (
+        guild_id, actor_id, target_id, action, detail, related_order_code, related_ticket_code, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(guildId, actorId, targetCustomerId, action, safeDetail, orderCode, relatedTicketCode, nowIso());
+  } catch {}
+}
+
+export function getDashboardSnapshotRaw() {
+  const totalOrders = db.prepare('SELECT COUNT(*) AS c FROM orders').get()?.c ?? 0;
+  const processing = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status IN ('PENDING_PAYMENT','PROCESSING')").get()?.c ?? 0;
+  const completed = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status = 'COMPLETED'").get()?.c ?? 0;
+  const revenue = db.prepare("SELECT COALESCE(SUM(total_amount), 0) AS s FROM orders WHERE payment_status = 'PAID'").get()?.s ?? 0;
+  const expiringSoon = db.prepare(`
+    SELECT COUNT(*) AS c
+    FROM orders
+    WHERE expiry_at IS NOT NULL
+      AND datetime(expiry_at) <= datetime('now', '+2 days')
+      AND datetime(expiry_at) > datetime('now')
+  `).get()?.c ?? 0;
+
+  const topCustomers = db.prepare(`
+    SELECT customer_id, COUNT(*) AS total_orders, COALESCE(SUM(total_amount),0) AS total_spent
+    FROM orders
+    GROUP BY customer_id
+    ORDER BY total_spent DESC, total_orders DESC
+    LIMIT 10
+  `).all();
+
+  const staffKpi = db.prepare(`
+    SELECT actor_id,
+           SUM(CASE WHEN action IN ('ORDER_COMPLETED','ORDER_COMPLETE_MANUAL','ORDER_COMPLETE_AUTO') THEN 1 ELSE 0 END) AS completed_count,
+           SUM(CASE WHEN action IN ('ORDER_DELIVERED','DELIVERY_SENT') THEN 1 ELSE 0 END) AS delivered_count,
+           COUNT(*) AS total_actions
+    FROM staff_logs
+    GROUP BY actor_id
+    ORDER BY delivered_count DESC, completed_count DESC, total_actions DESC
+    LIMIT 10
+  `).all();
+
+  return {
+    totalOrders,
+    processing,
+    completed,
+    revenue,
+    expiringSoon,
+    topCustomers,
+    staffKpi,
+    generatedAt: nowIso(),
+  };
+}
+
+export function getOrdersExpiringInWindowRaw(minHours, maxHours) {
+  return db.prepare(`
+    SELECT *
+    FROM orders
+    WHERE expiry_at IS NOT NULL
+      AND datetime(expiry_at) <= datetime('now', ?)
+      AND datetime(expiry_at) > datetime('now', ?)
+  `).all(`+${maxHours} hours`, `+${minHours} hours`);
+}
+
+export function markExpiryNoticeRaw(orderCode, fieldName) {
+  const allowed = new Set(['expiry_notice_2d_sent_at', 'expiry_notice_1d_sent_at']);
+  if (!allowed.has(fieldName)) throw new Error('Field reminder không hợp lệ.');
+
+  db.prepare(`
+    UPDATE orders
+    SET ${fieldName} = ?, updated_at = ?
+    WHERE order_code = ?
+  `).run(nowIso(), nowIso(), orderCode);
+}
+
+export function createRenewalOrderRaw({
+  guildId,
+  ticketId,
+  ticketChannelId,
+  customerId,
+  productName,
+  quantity,
+  note,
+  totalAmount,
+  durationMonths,
+  orderLogChannelId,
+  createdById,
+}) {
+  const timestamp = nowIso();
+  const safeAmount = Math.max(0, Number(totalAmount ?? 0));
+  const paymentStatus = safeAmount > 0 ? 'UNPAID' : 'FREE';
+  const status = safeAmount > 0 ? 'PENDING_PAYMENT' : 'PROCESSING';
+
+  const result = db.prepare(`
+    INSERT INTO orders (
+      order_code,
+      guild_id,
+      ticket_id,
+      ticket_channel_id,
+      customer_id,
+      product_name,
+      quantity,
+      note,
+      status,
+      payment_status,
+      total_amount,
+      amount_paid,
+      order_log_channel_id,
+      duration_months,
+      created_by_id,
+      created_at,
+      updated_at
+    ) VALUES (
+      NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )
+  `).run(
+    guildId,
+    ticketId ?? null,
+    ticketChannelId ?? null,
+    customerId,
+    productName,
+    quantity ?? 1,
+    note ?? null,
+    status,
+    paymentStatus,
+    safeAmount,
+    safeAmount > 0 ? 0 : safeAmount,
+    orderLogChannelId ?? null,
+    durationMonths ?? 1,
+    createdById,
+    timestamp,
+    timestamp,
+  );
+
+  const id = Number(result.lastInsertRowid);
+  const orderCode = `CR_${String(100000 + id).slice(-6)}`;
+  const payosOrderCode = Number(String(orderCode).replace(/^CR_/, ''));
+  const paymentCode = safeAmount > 0 ? orderCode : null;
+
+  db.prepare(`
+    UPDATE orders
+    SET order_code = ?,
+        payment_code = ?,
+        payos_order_code = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(orderCode, paymentCode, payosOrderCode, nowIso(), id);
+
+  syncCustomerStats(guildId, customerId);
+  return getOrderByCodeRaw(orderCode);
+}

@@ -1,0 +1,129 @@
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { getGuildConfig } from '../services/guildConfigService.js';
+import { emitStaffLog } from '../services/staffLogService.js';
+import { getTicketByChannelId } from '../services/ticketService.js';
+import { createOrder, getQueuePosition, saveOrderLogMessage } from '../services/orderService.js';
+import { sendOrRefreshPaymentQr } from '../services/paymentService.js';
+import { ensureRateLimit } from '../services/abuseService.js';
+import {
+  buildOrderActionComponents,
+  buildOrderCreatedEmbed,
+  buildQueuePositionEmbed,
+  buildQueueViewComponents,
+} from '../utils/embeds.js';
+import { buildOrderLogContent, parseMoneyInput } from '../utils/formatters.js';
+import { config } from '../config.js';
+
+export const data = new SlashCommandBuilder()
+  .setName('oder')
+  .setDescription('Tạo đơn hàng và liên kết trực tiếp với ticket hiện tại.')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+  .addUserOption((option) => option.setName('khach_hang').setDescription('Khách hàng của đơn này').setRequired(true))
+  .addStringOption((option) => option.setName('san_pham').setDescription('Tên sản phẩm').setRequired(true).setMaxLength(100))
+  .addIntegerOption((option) => option.setName('so_luong').setDescription('Số lượng sản phẩm').setRequired(true).setMinValue(1).setMaxValue(999))
+  .addStringOption((option) => option.setName('gia_tien').setDescription('Số tiền cần thanh toán, ví dụ 55000 hoặc 55k').setRequired(false))
+  .addIntegerOption((option) => option.setName('so_thang').setDescription('Thời hạn sản phẩm theo tháng').setRequired(false).setMinValue(1).setMaxValue(36))
+  .addChannelOption((option) => option.setName('ticket').setDescription('Ticket cần gắn với đơn. Bỏ trống nếu đang đứng trong ticket.').addChannelTypes(ChannelType.GuildText).setRequired(false))
+  .addStringOption((option) => option.setName('ghi_chu').setDescription('Ghi chú nội bộ cho đơn').setRequired(false).setMaxLength(250));
+
+export async function execute(interaction) {
+  await interaction.deferReply({ flags: 64 });
+  try {
+    const guildConfig = getGuildConfig(interaction.guildId);
+    if (!guildConfig) {
+      await interaction.editReply('⚠️ Chưa setup hệ thống. Hãy chạy `/setup-ticket` trước.');
+      return;
+    }
+
+    ensureRateLimit({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      action: 'CREATE_ORDER',
+      limit: config.orderCreateBurstLimit,
+      windowSeconds: config.orderCreateBurstWindowSeconds,
+      message: '⚠️ Bạn tạo đơn quá nhanh. Vui lòng chờ thêm rồi thử lại.',
+    });
+
+    const customer = interaction.options.getUser('khach_hang', true);
+    const productName = interaction.options.getString('san_pham', true);
+    const quantity = interaction.options.getInteger('so_luong', true);
+    const note = interaction.options.getString('ghi_chu');
+    const amount = parseMoneyInput(interaction.options.getString('gia_tien')) ?? 0;
+    const durationMonths = interaction.options.getInteger('so_thang') ?? config.defaultOrderDurationMonths;
+    const ticketChannel = interaction.options.getChannel('ticket') ?? interaction.channel;
+
+    const ticket = getTicketByChannelId(ticketChannel.id);
+    const allowedTicketTypes = ['ORDER', 'SUPPORT', 'COMPLAINT', 'WARRANTY'];
+    if (!ticket || ticket.status !== 'OPEN' || !allowedTicketTypes.includes(ticket.ticket_type)) {
+      await interaction.editReply('⚠️ Ticket này không được phép tạo đơn. Chỉ ticket mua hàng / hỗ trợ / khiếu nại / bảo hành mới được lên đơn.');
+      return;
+    }
+    if (ticket.customer_id !== customer.id) {
+      await interaction.editReply('⚠️ Khách hàng bạn chọn không trùng với chủ sở hữu của ticket này nên bot từ chối để tránh xung đột dữ liệu.');
+      return;
+    }
+
+    const order = createOrder({
+      guildId: interaction.guildId,
+      ticketId: ticket.id,
+      ticketChannelId: ticket.channel_id,
+      customerId: customer.id,
+      productName,
+      quantity,
+      note,
+      totalAmount: amount,
+      durationMonths,
+      orderLogChannelId: guildConfig.order_log_channel_id,
+      createdById: interaction.user.id,
+    });
+    const queue = getQueuePosition(order);
+    const orderLogChannel = await interaction.guild.channels.fetch(guildConfig.order_log_channel_id);
+    if (!orderLogChannel || !orderLogChannel.isTextBased()) {
+      throw new Error('Không tìm thấy kênh log order hợp lệ. Hãy chạy lại /setup-ticket.');
+    }
+    const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
+    saveOrderLogMessage(order.order_code, logMessage.id);
+
+    await ticketChannel.send({
+      content: `<@${customer.id}>`,
+      embeds: [
+        buildOrderCreatedEmbed(order, guildConfig.order_log_channel_id),
+        buildQueuePositionEmbed(order, queue.position, queue.total),
+      ],
+      components: [
+        ...buildOrderActionComponents(order.order_code),
+        ...buildQueueViewComponents(order.order_code),
+      ],
+    });
+
+    let paymentNotice = 'Đơn này không cần tạo link thanh toán.';
+    if (order.total_amount > 0) {
+      try {
+        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
+        paymentNotice = 'Bot đã gửi QR + link checkout PayOS trong ticket.';
+      } catch (error) {
+        paymentNotice = `Chưa tạo được PayOS checkout: ${error.message}. Hãy kiểm tra /setup-payos rồi dùng /qr để gửi lại.`;
+      }
+    }
+
+    await emitStaffLog(interaction.client, {
+      guildId: interaction.guildId,
+      actorId: interaction.user.id,
+      targetId: customer.id,
+      action: 'ORDER_CREATE',
+      detail: `${productName} x${quantity}`,
+      relatedOrderCode: order.order_code,
+      relatedTicketCode: ticket.ticket_code,
+    });
+
+    await interaction.editReply(`✅ Đã tạo đơn \`${order.order_code}\` và ghi log vào ${orderLogChannel}. ${paymentNotice}`);
+  } catch (error) {
+    console.error('[ORDER] Lỗi:', error);
+    const message = `❌ Có lỗi khi tạo đơn hàng: ${error.message ?? 'Lỗi không xác định'}`;
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(message).catch(() => null);
+    } else {
+      await interaction.reply({ content: message, flags: 64 }).catch(() => null);
+    }
+  }
+}

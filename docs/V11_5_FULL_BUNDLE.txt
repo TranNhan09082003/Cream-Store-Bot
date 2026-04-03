@@ -1,0 +1,68 @@
+CREAM STORE BOT V11.5 FULL BUNDLE
+=================================
+
+Đây là gói tổng hợp:
+- v11.1 full-integration
+- status/presence patch
+- ticket commands patch
+
+Mục tiêu:
+- Chép đè một lần cho gọn
+- Không đụng database cũ
+- Không yêu cầu xóa data/
+- Phù hợp bot đang chạy thật
+
+Có trong bundle:
+1. /sua-don
+2. /claim-ticket
+3. /release-ticket
+4. /claim-order
+5. /release-order
+6. /renew
+7. /close
+8. /rename
+9. /add-user
+10. /remove-user
+11. /reopen
+12. deep notifications
+13. dashboard mini
+14. presence/status rotation
+
+CÁCH CẬP NHẬT
+-------------
+1. Backup source hiện tại của bạn trước.
+2. Giải nén ZIP này.
+3. Copy đè toàn bộ file vào project hiện tại.
+4. Chạy:
+   npm run deploy
+   npm start
+
+BIẾN .ENV TÙY CHỌN
+------------------
+DASHBOARD_ENABLED=true
+DASHBOARD_PORT=3210
+DASHBOARD_TOKEN=mot_chuoi_bi_mat_dai
+DEEP_NOTIFICATION_INTERVAL_MINUTES=5
+PRESENCE_ROTATION_INTERVAL_MINUTES=1
+
+DASHBOARD
+---------
+- Health: /dashboard/health
+- JSON:   /dashboard/stats
+- HTML:   /dashboard
+
+LƯU Ý
+-----
+- Bản này ghi đè:
+  src/index.js
+  src/services/schedulerService.js
+
+- Bản này giả định DB của bạn đã có các cột v10.x cần thiết:
+  duration_months
+  expiry_at
+  expiry_notice_2d_sent_at
+  expiry_notice_1d_sent_at
+  claim_staff_id
+  claim_at
+
+- Nếu bot hiện tại có custom riêng ở index.js / schedulerService.js, hãy backup trước khi chép đè.

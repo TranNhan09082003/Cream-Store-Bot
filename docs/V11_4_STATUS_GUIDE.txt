@@ -1,0 +1,52 @@
+CREAM STORE BOT V11.4 STATUS PATCH
+===================================
+
+Mục tiêu:
+- Thêm trạng thái hoạt động / presence chuyên nghiệp cho bot
+- Không đụng database
+- Không đụng data/
+- Patch an toàn cho bot đang chạy thật
+
+File có trong patch:
+- src/services/presenceService.js
+
+TÍCH HỢP NHANH
+--------------
+1. Copy file `src/services/presenceService.js` vào project.
+2. Mở file nơi bot xử lý `ClientReady`.
+   Thường là:
+   - src/bootstrap.js
+   hoặc
+   - src/index.js
+
+3. Thêm import:
+   import { startPresenceRotation } from './services/presenceService.js';
+   Nếu file bootstrap nằm cùng cấp `services`, giữ đường dẫn như trên.
+   Nếu file khác vị trí, chỉnh relative path cho đúng.
+
+4. Trong sự kiện ready, thêm:
+   startPresenceRotation(readyClient);
+
+Ví dụ:
+
+client.once(Events.ClientReady, (readyClient) => {
+  console.log(`[READY] Logged in as ${readyClient.user.tag}`);
+  startPresenceRotation(readyClient);
+});
+
+BIẾN .ENV TÙY CHỌN
+------------------
+PRESENCE_ROTATION_INTERVAL_MINUTES=1
+
+Các trạng thái sẽ tự xoay:
+- Cream Store | /oder
+- PayOS thanh toán tự động
+- X đơn đang xử lý
+- Y đơn đã hoàn thành
+- Ticket & bảo hành 24/7
+
+LƯU Ý
+-----
+- Patch này đọc dữ liệu từ bảng `orders` để hiện số đơn đang xử lý / đã hoàn thành.
+- Nếu DB chưa có bảng `orders`, bot vẫn chạy vì service có fallback an toàn.
+- Nếu bạn muốn, có thể chỉnh câu chữ trực tiếp trong `getPresenceTemplates()`.

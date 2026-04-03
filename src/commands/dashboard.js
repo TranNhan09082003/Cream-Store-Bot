@@ -1,0 +1,13 @@
+import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { getDashboardData } from '../services/dashboardService.js';
+import { buildDashboardEmbed } from '../utils/embeds.js';
+
+export const data = new SlashCommandBuilder()
+  .setName('dashboard')
+  .setDescription('Xem dashboard thống kê nhanh của Cream Store.')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+
+export async function execute(interaction) {
+  const data = getDashboardData(interaction.guildId);
+  await interaction.reply({ embeds: [buildDashboardEmbed(data.summary, data.topProducts, data.recentLogs)], ephemeral: true });
+}

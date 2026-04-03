@@ -1,0 +1,46 @@
+CREAM STORE BOT V11.6 HOSTING DASHBOARD FIX
+==============================================
+
+Fix theo ảnh lỗi của bạn:
+1. Không mở dashboard thành server riêng nữa
+2. Gắn dashboard vào CHÍNH HTTP server/webhook hiện có
+3. Không còn lỗi EADDRINUSE do app.listen trùng
+4. Mở dashboard ngay trên cùng domain/port với webhook
+
+FILE THAY
+---------
+- src/index.js
+- src/services/dashboardMiniServer.js
+- src/services/webhookServer.js
+
+CÁCH CẬP NHẬT
+-------------
+1. Backup source hiện tại.
+2. Giải nén ZIP này.
+3. Copy đè 3 file trên vào project hiện tại.
+4. Giữ nguyên data/ và database.
+5. Restart bot:
+   npm start
+
+ENV NÊN CÓ
+----------
+DASHBOARD_ENABLED=true
+DASHBOARD_TOKEN=mot_chuoi_bi_mat_dai
+HTTP_PORT=2753
+PUBLIC_BASE_URL=http://node.sang0023.io.vn:2753
+
+LƯU Ý
+-----
+- Từ giờ dashboard KHÔNG dùng DASHBOARD_PORT riêng nữa.
+- Dashboard chạy chung server với webhook/payos/http port.
+
+LINK MỞ DASHBOARD
+-----------------
+Nếu có token:
+  http://node.sang0023.io.vn:2753/dashboard?token=mot_chuoi_bi_mat_dai
+
+Health:
+  http://node.sang0023.io.vn:2753/dashboard/health?token=mot_chuoi_bi_mat_dai
+
+JSON:
+  http://node.sang0023.io.vn:2753/dashboard/stats?token=mot_chuoi_bi_mat_dai
