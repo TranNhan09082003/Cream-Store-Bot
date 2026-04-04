@@ -20,12 +20,6 @@ export const data = new SlashCommandBuilder()
   .setName('close')
   .setDescription('Đóng ticket hiện tại và khóa quyền nhắn tin.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-  .addBooleanOption((option) =>
-    option
-      .setName('xoa_sau_5_phut')
-      .setDescription('Nếu bật, bot sẽ tự xóa kênh sau 5 phút')
-      .setRequired(false),
-  )
   .addStringOption((option) =>
     option
       .setName('ly_do')
@@ -43,7 +37,6 @@ export async function execute(interaction) {
     return;
   }
 
-  const deleteLater = interaction.options.getBoolean('xoa_sau_5_phut') ?? false;
   const reason = interaction.options.getString('ly_do') ?? 'Không có lý do';
   const ticket = getTicketByChannelId(channel.id);
 
@@ -51,6 +44,14 @@ export async function execute(interaction) {
 
   try {
     const transcriptResult = ticket?.status === 'OPEN' ? await exportTicketTranscript(channel).catch(() => null) : null;
+    
+    if (ticket?.customer_id) {
+      await channel.permissionOverwrites.edit(ticket.customer_id, {
+        SendMessages: false,
+        AddReactions: false,
+      }).catch(() => null);
+    }
+
     await channel.permissionOverwrites.edit(everyone, {
       SendMessages: false,
       AddReactions: false,
@@ -67,7 +68,7 @@ export async function execute(interaction) {
         [
           `**Người đóng:** <@${interaction.user.id}>`,
           `**Lý do:** ${reason}`,
-          deleteLater ? '⏳ Kênh sẽ tự xóa sau **5 phút**.' : '🗂️ Kênh đã được khóa nhưng chưa xóa.',
+          '⏳ Kênh sẽ tự xóa sau **2 phút**.',
         ].join('\n'),
       )
       .setColor(0xED4245)
@@ -102,17 +103,13 @@ export async function execute(interaction) {
       });
     }
 
-    await interaction.editReply(deleteLater
-      ? '✅ Đã đóng ticket và lên lịch xóa sau 5 phút.'
-      : '✅ Đã đóng ticket.');
+    await interaction.editReply('✅ Đã đóng ticket và lên lịch xóa sau 2 phút.');
 
-    if (deleteLater) {
-      setTimeout(async () => {
-        try {
-          await channel.delete(`Ticket đã được đóng bởi ${interaction.user.tag}`);
-        } catch {}
-      }, 5 * 60 * 1000);
-    }
+    setTimeout(async () => {
+      try {
+        await channel.delete(`Ticket đã được đóng bởi ${interaction.user.tag}`);
+      } catch {}
+    }, 2 * 60 * 1000);
   } catch (error) {
     console.error('[TICKET/CLOSE] Lỗi:', error);
     await interaction.editReply(`❌ Không thể đóng ticket: ${error.message ?? 'Lỗi không xác định'}`);

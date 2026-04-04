@@ -10,6 +10,7 @@ import {
   PermissionFlagsBits,
   TextInputBuilder,
   TextInputStyle,
+  EmbedBuilder,
 } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -271,6 +272,24 @@ async function handleTicketClose(interaction, ticketId) {
   await safeReply(interaction, { content: '🗃️ Bot đang xuất transcript và đóng ticket...', ephemeral: true });
 
   const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
+  try {
+    if (ticket.customer_id) {
+       await interaction.channel.permissionOverwrites.edit(ticket.customer_id, {
+         SendMessages: false,
+         AddReactions: false,
+       }).catch(() => null);
+    }
+    await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+       SendMessages: false,
+       AddReactions: false,
+    }).catch(() => null);
+
+    if (!interaction.channel.name.startsWith('closed-')) {
+      const newName = `closed-${interaction.channel.name}`.slice(0, 95);
+      await interaction.channel.setName(newName).catch(() => null);
+    }
+  } catch (err) {}
+
   closeTicket(ticket.id, interaction.user.id);
   await emitStaffLog(interaction.client, {
     guildId: interaction.guildId, actorId: interaction.user.id, targetId: ticket.customer_id, action: 'TICKET_CLOSE',
@@ -293,7 +312,27 @@ async function handleTicketClose(interaction, ticketId) {
     });
   }
 
-  await interaction.channel.delete(`Ticket ${ticket.ticket_code} đã đóng bởi ${interaction.user.tag}`).catch(() => null);
+  const embed = new EmbedBuilder()
+    .setTitle('🔒 Ticket đã được đóng')
+    .setDescription(
+      [
+        `**Người đóng:** <@${interaction.user.id}>`,
+        '⏳ Kênh sẽ tự xóa sau **2 phút**.',
+      ].join('\n'),
+    )
+    .setColor(0xED4245)
+    .setTimestamp();
+
+  await interaction.channel.send({ embeds: [embed] }).catch(() => null);
+
+  setTimeout(async () => {
+    try {
+      const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
+      if (channel) {
+        await channel.delete(`Ticket ${ticket.ticket_code} đã đóng bởi ${interaction.user.tag}`).catch(() => null);
+      }
+    } catch {}
+  }, 2 * 60 * 1000);
 }
 
 async function handleDeliveryClaim(interaction, orderCode) {
