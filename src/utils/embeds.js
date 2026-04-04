@@ -95,17 +95,72 @@ export function buildTicketPanelComponents() {
 }
 
 export function buildTicketWelcomeEmbed(ticketCode, customerId, ticketType = 'ORDER', relatedOrderCode = null) {
-  const isWarranty = ticketType === 'WARRANTY';
+  let title = 'Ticket mua hàng đã được tạo';
+  let color = config.accentColorPrimary;
+  const descLines = [
+    `Xin chào <@${customerId}> 💖`,
+    `**Mã ticket:** \`${ticketCode}\``,
+  ];
+
+  switch (ticketType) {
+    case 'WARRANTY':
+      title = '🛠️ Ticket bảo hành đã được tạo';
+      color = config.accentColorWarning;
+      descLines.push(
+        `**Liên kết đơn:** \`${relatedOrderCode ?? 'Không xác định'}\``,
+        '',
+        '• Vui lòng mô tả chi tiết lỗi bạn đang gặp phải.',
+        '• Gửi kèm hình ảnh/video lỗi để staff hỗ trợ và xử lý nhanh nhất nhé.',
+        '• Xin bạn kiên nhẫn đợi chút, Support sẽ vào hỗ trợ bạn ngay á.'
+      );
+      break;
+    case 'SUPPORT':
+      title = '🆘 Ticket hỗ trợ đã được tạo';
+      color = config.accentColorInfo;
+      descLines.push(
+        '',
+        '• Cảm ơn bạn đã liên hệ. Bạn cần giải đáp thắc mắc hay hỗ trợ vấn đề gì?',
+        '• Xin vui lòng ghi chi tiết ra đây, Support sẽ sớm kiểm tra và phản hồi.'
+      );
+      break;
+    case 'COMPLAINT':
+      title = '⚠️ Ticket khiếu nại đã được tạo';
+      color = config.accentColorDanger;
+      descLines.push(
+        '',
+        '• Thành thật xin lỗi vì trải nghiệm chưa tốt của bạn.',
+        '• Vui lòng ghi tóm tắt sự kiện khiếu nại (bằng chứng, hình ảnh nếu có).',
+        '• Quản lý sẽ trực tiếp vào giải quyết cho bạn nhanh nhất có thể.'
+      );
+      break;
+    case 'PARTNERSHIP':
+      title = '🤝 Ticket hợp tác đã được tạo';
+      color = config.accentColorSuccess;
+      descLines.push(
+        '',
+        '• Cảm ơn bạn đã quan tâm đến việc hợp tác cùng Cream Store.',
+        '• Vui lòng để lại thông tin và đề xuất của bạn.',
+        '• Quản lý sẽ trực tiếp trao đổi cụ thể với bạn ngay khi có thể.'
+      );
+      break;
+    case 'ORDER':
+    default:
+      title = '🛍️ Ticket mua hàng đã được tạo';
+      color = config.accentColorPrimary;
+      descLines.push(
+        '',
+        '• Cảm ơn bạn đã ghé qua store! Bạn muốn mua sản phẩm dịch vụ gì báo staff nghen.',
+        '• Support sẽ lên đơn và tạo mã thanh toán cho bạn ạ.',
+        '• Sau khi hoàn tất và giao hàng, sẽ có nút feedback nha.'
+      );
+      break;
+  }
+
   return applyBranding(
     new EmbedBuilder()
-      .setColor(isWarranty ? config.accentColorWarning : config.accentColorPrimary)
-      .setTitle(isWarranty ? 'Ticket bảo hành đã được tạo' : 'Ticket mua hàng đã được tạo')
-      .setDescription([
-        `Xin chào <@${customerId}> 💖`,
-        `**Mã ticket:** \`${ticketCode}\``,
-        isWarranty ? `**Liên kết đơn:** \`${relatedOrderCode ?? 'Không xác định'}\`` : '• Staff sẽ xác nhận và tạo đơn ngay trong ticket này.',
-        isWarranty ? '• Vui lòng mô tả lỗi càng chi tiết càng tốt để staff hỗ trợ nhanh.' : '• Sau khi hoàn tất, bot sẽ nhắc bạn feedback để giữ quyền lợi bảo hành.',
-      ].join('\n'))
+      .setColor(color)
+      .setTitle(title)
+      .setDescription(descLines.join('\n'))
       .setTimestamp(),
   );
 }
