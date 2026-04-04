@@ -335,7 +335,7 @@ function renderCards() {
     tbody.parentElement.style.display = 'block';
     empty.style.display = 'none';
 
-    container.innerHTML = filtered.map((acc, i) => {
+    tbody.innerHTML = filtered.map((acc, i) => {
         const st = getAccountStatus(acc);
         const svc = SERVICE_META[acc.service || 'netflix'];
         const renCount = (acc.history || []).length;
