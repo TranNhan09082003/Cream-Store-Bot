@@ -11,7 +11,9 @@ import {
   TextInputBuilder,
   TextInputStyle,
   EmbedBuilder,
+  RoleSelectMenuBuilder,
 } from 'discord.js';
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -56,6 +58,8 @@ const commandsDirectory = path.resolve(__dirname, '..', 'commands');
 const FEEDBACK_TEXT_INPUT_ID = 'feedback_content';
 const WARRANTY_ORDER_INPUT_ID = 'warranty_order_code';
 const WARRANTY_REASON_INPUT_ID = 'warranty_reason';
+
+const announcementCache = new Map();
 
 export async function loadCommands() {
   const commandFiles = fs.readdirSync(commandsDirectory).filter((file) => file.endsWith('.js')).sort();
@@ -662,6 +666,60 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      if (interaction.isModalSubmit() && interaction.customId === 'announcement:modal') {
+        const content = interaction.fields.getTextInputValue('announcement_content');
+        
+        const roleSelect = new RoleSelectMenuBuilder()
+          .setCustomId('announcement:roleselect')
+          .setPlaceholder('Chọn các role muốn tag (không bắt buộc)...')
+          .setMinValues(0)
+          .setMaxValues(10);
+          
+        const confirmBtn = new ButtonBuilder()
+          .setCustomId('announcement:confirm')
+          .setLabel('🚀 Xác nhận gửi')
+          .setStyle(ButtonStyle.Success);
+          
+        const cancelBtn = new ButtonBuilder()
+          .setCustomId('announcement:cancel')
+          .setLabel('Hủy')
+          .setStyle(ButtonStyle.Danger);
+          
+        const embed = new EmbedBuilder()
+          .setTitle('📝 Xác nhận thông báo')
+          .setDescription(`**Nội dung sẽ gửi:**\n\n${content.substring(0, 4000)}`)
+          .setColor(0x3498db)
+          .setFooter({ text: 'Chọn role bên dưới nếu muốn tag, sau đó bấm Xác nhận gửi.' });
+          
+        const reply = await interaction.reply({
+          embeds: [embed],
+          components: [
+            new ActionRowBuilder().addComponents(roleSelect),
+            new ActionRowBuilder().addComponents(confirmBtn, cancelBtn)
+          ],
+          ephemeral: true,
+          fetchReply: true
+        });
+        
+        announcementCache.set(reply.id, {
+          content,
+          roles: [],
+          channelId: interaction.channelId
+        });
+        return;
+      }
+
+      if (interaction.isAnySelectMenu() && interaction.customId === 'announcement:roleselect') {
+        const cacheData = announcementCache.get(interaction.message.id);
+        if (!cacheData) {
+          await safeReply(interaction, { content: 'Phiên bản này đã hết hạn. Vui lòng gõ lại lệnh.', ephemeral: true });
+          return;
+        }
+        cacheData.roles = interaction.values;
+        await interaction.deferUpdate().catch(() => null);
+        return;
+      }
+
       if (!interaction.isButton()) return;
 
       ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `BUTTON_${interaction.customId.split(':')[0]}`, limit: 1, windowSeconds: config.buttonCooldownSeconds, message: 'Bạn bấm nút quá nhanh, vui lòng chờ vài giây.' });
@@ -680,6 +738,33 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId === 'ticket:warranty:panel') {
         await interaction.showModal(buildWarrantyPanelModal());
         return;
+      }
+
+      if (interaction.customId === 'announcement:cancel') {
+         announcementCache.delete(interaction.message.id);
+         await interaction.update({ content: '❌ Đã hủy đăng thông báo.', embeds: [], components: [] }).catch(() => null);
+         return;
+      }
+      
+      if (interaction.customId === 'announcement:confirm') {
+         const cacheData = announcementCache.get(interaction.message.id);
+         if (!cacheData) {
+           await interaction.update({ content: '⚠️ Phiên thao tác này đã hết hạn. Vui lòng gõ lại lệnh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
+           return;
+         }
+         
+         const rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
+         const finalMessage = rolePings ? `${rolePings}\n\n${cacheData.content}` : cacheData.content;
+         
+         const channel = await interaction.guild.channels.fetch(cacheData.channelId).catch(() => null);
+         if (channel) {
+             await channel.send({ content: finalMessage });
+             announcementCache.delete(interaction.message.id);
+             await interaction.update({ content: '✅ Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
+         } else {
+             await interaction.update({ content: '❌ Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
+         }
+         return;
       }
 
       if (interaction.customId.startsWith('ticket:close:')) {
