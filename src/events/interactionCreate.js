@@ -671,9 +671,19 @@ export function registerInteractionHandler(client, commands) {
         
         const roleSelect = new RoleSelectMenuBuilder()
           .setCustomId('announcement:roleselect')
-          .setPlaceholder('Chọn các role muốn tag (không bắt buộc)...')
+          .setPlaceholder('Gõ phím để tìm role (Discord mặc định chỉ hiện 25 Role)...')
           .setMinValues(0)
           .setMaxValues(10);
+          
+        const everyoneBtn = new ButtonBuilder()
+          .setCustomId('announcement:toggle_everyone')
+          .setLabel('⚪ Không Tag @everyone')
+          .setStyle(ButtonStyle.Secondary);
+
+        const hereBtn = new ButtonBuilder()
+          .setCustomId('announcement:toggle_here')
+          .setLabel('⚪ Không Tag @here')
+          .setStyle(ButtonStyle.Secondary);
           
         const confirmBtn = new ButtonBuilder()
           .setCustomId('announcement:confirm')
@@ -695,6 +705,7 @@ export function registerInteractionHandler(client, commands) {
           embeds: [embed],
           components: [
             new ActionRowBuilder().addComponents(roleSelect),
+            new ActionRowBuilder().addComponents(everyoneBtn, hereBtn),
             new ActionRowBuilder().addComponents(confirmBtn, cancelBtn)
           ],
           ephemeral: true,
@@ -704,6 +715,8 @@ export function registerInteractionHandler(client, commands) {
         announcementCache.set(reply.id, {
           content,
           roles: [],
+          tagEveryone: false,
+          tagHere: false,
           channelId: interaction.channelId
         });
         return;
@@ -721,6 +734,37 @@ export function registerInteractionHandler(client, commands) {
       }
 
       if (!interaction.isButton()) return;
+
+      if (interaction.customId === 'announcement:toggle_everyone' || interaction.customId === 'announcement:toggle_here') {
+          const cacheData = announcementCache.get(interaction.message.id);
+          if (!cacheData) {
+              await interaction.update({ content: '⚠️ Phiên thao tác đã hết hạn.', embeds: [], components: [] }).catch(()=>null);
+              return;
+          }
+          const isEveryone = interaction.customId === 'announcement:toggle_everyone';
+          if (isEveryone) cacheData.tagEveryone = !cacheData.tagEveryone;
+          else cacheData.tagHere = !cacheData.tagHere;
+          
+          const newRows = interaction.message.components.map(row => ActionRowBuilder.from(row));
+          newRows.forEach(row => {
+               row.components = row.components.map(comp => {
+                   if (comp.data?.custom_id === 'announcement:toggle_everyone') {
+                       return ButtonBuilder.from(comp)
+                           .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
+                           .setStyle(cacheData.tagEveryone ? 3 : 2); // 3=Success, 2=Secondary
+                   }
+                   if (comp.data?.custom_id === 'announcement:toggle_here') {
+                       return ButtonBuilder.from(comp)
+                           .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
+                           .setStyle(cacheData.tagHere ? 3 : 2);
+                   }
+                   return comp;
+               });
+          });
+          
+          await interaction.update({ components: newRows }).catch(() => null);
+          return;
+      }
 
       ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `BUTTON_${interaction.customId.split(':')[0]}`, limit: 1, windowSeconds: config.buttonCooldownSeconds, message: 'Bạn bấm nút quá nhanh, vui lòng chờ vài giây.' });
 
@@ -753,8 +797,12 @@ export function registerInteractionHandler(client, commands) {
            return;
          }
          
-         const rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
-         const finalMessage = rolePings ? `${rolePings}\n\n${cacheData.content}` : cacheData.content;
+         let rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
+         if (cacheData.tagEveryone) rolePings += ' @everyone';
+         if (cacheData.tagHere) rolePings += ' @here';
+         
+         const prefix = rolePings.trim();
+         const finalMessage = prefix ? `${prefix}\n\n${cacheData.content}` : cacheData.content;
          
          const channel = await interaction.guild.channels.fetch(cacheData.channelId).catch(() => null);
          if (channel) {
