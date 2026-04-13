@@ -264,6 +264,7 @@ export function initDatabase() {
   ensureColumn('orders', 'paid_transaction_content', 'TEXT');
   ensureColumn('orders', 'duration_months', 'INTEGER NOT NULL DEFAULT 1');
   ensureColumn('orders', 'expiry_at', 'TEXT');
+  ensureColumn('orders', 'expiry_notice_3d_sent_at', 'TEXT');
   ensureColumn('orders', 'expiry_notice_2d_sent_at', 'TEXT');
   ensureColumn('orders', 'expiry_notice_1d_sent_at', 'TEXT');
   ensureColumn('orders', 'credential_profile', 'TEXT');

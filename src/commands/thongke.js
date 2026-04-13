@@ -1,0 +1,71 @@
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { getRevenueStatsRaw } from '../services/v11DbHelpers.js';
+
+export const data = new SlashCommandBuilder()
+  .setName('thongke')
+  .setDescription('Báo cáo thống kê tổng quan doanh thu và đơn hàng.')
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+  .addStringOption((o) =>
+    o
+      .setName('thoi_gian')
+      .setDescription('Chọn mốc thời gian muốn xem báo cáo')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Hôm nay', value: 'today' },
+        { name: '7 Ngày qua', value: 'week' },
+        { name: 'Tháng này', value: 'month' },
+        { name: 'Toàn bộ thời gian', value: 'all' }
+      )
+  );
+
+export async function execute(interaction) {
+  await interaction.deferReply({ ephemeral: false });
+
+  try {
+    const timeRange = interaction.options.getString('thoi_gian', true);
+    
+    let startDateIso = null;
+    let endDateIso = null;
+    const now = new Date();
+    
+    if (timeRange === 'today') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      startDateIso = today.toISOString();
+      endDateIso = now.toISOString();
+    } else if (timeRange === 'week') {
+      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startDateIso = lastWeek.toISOString();
+      endDateIso = now.toISOString();
+    } else if (timeRange === 'month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDateIso = firstDay.toISOString();
+      endDateIso = now.toISOString();
+    }
+
+    const stats = getRevenueStatsRaw(startDateIso, endDateIso);
+
+    const embed = new EmbedBuilder()
+      .setTitle('📊 Báo Cáo Doanh Thu & Đơn Hàng')
+      .setColor(0x00ff00)
+      .setTimestamp();
+
+    if (timeRange === 'today') embed.setDescription('Số liệu thống kê trong **Hôm Nay**.');
+    if (timeRange === 'week') embed.setDescription('Số liệu thống kê trong **7 Ngày Qua**.');
+    if (timeRange === 'month') embed.setDescription('Số liệu thống kê trong **Tháng Này**.');
+    if (timeRange === 'all') embed.setDescription('Số liệu thống kê **Toàn Bộ Thời Gian**.');
+
+    const formatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+
+    embed.addFields(
+      { name: '💰 Tổng Doanh Thu', value: `**${formatter.format(stats.total_revenue || 0)}**`, inline: false },
+      { name: '📦 Tổng Đơn Hàng', value: `${stats.total_orders || 0} đơn`, inline: true },
+      { name: '✅ Đã Hoàn Thành', value: `${stats.completed_orders || 0} đơn`, inline: true },
+      { name: '⏳ Chưa Thanh Toán', value: `${stats.unpaid_orders || 0} đơn`, inline: true }
+    );
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[THONGKE] Error:', error);
+    await interaction.editReply('❌ Đã xảy ra lỗi khi tính toán thống kê.');
+  }
+}

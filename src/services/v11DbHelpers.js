@@ -150,7 +150,7 @@ export function getOrdersExpiringInWindowRaw(minHours, maxHours) {
 }
 
 export function markExpiryNoticeRaw(orderCode, fieldName) {
-  const allowed = new Set(['expiry_notice_2d_sent_at', 'expiry_notice_1d_sent_at']);
+  const allowed = new Set(['expiry_notice_3d_sent_at', 'expiry_notice_2d_sent_at', 'expiry_notice_1d_sent_at']);
   if (!allowed.has(fieldName)) throw new Error('Field reminder không hợp lệ.');
 
   db.prepare(`
@@ -158,6 +158,41 @@ export function markExpiryNoticeRaw(orderCode, fieldName) {
     SET ${fieldName} = ?, updated_at = ?
     WHERE order_code = ?
   `).run(nowIso(), nowIso(), orderCode);
+}
+
+export function getRevenueStatsRaw(startDateIso, endDateIso) {
+  const params = [];
+  let sql = `
+    SELECT COUNT(*) AS total_orders, 
+           COALESCE(SUM(CASE WHEN payment_status = 'PAID' THEN total_amount ELSE 0 END), 0) AS total_revenue,
+           SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_orders,
+           SUM(CASE WHEN payment_status = 'UNPAID' THEN 1 ELSE 0 END) AS unpaid_orders
+    FROM orders
+    WHERE 1=1
+  `;
+             
+  if (startDateIso) {
+    sql += ` AND datetime(created_at) >= datetime(?)`;
+    params.push(startDateIso);
+  }
+  if (endDateIso) {
+    sql += ` AND datetime(created_at) <= datetime(?)`;
+    params.push(endDateIso);
+  }
+  
+  return db.prepare(sql).get(...params);
+}
+
+export function getExpiringOrdersRaw(days) {
+  return db.prepare(`
+    SELECT *
+    FROM orders
+    WHERE expiry_at IS NOT NULL
+      AND status != 'CANCELLED'
+      AND datetime(expiry_at) <= datetime('now', ?)
+      AND datetime(expiry_at) > datetime('now', '-1 day')
+    ORDER BY expiry_at ASC
+  `).all(`+${days} days`);
 }
 
 export function createRenewalOrderRaw({
