@@ -29,10 +29,11 @@ export const data = new SlashCommandBuilder()
   .addBooleanOption((option) => option.setName('gui_truc_tiep').setDescription('Bật để DM thẳng email/mật khẩu').setRequired(false));
 
 export async function execute(interaction) {
+  await interaction.deferReply({ ephemeral: true });
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'SHIP')) {
-    await interaction.reply({ content: '⚠️ Chỉ shipper/manager mới được dùng lệnh này.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Chỉ shipper/manager mới được dùng lệnh này.', ephemeral: true });
     return;
   }
 
@@ -47,18 +48,18 @@ export async function execute(interaction) {
 
   let order = getOrderByCode(orderCode);
   if (!order) {
-    await interaction.reply({ content: '⚠️ Không tìm thấy mã đơn này.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Không tìm thấy mã đơn này.', ephemeral: true });
     return;
   }
 
   if (interaction.channelId && order.ticket_channel_id && interaction.channelId !== order.ticket_channel_id) {
-    await interaction.reply({ content: `⚠️ Đơn \`${order.order_code}\` thuộc ticket khác. Hãy dùng lệnh trong <#${order.ticket_channel_id}> để tránh giao sai.`, ephemeral: true });
+    await interaction.editReply({ content: `⚠️ Đơn \`${order.order_code}\` thuộc ticket khác. Hãy dùng lệnh trong <#${order.ticket_channel_id}> để tránh giao sai.`, ephemeral: true });
     return;
   }
 
   if (order.status !== 'COMPLETED') {
     if (order.total_amount > 0 && !['PAID', 'FREE'].includes(order.payment_status)) {
-      await interaction.reply({ content: '⚠️ Đơn chưa thanh toán xong nên bot chưa thể tự đồng bộ sang hoàn thành khi giao hàng.', ephemeral: true });
+      await interaction.editReply({ content: '⚠️ Đơn chưa thanh toán xong nên bot chưa thể tự đồng bộ sang hoàn thành khi giao hàng.', ephemeral: true });
       return;
     }
     order = markOrderCompleted(order.order_code, interaction.user.id, config.feedbackTimeoutHours) ?? order;
@@ -69,13 +70,13 @@ export async function execute(interaction) {
 
   const customer = await interaction.client.users.fetch(order.customer_id).catch(() => null);
   if (!customer) {
-    await interaction.reply({ content: '⚠️ Không fetch được tài khoản khách hàng.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Không fetch được tài khoản khách hàng.', ephemeral: true });
     return;
   }
 
   const dmChannel = await customer.createDM().catch(() => null);
   if (!dmChannel) {
-    await interaction.reply({ content: '⚠️ Không mở được DM với khách. Hãy yêu cầu khách bật tin nhắn riêng rồi chạy lại lệnh.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Không mở được DM với khách. Hãy yêu cầu khách bật tin nhắn riêng rồi chạy lại lệnh.', ephemeral: true });
     return;
   }
 
@@ -87,14 +88,14 @@ export async function execute(interaction) {
   if (Boolean(credentialEmail && credentialPassword) && sendDirect) {
     dmMessage = await dmChannel.send({ embeds: buildDeliveryCredentialEmbeds(storedOrder), components: buildDeliveryLoginComponents(storedOrder) }).catch(() => null);
     if (!dmMessage) {
-      await interaction.reply({ content: '⚠️ Không gửi được DM giao hàng cho khách hàng.', ephemeral: true });
+      await interaction.editReply({ content: '⚠️ Không gửi được DM giao hàng cho khách hàng.', ephemeral: true });
       return;
     }
     persist(dmMessage.id);
   } else {
     dmMessage = await dmChannel.send({ embeds: [buildDeliveryNoticeEmbed(storedOrder)], components: shouldShowClaimButton ? buildDeliveryClaimComponents(order.order_code) : [] }).catch(() => null);
     if (!dmMessage) {
-      await interaction.reply({ content: '⚠️ Không gửi được DM cho khách hàng.', ephemeral: true });
+      await interaction.editReply({ content: '⚠️ Không gửi được DM cho khách hàng.', ephemeral: true });
       return;
     }
     persist(dmMessage.id);
@@ -109,5 +110,5 @@ export async function execute(interaction) {
   await applyCustomerRoles(interaction.guild, order.customer_id);
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'DELIVERY_SENT', detail: sendDirect ? 'Gửi trực tiếp qua DM' : 'Gửi DM với nút nhận Gmail', relatedOrderCode: order.order_code });
 
-  await interaction.reply({ content: `✅ Đã gửi DM giao hàng cho khách của đơn ${order.order_code} và đồng bộ trạng thái hoàn thành.`, ephemeral: true });
+  await interaction.editReply({ content: `✅ Đã gửi DM giao hàng cho khách của đơn ${order.order_code} và đồng bộ trạng thái hoàn thành.`, ephemeral: true });
 }
