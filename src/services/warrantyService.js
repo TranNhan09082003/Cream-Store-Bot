@@ -79,8 +79,9 @@ export async function openWarrantyTicket({ guild, customerId, actorId, orderCode
   await channel.send({
     content: `<@${customerId}>`,
     embeds: [buildTicketWelcomeEmbed(ticket.ticket_code, customerId, 'WARRANTY', orderCode)],
-    components: buildTicketControlComponents(ticket.id),
+    components: buildTicketControlComponents(ticket.id, customerId),
   }).catch(() => null);
+
 
   if (reason) {
     await channel.send(`📝 **Mô tả lỗi / yêu cầu bảo hành:**\n${reason}`).catch(() => null);

@@ -1,5 +1,8 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import { assignOrderClaimRaw, getOrderByCodeRaw, insertStaffLogRaw } from '../services/v11DbHelpers.js';
+import { claimOrder, getOrderByCode } from '../services/orderService.js';
+import { emitStaffLog } from '../services/staffLogService.js';
+import { isStaffMember } from '../utils/permissions.js';
+import { getGuildConfig } from '../services/guildConfigService.js';
 
 export const data = new SlashCommandBuilder()
   .setName('claim-order')
@@ -8,37 +11,37 @@ export const data = new SlashCommandBuilder()
   .addStringOption((o) => o.setName('ma_don').setDescription('Mã đơn hàng').setRequired(true));
 
 export async function execute(interaction) {
-  await interaction.deferReply({ flags: 64 });
+  await interaction.deferReply({ ephemeral: true });
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!isStaffMember(member, guildConfig)) {
+    await interaction.editReply({ content: '⚠️ Chỉ staff mới được claim đơn hàng.' });
+    return;
+  }
 
   const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
-  const before = getOrderByCodeRaw(orderCode);
+  const order = getOrderByCode(orderCode);
 
-  if (!before) {
-    await interaction.editReply('⚠️ Không tìm thấy mã đơn.');
+  if (!order) {
+    await interaction.editReply({ content: '⚠️ Không tìm thấy mã đơn.' });
     return;
   }
 
-  const activeClaim = before.claimed_by_id ?? before.claim_staff_id;
-  const activeClaimAt = before.claimed_at ?? before.claim_at;
-  if (activeClaim && activeClaim !== interaction.user.id) {
-    await interaction.editReply(`⚠️ Đơn này đang do <@${activeClaim}> xử lý.`);
+  if (order.claimed_by_id && order.claimed_by_id !== interaction.user.id) {
+    await interaction.editReply({ content: `⚠️ Đơn này đang do <@${order.claimed_by_id}> xử lý.` });
     return;
   }
 
-  const after = assignOrderClaimRaw(orderCode, interaction.user.id);
-  const nextClaim = after.claimed_by_id ?? after.claim_staff_id;
-  const nextClaimAt = after.claimed_at ?? after.claim_at;
-
-  insertStaffLogRaw({
+  const updated = claimOrder(orderCode, interaction.user.id);
+  await emitStaffLog(interaction.client, {
     guildId: interaction.guildId,
     actorId: interaction.user.id,
+    targetId: updated.customer_id,
     action: 'ORDER_CLAIM',
-    orderCode,
-    targetCustomerId: after.customer_id,
     detail: 'Lệnh /claim-order',
-    beforeJson: JSON.stringify({ claimed_by_id: activeClaim, claimed_at: activeClaimAt }),
-    afterJson: JSON.stringify({ claimed_by_id: nextClaim, claimed_at: nextClaimAt }),
+    relatedOrderCode: orderCode,
   });
 
-  await interaction.editReply(`✅ Đã claim đơn \`${orderCode}\`.`);
+  await interaction.editReply({ content: `✅ Đã claim đơn \`${orderCode}\`.` });
 }

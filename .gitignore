@@ -1,7 +1,17 @@
 node_modules
 .env
-/data/*.sqlite
-/data/*.sqlite-shm
-/data/*.sqlite-wal
+
+# Bot data - KHÔNG được commit lên GitHub
+/data/
+data/
+
+# npm cache & logs
+.npm/
+.cache/
 npm-debug.log*
+
+# OS
 .DS_Store
+
+# Temp / zip files
+*.zip

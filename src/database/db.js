@@ -289,12 +289,14 @@ export function initDatabase() {
   ensureColumn('orders', 'discord_renewal_cycle', 'INTEGER');
   ensureColumn('orders', 'history_json', 'TEXT');
 
-  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_payment_code ON orders (payment_code)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_payos_order_code ON orders (payos_order_code)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_payment_link_id ON orders (payment_link_id)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_queue ON orders (guild_id, queue_group, priority_rank, status, created_at)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_expiry_at ON orders (expiry_at, status)');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_tickets_auto_close ON tickets (auto_close_at, status)');
+  // Guild settings — category riêng theo loại ticket
+  ensureColumn('guild_settings', 'support_category_id', 'TEXT');
+  ensureColumn('guild_settings', 'complaint_category_id', 'TEXT');
+  ensureColumn('guild_settings', 'partnership_category_id', 'TEXT');
+
+  // Customer flags — mute ticket (ngăn tạo ticket)
+  ensureColumn('customer_flags', 'is_ticket_muted', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('customer_flags', 'ticket_mute_reason', 'TEXT');
 }
 
 export function nowIso() {

@@ -82,3 +82,31 @@ export function clearWarnings(guildId, customerId, actorId) {
 export function listFlags(guildId, limit = 20) {
   return listBlacklistStmt().all(guildId, limit);
 }
+
+export function getTicketMuteStatus(guildId, customerId) {
+  const row = db.prepare('SELECT is_ticket_muted, ticket_mute_reason FROM customer_flags WHERE guild_id = ? AND customer_id = ?').get(guildId, customerId);
+  return {
+    is_ticket_muted: Number(row?.is_ticket_muted ?? 0),
+    ticket_mute_reason: row?.ticket_mute_reason ?? null,
+  };
+}
+
+export function setTicketMuteStatus(guildId, customerId, isMuted, actorId, reason = null) {
+  db.prepare(`
+    INSERT INTO customer_flags (guild_id, customer_id, warning_count, is_blacklisted, is_ticket_muted, ticket_mute_reason, updated_by, updated_at)
+    VALUES (@guild_id, @customer_id, 0, 0, @is_ticket_muted, @ticket_mute_reason, @updated_by, @updated_at)
+    ON CONFLICT(guild_id, customer_id) DO UPDATE SET
+      is_ticket_muted = excluded.is_ticket_muted,
+      ticket_mute_reason = excluded.ticket_mute_reason,
+      updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at
+  `).run({
+    guild_id: guildId,
+    customer_id: customerId,
+    is_ticket_muted: isMuted ? 1 : 0,
+    ticket_mute_reason: isMuted ? (reason ?? 'Không rõ lý do') : null,
+    updated_by: actorId,
+    updated_at: nowIso(),
+  });
+  return getTicketMuteStatus(guildId, customerId);
+}

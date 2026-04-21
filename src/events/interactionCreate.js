@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config } from '../config.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
-import { getCustomerFlag } from '../services/blacklistService.js';
+import { getCustomerFlag, getTicketMuteStatus, setTicketMuteStatus } from '../services/blacklistService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
 import {
   cancelOrder,
@@ -28,6 +28,7 @@ import {
   getQueuePosition,
   markOrderCompleted,
   setOrderStatus,
+  getCompletedOrdersByCustomer,
 } from '../services/orderService.js';
 import { publishFeedback } from '../services/feedbackService.js';
 import { cancelPayOSPaymentLink, confirmOrderPaidManually } from '../services/paymentService.js';
@@ -36,18 +37,23 @@ import { closeTicket, createTicket, getOpenTicketByCustomer, getTicketByChannelI
 import { exportTicketTranscript } from '../services/transcriptService.js';
 import { openWarrantyTicket } from '../services/warrantyService.js';
 import {
+  buildCloseConfirmComponents,
+  buildCloseConfirmEmbed,
   buildCredentialEmbeds,
   buildDeliveryCredentialEmbeds,
   buildDeliveryLoginComponents,
   buildFeedbackModalPrompt,
+  buildMuteTicketEmbed,
   buildQuickFeedbackAckEmbed,
   buildQueueStatusText,
   buildTicketControlComponents,
   buildTicketWelcomeEmbed,
   buildWarrantyPanelModalPrompt,
+  buildWarrantyProductSelectComponents,
+  buildWarrantySelectEmbed,
 } from '../utils/embeds.js';
 import { buildTicketChannelName, parseMoneyInput } from '../utils/formatters.js';
-import { TICKET_MEMBER_PERMISSIONS, isStaffMember, assertStaffCapability } from '../utils/permissions.js';
+import { TICKET_MEMBER_PERMISSIONS, isStaffMember, isManager, assertStaffCapability } from '../utils/permissions.js';
 import { ensureRateLimit } from '../services/abuseService.js';
 import { keepTicketOpen, scheduleTicketAutoClose } from '../services/ticketService.js';
 import { claimOrder, releaseOrderClaim } from '../services/orderService.js';
@@ -60,6 +66,12 @@ const WARRANTY_ORDER_INPUT_ID = 'warranty_order_code';
 const WARRANTY_REASON_INPUT_ID = 'warranty_reason';
 
 const announcementCache = new Map();
+const ANNOUNCEMENT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
+
+function announcementCacheSet(key, value) {
+  announcementCache.set(key, value);
+  setTimeout(() => announcementCache.delete(key), ANNOUNCEMENT_CACHE_TTL_MS);
+}
 
 export async function loadCommands() {
   const commandFiles = fs.readdirSync(commandsDirectory).filter((file) => file.endsWith('.js')).sort();
@@ -169,6 +181,17 @@ function buildFeedbackModal(orderCode, stars) {
   return modal;
 }
 
+// Xác định category đúng theo loại ticket
+function getTicketCategoryId(guildConfig, ticketType) {
+  switch (ticketType) {
+    case 'SUPPORT': return guildConfig.support_category_id || guildConfig.ticket_category_id;
+    case 'COMPLAINT': return guildConfig.complaint_category_id || guildConfig.ticket_category_id;
+    case 'PARTNERSHIP': return guildConfig.partnership_category_id || guildConfig.ticket_category_id;
+    case 'WARRANTY': return guildConfig.warranty_category_id || guildConfig.ticket_category_id;
+    default: return guildConfig.ticket_category_id; // ORDER
+  }
+}
+
 async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   if (!interaction.inGuild()) {
     await safeReply(interaction, { content: 'Ticket chỉ tạo được trong server.', ephemeral: true });
@@ -181,10 +204,21 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
     return;
   }
 
+  // Kiểm tra blacklist
   const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
   if (Number(flag.is_blacklisted) === 1) {
     await safeReply(interaction, {
-      content: `⛔ Bạn đang bị chặn mở ticket. Lý do: ${flag.blacklist_reason ?? 'Không rõ lý do'}`,
+      content: `⛔ Bạn đang bị chặn mở ticket. Lý do: **${flag.blacklist_reason ?? 'Không rõ lý do'}**`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Kiểm tra mute ticket
+  const muteStatus = getTicketMuteStatus(interaction.guildId, interaction.user.id);
+  if (muteStatus.is_ticket_muted) {
+    await safeReply(interaction, {
+      content: `🔇 Bạn đã bị admin ngăn tạo ticket.\n> **Lý do:** ${muteStatus.ticket_mute_reason ?? 'Không rõ lý do'}`,
       ephemeral: true,
     });
     return;
@@ -195,7 +229,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
   if (existingTicket) {
     await safeReply(interaction, {
-      content: `Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
+      content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
       ephemeral: true,
     });
     return;
@@ -214,10 +248,11 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
     overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
   }
 
+  const categoryId = getTicketCategoryId(guildConfig, normalizedType);
   const channel = await interaction.guild.channels.create({
     name: `ticket-${Math.random().toString().slice(2, 8)}`,
     type: ChannelType.GuildText,
-    parent: normalizedType === 'WARRANTY' ? (guildConfig.warranty_category_id || guildConfig.ticket_category_id) : guildConfig.ticket_category_id,
+    parent: categoryId,
     permissionOverwrites: overwrites,
   });
 
@@ -233,7 +268,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   await channel.send({
     content: `<@${interaction.user.id}>`,
     embeds: [buildTicketWelcomeEmbed(ticket.ticket_code, interaction.user.id, normalizedType)],
-    components: buildTicketControlComponents(ticket.id),
+    components: buildTicketControlComponents(ticket.id, interaction.user.id),
   });
 
   await emitStaffLog(interaction.client, {
@@ -246,11 +281,32 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   });
 
   await safeReply(interaction, {
-    content: `✅ Ticket ${normalizedType.toLowerCase()} của bạn đã được tạo: ${channel}`,
+    content: `✅ Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
     ephemeral: true,
   });
 }
 
+// Bước 1: Hiện confirmation embed (chỉ admin/manager)
+async function handleTicketCloseRequest(interaction, ticketId) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!isManager(member, guildConfig)) {
+    await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể đóng ticket.', ephemeral: true });
+    return;
+  }
+  const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
+  if (!ticket || ticket.status !== 'OPEN') {
+    await safeReply(interaction, { content: '⚠️ Ticket này không còn hợp lệ hoặc đã đóng.', ephemeral: true });
+    return;
+  }
+  await safeReply(interaction, {
+    embeds: [buildCloseConfirmEmbed(ticket.ticket_code)],
+    components: buildCloseConfirmComponents(ticket.id),
+    ephemeral: true,
+  });
+}
+
+// Bước 2: Thực sự đóng ticket sau khi confirm
 async function handleTicketClose(interaction, ticketId) {
   if (!interaction.inGuild()) {
     await safeReply(interaction, { content: 'Ticket chỉ đóng được trong server.', ephemeral: true });
@@ -263,30 +319,29 @@ async function handleTicketClose(interaction, ticketId) {
     return;
   }
 
-  const guildConfig = getGuildConfig(interaction.guildId);
-  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  const isOwner = ticket.customer_id === interaction.user.id;
-  const isStaff = isStaffMember(member, guildConfig);
-
-  if (!isOwner && !isStaff) {
-    await safeReply(interaction, { content: '⚠️ Bạn không có quyền đóng ticket này.', ephemeral: true });
-    return;
+  // Ack confirm button
+  if (interaction.isButton()) {
+    await interaction.update({ content: '🗃️ Đang xuất transcript và đóng ticket...', embeds: [], components: [] }).catch(() => null);
   }
 
-  await safeReply(interaction, { content: '🗃️ Bot đang xuất transcript và đóng ticket...', ephemeral: true });
-
   const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
+
   try {
+    const everyone = interaction.guild.roles.everyone;
+    const guildConfig = getGuildConfig(interaction.guildId);
+
+    // Khóa tất cả, chỉ để bot + manager chat được
+    const newOverwrites = [
+      { id: everyone.id, deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] },
+      { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
+    ];
     if (ticket.customer_id) {
-       await interaction.channel.permissionOverwrites.edit(ticket.customer_id, {
-         SendMessages: false,
-         AddReactions: false,
-       }).catch(() => null);
+      newOverwrites.push({ id: ticket.customer_id, deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] });
     }
-    await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
-       SendMessages: false,
-       AddReactions: false,
-    }).catch(() => null);
+    if (guildConfig?.manager_role_id) {
+      newOverwrites.push({ id: guildConfig.manager_role_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
+    }
+    await interaction.channel.permissionOverwrites.set(newOverwrites).catch(() => null);
 
     if (!interaction.channel.name.startsWith('closed-')) {
       const newName = `closed-${interaction.channel.name}`.slice(0, 95);
@@ -302,28 +357,20 @@ async function handleTicketClose(interaction, ticketId) {
 
   if (ticket.ticket_type === 'WARRANTY' && ticket.related_order_code) {
     const order = setOrderStatus(ticket.related_order_code, 'COMPLETED');
-    if (order) {
-      await updateOrderLogMessage(interaction.guild, order);
-    }
+    if (order) await updateOrderLogMessage(interaction.guild, order);
   }
 
   if (transcriptResult) {
-    await deliverTranscript({
-      guild: interaction.guild,
-      ticket,
-      transcriptResult,
-      closedById: interaction.user.id,
-    });
+    await deliverTranscript({ guild: interaction.guild, ticket, transcriptResult, closedById: interaction.user.id });
   }
 
   const embed = new EmbedBuilder()
-    .setTitle('🔒 Ticket đã được đóng')
-    .setDescription(
-      [
-        `**Người đóng:** <@${interaction.user.id}>`,
-        '⏳ Kênh sẽ tự xóa sau **2 phút**.',
-      ].join('\n'),
-    )
+    .setTitle('🔒  Ticket Đã Đóng')
+    .setDescription([
+      `> **Đóng bởi:** <@${interaction.user.id}>`,
+      '> ⏳ Channel sẽ **tự xóa sau 2 phút**.',
+      '> 📄 Transcript đã được lưu và gửi cho khách.',
+    ].join('\n'))
     .setColor(0xED4245)
     .setTimestamp();
 
@@ -332,12 +379,11 @@ async function handleTicketClose(interaction, ticketId) {
   setTimeout(async () => {
     try {
       const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
-      if (channel) {
-        await channel.delete(`Ticket ${ticket.ticket_code} đã đóng bởi ${interaction.user.tag}`).catch(() => null);
-      }
+      if (channel) await channel.delete(`Ticket ${ticket.ticket_code} đóng bởi ${interaction.user.tag}`).catch(() => null);
     } catch {}
   }, 2 * 60 * 1000);
 }
+
 
 async function handleDeliveryClaim(interaction, orderCode) {
   const order = getOrderByCode(orderCode);
@@ -456,31 +502,46 @@ async function handleFeedbackButton(interaction, orderCode, starsRaw) {
 }
 
 
-async function handleWarrantyPanelModalSubmit(interaction) {
-  const orderCode = interaction.fields.getTextInputValue(WARRANTY_ORDER_INPUT_ID)?.trim().toUpperCase();
-  const reason = interaction.fields.getTextInputValue(WARRANTY_REASON_INPUT_ID)?.trim() || null;
-
+// Xử lý khi khách đã chọn sản phẩm từ dropdown bảo hành
+async function handleWarrantyProductSelect(interaction) {
+  const orderCode = interaction.values?.[0];
   if (!orderCode) {
-    await interaction.reply({ content: '⚠️ Bạn cần nhập mã đơn để mở ticket bảo hành.', ephemeral: true }).catch(() => null);
+    await safeReply(interaction, { content: '⚠️ Không nhận được lựa chọn. Vui lòng thử lại.', ephemeral: true });
     return;
   }
 
   const order = getOrderByCode(orderCode);
-  if (!order) {
-    await interaction.reply({ content: '⚠️ Không tìm thấy đơn hàng với mã bạn nhập.', ephemeral: true }).catch(() => null);
+  if (!order || order.customer_id !== interaction.user.id) {
+    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng hoặc bạn không phải chủ sở hữu.', ephemeral: true });
     return;
   }
 
-  if (order.customer_id !== interaction.user.id) {
-    await interaction.reply({ content: '⚠️ Bạn không phải chủ của đơn hàng này.', ephemeral: true }).catch(() => null);
-    return;
-  }
+  // Hiện modal nhập lý do bảo hành
+  const modal = new ModalBuilder()
+    .setCustomId(`warranty:reason:modal:${orderCode}`)
+    .setTitle('🛠️ Mô Tả Yêu Cầu Bảo Hành');
+
+  const reasonInput = new TextInputBuilder()
+    .setCustomId('warranty_reason')
+    .setLabel(`Đơn ${orderCode} — Mô tả lỗi bạn gặp phải`)
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setPlaceholder('Ví dụ: Profile bị out, không đăng nhập được, sai PIN, cần đổi tài khoản...')
+    .setMaxLength(500);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+  await interaction.showModal(modal);
+}
+
+// Xử lý modal lý do bảo hành → tạo ticket
+async function handleWarrantyReasonModalSubmit(interaction, orderCode) {
+  const reason = interaction.fields.getTextInputValue('warranty_reason')?.trim() || null;
 
   const result = await openWarrantyTicket({
     guild: interaction.guild,
     customerId: interaction.user.id,
     actorId: interaction.user.id,
-    orderCode,
+    orderCode: orderCode.toUpperCase(),
     reason: reason ?? 'Khách mở ticket bảo hành từ panel.',
   });
 
@@ -488,11 +549,12 @@ async function handleWarrantyPanelModalSubmit(interaction) {
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: interaction.user.id, action: 'WARRANTY_OPEN', detail: reason ?? 'Mở bảo hành từ panel', relatedOrderCode: orderCode, relatedTicketCode: result.ticket.ticket_code });
   await interaction.reply({
     content: result.reused
-      ? `ℹ️ Đơn ${orderCode} đã có ticket bảo hành tại ${result.channel}.`
-      : `✅ Đã mở ticket bảo hành cho đơn ${orderCode}: ${result.channel}`,
+      ? `ℹ️ Đơn **${orderCode}** đã có ticket bảo hành tại ${result.channel}.`
+      : `✅ Đã mở ticket bảo hành cho đơn **${orderCode}**: ${result.channel}`,
     ephemeral: true,
   }).catch(() => null);
 }
+
 
 async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
   const stars = Number.parseInt(starsRaw, 10);
@@ -661,8 +723,23 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      // Warranty reason modal: warranty:reason:modal:${orderCode}
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('warranty:reason:modal:')) {
+        const orderCode = interaction.customId.split(':').slice(3).join(':');
+        await handleWarrantyReasonModalSubmit(interaction, orderCode);
+        return;
+      }
+
       if (interaction.isModalSubmit() && interaction.customId === 'ticket:warranty:panel:modal') {
-        await handleWarrantyPanelModalSubmit(interaction);
+        // Legacy fallback – không nên xảy ra nhưng giữ để tương thích
+        const orderCode = interaction.fields.getTextInputValue('warranty_order_code')?.trim().toUpperCase();
+        const reason = interaction.fields.getTextInputValue('warranty_reason')?.trim() || null;
+        if (!orderCode) { await interaction.reply({ content: '⚠️ Mã đơn trống.', ephemeral: true }).catch(() => null); return; }
+        const order = getOrderByCode(orderCode);
+        if (!order || order.customer_id !== interaction.user.id) { await interaction.reply({ content: '⚠️ Không tìm thấy đơn hoặc không phải chủ sở hữu.', ephemeral: true }).catch(() => null); return; }
+        const result = await openWarrantyTicket({ guild: interaction.guild, customerId: interaction.user.id, actorId: interaction.user.id, orderCode, reason: reason ?? 'Bảo hành từ panel.' });
+        await updateOrderLogMessage(interaction.guild, result.order);
+        await interaction.reply({ content: result.reused ? `ℹ️ Ticket bảo hành đã tồn tại tại ${result.channel}.` : `✅ Ticket bảo hành đã mở tại ${result.channel}.`, ephemeral: true }).catch(() => null);
         return;
       }
 
@@ -712,7 +789,7 @@ export function registerInteractionHandler(client, commands) {
           fetchReply: true
         });
         
-        announcementCache.set(reply.id, {
+        announcementCacheSet(reply.id, {
           content,
           roles: [],
           tagEveryone: false,
@@ -730,6 +807,12 @@ export function registerInteractionHandler(client, commands) {
         }
         cacheData.roles = interaction.values;
         await interaction.deferUpdate().catch(() => null);
+        return;
+      }
+
+      // Warranty product select menu
+      if (interaction.isAnySelectMenu() && interaction.customId === 'warranty:product:select') {
+        await handleWarrantyProductSelect(interaction);
         return;
       }
 
@@ -780,7 +863,20 @@ export function registerInteractionHandler(client, commands) {
       }
 
       if (interaction.customId === 'ticket:warranty:panel') {
-        await interaction.showModal(buildWarrantyPanelModal());
+        // Thay vì modal, hiện SelectMenu với đơn hàng đã hoàn thành
+        const completedOrders = getCompletedOrdersByCustomer(interaction.guildId, interaction.user.id, 25);
+        if (!completedOrders.length) {
+          await safeReply(interaction, {
+            content: '⚠️ Bạn chưa có đơn hàng hoàn thành nào để bảo hành. Liên hệ staff nếu cần hỗ trợ.',
+            ephemeral: true,
+          });
+          return;
+        }
+        await safeReply(interaction, {
+          embeds: [buildWarrantySelectEmbed()],
+          components: buildWarrantyProductSelectComponents(completedOrders),
+          ephemeral: true,
+        });
         return;
       }
 
@@ -815,9 +911,42 @@ export function registerInteractionHandler(client, commands) {
          return;
       }
 
+      // Close ticket confirmation flow
       if (interaction.customId.startsWith('ticket:close:')) {
-        const [, , ticketId] = interaction.customId.split(':');
-        await handleTicketClose(interaction, ticketId);
+        const parts = interaction.customId.split(':');
+        // ticket:close:confirm:${ticketId}
+        if (parts[2] === 'confirm') {
+          await handleTicketClose(interaction, parts[3]);
+          return;
+        }
+        // ticket:close:cancel
+        if (parts[2] === 'cancel') {
+          await interaction.update({ content: '❌ Đã hủy đóng ticket.', embeds: [], components: [] }).catch(() => null);
+          return;
+        }
+        // ticket:close:${ticketId} → hiện confirmation
+        await handleTicketCloseRequest(interaction, parts[2]);
+        return;
+      }
+
+      // Mute ticket button
+      if (interaction.customId.startsWith('ticket:mute:')) {
+        const [, , customerId] = interaction.customId.split(':');
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        if (!isManager(member, guildConfig)) {
+          await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể mute user.', ephemeral: true });
+          return;
+        }
+        const current = getTicketMuteStatus(interaction.guildId, customerId);
+        const newMuted = !current.is_ticket_muted;
+        setTicketMuteStatus(interaction.guildId, customerId, newMuted, interaction.user.id, newMuted ? 'Admin mute từ ticket' : null);
+        const target = await interaction.client.users.fetch(customerId).catch(() => null);
+        if (target) {
+          await safeReply(interaction, { embeds: [buildMuteTicketEmbed(target, newMuted, newMuted ? 'Admin mute từ ticket' : null, interaction.user.id)], ephemeral: true });
+        } else {
+          await safeReply(interaction, { content: newMuted ? `✅ Đã mute user \`${customerId}\` khỏi ticket.` : `✅ Đã bỏ mute user \`${customerId}\`.`, ephemeral: true });
+        }
         return;
       }
 

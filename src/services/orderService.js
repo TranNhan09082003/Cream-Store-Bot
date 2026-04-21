@@ -154,3 +154,15 @@ export function getStaffKpis(guildId, limit=10){return getStaffKpiStmt().all(gui
 
 export const getOrdersExpiringBetween = (fromIso, toIso, limit=20) => getOrdersExpiringBetweenStmt().all(fromIso, toIso, limit);
 export function markExpiryReminderSent(orderCode, daysBefore){ const t = nowIso(); if (Number(daysBefore) >= 2) markExpiryNotice2dStmt().run(t, t, orderCode); else markExpiryNotice1dStmt().run(t, t, orderCode); return getOrderByCode(orderCode); }
+
+// Lấy đơn đã hoàn thành của khách (cho warranty select menu)
+export function getCompletedOrdersByCustomer(guildId, customerId, limit = 25) {
+  return db.prepare(`
+    SELECT * FROM orders
+    WHERE guild_id = ? AND customer_id = ?
+      AND status IN ('COMPLETED', 'WARRANTY_OPEN')
+    ORDER BY completed_at DESC, id DESC
+    LIMIT ?
+  `).all(guildId, customerId, limit);
+}
+
