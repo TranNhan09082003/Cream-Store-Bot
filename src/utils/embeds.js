@@ -654,8 +654,8 @@ export function buildCredentialEmbeds(order) {
 // ═══════════════════════════════════════════════
 // Transcript
 // ═══════════════════════════════════════════════
-export function buildTranscriptSummaryEmbed(ticket, closedById, messageCount) {
-  return applyBranding(
+export function buildTranscriptSummaryEmbed(ticket, closedById, messageCount, transcriptUrl) {
+  const embed = applyBranding(
     new EmbedBuilder()
       .setTitle('🗃️  Ticket Đã Đóng — Transcript')
       .setColor(0x99aab5)
@@ -666,18 +666,33 @@ export function buildTranscriptSummaryEmbed(ticket, closedById, messageCount) {
         { name: '🔒 Đóng Bởi', value: `<@${closedById}>`, inline: true },
         { name: '💬 Tin Nhắn', value: `${messageCount}`, inline: true },
       )
-      .setTimestamp(),
+      .setTimestamp()
   );
+  if (transcriptUrl) embed.setDescription(`🔗 [Xem Transcript trên Web](${transcriptUrl})`);
+  return embed;
 }
 
-export function buildTranscriptCustomerEmbed(ticket, messageCount) {
-  return applyBranding(
+export function buildTranscriptCustomerEmbed(ticket, messageCount, transcriptUrl) {
+  const embed = applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorInfo)
       .setTitle(`📄  Transcript Ticket \`${ticket.ticket_code}\``)
       .setDescription(`> Bot gửi lại transcript của ticket này cho bạn. (${messageCount} tin nhắn)`)
-      .setTimestamp(),
+      .setTimestamp()
   );
+  if (transcriptUrl) {
+    embed.setDescription(embed.data.description + `\n🔗 **[Bấm vào đây để xem nội dung chat trên web](${transcriptUrl})**`);
+  }
+  return embed;
+}
+
+export function buildTranscriptLinkComponents(url) {
+  if (!url) return [];
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setLabel('Xem Transcript trên Web').setStyle(ButtonStyle.Link).setURL(url)
+    )
+  ];
 }
 
 // ═══════════════════════════════════════════════
@@ -926,3 +941,5 @@ export function buildBlacklistEmbed(user, flag) {
       .setTimestamp(),
   );
 }
+
+// END OF FILE

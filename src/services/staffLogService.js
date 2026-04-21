@@ -1,3 +1,4 @@
+import { EmbedBuilder } from 'discord.js';
 import { db, nowIso } from '../database/db.js';
 import { getGuildConfig } from './guildConfigService.js';
 
@@ -34,11 +35,16 @@ export async function emitStaffLog(client, payload) {
   const channel = guild ? await guild.channels.fetch(guildConfig.staff_log_channel_id).catch(() => null) : null;
   if (!channel?.isTextBased()) return;
 
-  const parts = [`🧾 **${payload.action}**`];
-  if (payload.actorId) parts.push(`• Staff: <@${payload.actorId}>`);
-  if (payload.targetId) parts.push(`• Khách: <@${payload.targetId}>`);
-  if (payload.relatedOrderCode) parts.push('• Đơn: `' + payload.relatedOrderCode + '`');
-  if (payload.relatedTicketCode) parts.push('• Ticket: `' + payload.relatedTicketCode + '`');
-  if (payload.detail) parts.push(`• Chi tiết: ${payload.detail}`);
-  await channel.send(parts.join('\n')).catch(() => null);
+  const embed = new EmbedBuilder()
+    .setColor(0x5865F2)
+    .setTitle(`🧾 Staff Log: ${payload.action}`)
+    .setTimestamp();
+  
+  if (payload.actorId) embed.addFields({ name: '👨‍💼 Staff', value: `<@${payload.actorId}>`, inline: true });
+  if (payload.targetId) embed.addFields({ name: '👤 Khách Hàng', value: `<@${payload.targetId}>`, inline: true });
+  if (payload.relatedOrderCode) embed.addFields({ name: '📦 Mã Đơn', value: `\`${payload.relatedOrderCode}\``, inline: true });
+  if (payload.relatedTicketCode) embed.addFields({ name: '🎫 Ticket', value: `\`${payload.relatedTicketCode}\``, inline: true });
+  if (payload.detail) embed.addFields({ name: '📝 Chi Tiết', value: payload.detail, inline: false });
+  
+  await channel.send({ embeds: [embed] }).catch(() => null);
 }

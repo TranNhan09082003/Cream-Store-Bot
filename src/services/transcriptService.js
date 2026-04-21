@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 function escapeHtml(input) {
   return String(input)
     .replace(/&/g, '&amp;')
@@ -96,11 +99,24 @@ a:hover { text-decoration:underline; }
 </body>
 </html>`;
 
+  const htmlFileName = `transcript_${channel.name}_${Date.now()}.html`;
+  const textFileName = `${channel.name}-transcript.txt`;
+
+  try {
+    const transcriptsDir = path.join(process.cwd(), 'data', 'transcripts');
+    if (!fs.existsSync(transcriptsDir)) {
+      fs.mkdirSync(transcriptsDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(transcriptsDir, htmlFileName), transcriptHtml, 'utf8');
+  } catch (error) {
+    console.error('[TRANSCRIPT] Khaong the luu file html:', error);
+  }
+
   return {
     htmlBuffer: Buffer.from(transcriptHtml, 'utf8'),
     textBuffer: Buffer.from(transcriptText, 'utf8'),
-    htmlFileName: `transcript_${channel.name}_${Date.now()}.html`,
-    textFileName: `${channel.name}-transcript.txt`,
+    htmlFileName,
+    textFileName,
     messageCount: allMessages.length,
   };
 }

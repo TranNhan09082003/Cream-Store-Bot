@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'node:path';
 import { registerDashboardRoutes } from './dashboardMiniServer.js';
 import { handlePayOSWebhook } from './paymentService.js';
 
@@ -100,6 +101,9 @@ export async function startWebhookServer(client = null) {
 
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true }));
+  
+  // Serve static transcripts
+  app.use('/transcripts', express.static(path.join(process.cwd(), 'data', 'transcripts')));
 
   registerPaymentRoutes(app);
   registerDashboardRoutes(app);
