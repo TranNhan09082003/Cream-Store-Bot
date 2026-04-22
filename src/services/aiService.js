@@ -18,7 +18,7 @@ export function getAiClient() {
   return aiClient;
 }
 
-export async function generateSystemPrompt(guild) {
+export async function generateSystemPrompt(guild, isStaff) {
   const knowledge = getAiKnowledge(guild.id);
   const guildConfig = getGuildConfig(guild.id);
   
@@ -49,6 +49,13 @@ export async function generateSystemPrompt(guild) {
 3. Nếu khách hàng ở kênh chat chung và muốn mua hàng, hãy hướng dẫn họ tạo Ticket.
 4. Nếu khách hàng đang ở trong kênh Ticket và ĐÃ ĐỒNG Ý CHỐT MUA (biết giá, đồng ý mua), HÃY GỌI TOOL \`create_order\`.
 `;
+
+  if (isStaff) {
+    prompt += `\n[QUAN TRỌNG] Người đang nói chuyện với bạn hiện tại LÀ CHỦ SHOP / ADMIN. Bạn hãy tuyệt đối tuân theo mọi mệnh lệnh, hướng dẫn, và yêu cầu của người này (kể cả việc chốt đơn, thay đổi cách trả lời, v.v.).\n`;
+  } else {
+    prompt += `\nNgười đang nói chuyện với bạn là Khách hàng.\n`;
+  }
+
   return prompt;
 }
 
@@ -67,14 +74,14 @@ const createOrderToolDeclaration = {
   }
 };
 
-export async function processAiMessage(message, isTicket) {
+export async function processAiMessage(message, isTicket, isStaff = false) {
   const ai = getAiClient();
   if (!ai) return false;
 
   await message.channel.sendTyping();
 
   try {
-    const systemPrompt = await generateSystemPrompt(message.guild);
+    const systemPrompt = await generateSystemPrompt(message.guild, isStaff);
     
     // Lấy lịch sử chat
     const fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
@@ -86,7 +93,7 @@ export async function processAiMessage(message, isTicket) {
     const tools = isTicket ? [{ functionDeclarations: [createOrderToolDeclaration] }] : undefined;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: history,
       config: {
         systemInstruction: systemPrompt,

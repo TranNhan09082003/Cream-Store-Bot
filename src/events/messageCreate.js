@@ -47,36 +47,43 @@ export async function execute(message) {
     }
   }
 
+  const isMentioned = message.mentions.has(message.client.user);
+
   // TRƯỜNG HỢP 1: TIN NHẮN TRONG TICKET
   if (ticket && ticket.status === 'OPEN') {
     const isCustomer = ticket.customer_id === message.author.id;
 
     if (isStaff && !isCustomer) {
-      // Nếu staff (không phải người tạo ticket) chat vào, tắt AI tự động trả lời
-      if (ticket.ai_status !== 'PAUSED') {
-        updateTicketAiStatus(ticket.id, 'PAUSED');
+      if (isMentioned) {
+        // Staff cố tình tag bot -> Yêu cầu bot làm việc -> Bật lại AI
+        if (ticket.ai_status === 'PAUSED') {
+          updateTicketAiStatus(ticket.id, 'ACTIVE');
+        }
+        await processAiMessage(message, true, true);
+        return;
+      } else {
+        // Nếu staff (không phải người tạo ticket) chat vào bình thường, tắt AI tự động trả lời
+        if (ticket.ai_status !== 'PAUSED') {
+          updateTicketAiStatus(ticket.id, 'PAUSED');
+        }
+        return; // Staff đang chat thì AI không xen vào
       }
-      return; // Staff đang chat thì AI không xen vào
     }
 
     // Nếu khách hàng chat và AI đang bật
     if (isCustomer && ticket.ai_status !== 'PAUSED') {
-      await processAiMessage(message, true);
+      await processAiMessage(message, true, false);
     }
     return;
   }
 
   // TRƯỜNG HỢP 2: TIN NHẮN KÊNH CHUNG (PUBLIC CHAT)
-  // Chỉ AI phản hồi ở kênh chung nếu được tag trực tiếp HOẶC lâu lâu phản hồi (ví dụ có từ khóa nhất định)
-  const isMentioned = message.mentions.has(message.client.user);
-  
   // Các từ khóa khách hay hỏi giá, hỏi dịch vụ
   const purchaseKeywords = ['giá', 'nhiêu', 'shop ơi', 'hỏi', 'còn hàng', 'mua', 'tư vấn', 'hỗ trợ', 'lỗi', 'bảo hành', 'cách làm', 'thế nào', 'sao', 'không', 'ko'];
   const contentLower = message.content.toLowerCase();
   
-  // Kiểm tra xem tin nhắn có chứa ý định mua hàng / cần support không (tránh kích hoạt với tin nhắn quá ngắn gọn trừ khi tag bot)
-  const hasIntent = contentLower.length >= 5 && purchaseKeywords.some(kw => contentLower.includes(kw));
-
+  // Kiểm tra xem tin nhắn có chứa ý định mua hàng không (chỉ check cho user thường)
+  const hasIntent = !isStaff && contentLower.length >= 5 && purchaseKeywords.some(kw => contentLower.includes(kw));
 
   if (isMentioned || hasIntent) {
     // Đảm bảo không reply ở các kênh log
@@ -85,6 +92,7 @@ export async function execute(message) {
       return;
     }
     
-    await processAiMessage(message, false);
+    await processAiMessage(message, false, isStaff);
   }
 }
+
