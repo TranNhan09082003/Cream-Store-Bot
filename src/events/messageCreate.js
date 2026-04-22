@@ -2,6 +2,8 @@ import { Events } from 'discord.js';
 import { getTicketByChannelId, updateTicketAiStatus } from '../services/ticketService.js';
 import { processAiMessage } from '../services/aiService.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
+import { moderateMessage } from '../services/aiModerationService.js';
+
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -17,6 +19,28 @@ export async function execute(message) {
   const isStaff = message.member.roles.cache.has(guildConfig.support_role_id) || 
                   message.member.roles.cache.has(guildConfig.manager_role_id) || 
                   message.member.permissions.has('ManageGuild');
+
+  // AI KIỂM DUYỆT (MODERATION) - Chỉ áp dụng cho User thường, tin nhắn > 5 ký tự
+  if (!isStaff && message.content.length >= 6) {
+    const modResult = await moderateMessage(message.content);
+    if (modResult) {
+      if (modResult.category === 'INSULT') {
+        await message.delete().catch(() => null);
+        await message.member.timeout(3 * 24 * 60 * 60 * 1000, modResult.reason || 'Dùng từ ngữ xúc phạm shop').catch(() => null);
+        await message.channel.send(`🚨 <@${message.author.id}> đã bị cấm chat 3 ngày vì vi phạm tiêu chuẩn cộng đồng/xúc phạm cửa hàng.`).catch(() => null);
+        return; // Dừng xử lý
+      }
+      if (modResult.category === 'SEVERE_COMPLAINT') {
+        await message.delete().catch(() => null);
+        return; // Dừng xử lý
+      }
+      if (modResult.category === 'MILD_COMPLAINT' && modResult.replyText) {
+        await message.reply(modResult.replyText).catch(() => null);
+        return; // Dừng xử lý, đã xoa dịu xong
+      }
+      // Nếu là NORMAL thì cho đi tiếp xuống dưới
+    }
+  }
 
   // TRƯỜNG HỢP 1: TIN NHẮN TRONG TICKET
   if (ticket && ticket.status === 'OPEN') {
