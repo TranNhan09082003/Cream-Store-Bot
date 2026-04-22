@@ -20,8 +20,12 @@ export async function execute(message) {
                   message.member.roles.cache.has(guildConfig.manager_role_id) || 
                   message.member.permissions.has('ManageGuild');
 
-  // AI KIỂM DUYỆT (MODERATION) - Chỉ áp dụng cho User thường, tin nhắn > 5 ký tự
-  if (!isStaff && message.content.length >= 6) {
+  // AI KIỂM DUYỆT (MODERATION) - Chỉ áp dụng cho User thường, tin nhắn > 5 ký tự và có chứa từ khóa nhạy cảm
+  const contentLower = message.content.toLowerCase();
+  const suspiciousKeywords = ['lừa đảo', 'scam', 'chậm', 'lâu', 'chưa thấy', 'đợi', 'thái độ', 'rác', 'cứt', 'địt', 'lồn', 'cặc', 'loz', 'đm', 'vkl', 'vl', 'đéo', 'ngu', 'câm', 'dở', 'tệ', 'kém', 'phốt', 'chửi'];
+  const isSuspicious = suspiciousKeywords.some(kw => contentLower.includes(kw));
+
+  if (!isStaff && message.content.length >= 6 && isSuspicious) {
     const modResult = await moderateMessage(message.content);
     if (modResult) {
       if (modResult.category === 'INSULT') {
@@ -80,7 +84,6 @@ export async function execute(message) {
   // TRƯỜNG HỢP 2: TIN NHẮN KÊNH CHUNG (PUBLIC CHAT)
   // Các từ khóa khách hay hỏi giá, hỏi dịch vụ
   const purchaseKeywords = ['giá', 'nhiêu', 'shop ơi', 'hỏi', 'còn hàng', 'mua', 'tư vấn', 'hỗ trợ', 'lỗi', 'bảo hành', 'cách làm', 'thế nào', 'sao', 'không', 'ko'];
-  const contentLower = message.content.toLowerCase();
   
   // Kiểm tra xem tin nhắn có chứa ý định mua hàng không (chỉ check cho user thường)
   const hasIntent = !isStaff && contentLower.length >= 5 && purchaseKeywords.some(kw => contentLower.includes(kw));
