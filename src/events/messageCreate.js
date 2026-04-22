@@ -20,8 +20,10 @@ export async function execute(message) {
 
   // TRƯỜNG HỢP 1: TIN NHẮN TRONG TICKET
   if (ticket && ticket.status === 'OPEN') {
-    if (isStaff) {
-      // Nếu staff chat vào ticket, tắt AI tự động trả lời
+    const isCustomer = ticket.customer_id === message.author.id;
+
+    if (isStaff && !isCustomer) {
+      // Nếu staff (không phải người tạo ticket) chat vào, tắt AI tự động trả lời
       if (ticket.ai_status !== 'PAUSED') {
         updateTicketAiStatus(ticket.id, 'PAUSED');
       }
@@ -29,7 +31,7 @@ export async function execute(message) {
     }
 
     // Nếu khách hàng chat và AI đang bật
-    if (ticket.customer_id === message.author.id && ticket.ai_status !== 'PAUSED') {
+    if (isCustomer && ticket.ai_status !== 'PAUSED') {
       await processAiMessage(message, true);
     }
     return;
