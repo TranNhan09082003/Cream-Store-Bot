@@ -34,6 +34,11 @@ export async function execute(message) {
         await message.delete().catch(() => null);
         return; // Dừng xử lý
       }
+      if (modResult.category === 'DELAY_COMPLAINT') {
+        await message.delete().catch(() => null);
+        await message.channel.send(`<@${message.author.id}> Các đơn hàng vẫn đang được tiến hành, nếu chậm là do nguyên liệu đang gặp vấn đề. Bạn thông cảm chờ thêm nhé!`).catch(() => null);
+        return;
+      }
       if (modResult.category === 'MILD_COMPLAINT' && modResult.replyText) {
         await message.reply(modResult.replyText).catch(() => null);
         return; // Dừng xử lý, đã xoa dịu xong
