@@ -112,6 +112,9 @@ export async function processAiMessage(message, isTicket) {
     return false;
   } catch (error) {
     console.error('[AI SERVICE] Error processing message:', error);
+    if (error.status === 503 || error.message?.includes('503')) {
+      await message.reply('⚠️ Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!').catch(() => null);
+    }
     return false;
   }
 }

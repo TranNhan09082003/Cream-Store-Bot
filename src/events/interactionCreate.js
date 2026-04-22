@@ -991,6 +991,16 @@ export function registerInteractionHandler(client, commands) {
         await handleFeedbackButton(interaction, orderCode, stars);
       }
     } catch (error) {
+      if (error.code === 'RATE_LIMITED') {
+        const payload = { content: `⚠️ ${error.message}`, ephemeral: true };
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(payload).catch(() => null);
+        } else {
+          await interaction.reply(payload).catch(() => null);
+        }
+        return; // Không ghi log spam
+      }
+
       console.error('[INTERACTION] Lỗi:', error);
 
       const payload = {
