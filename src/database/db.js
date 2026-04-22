@@ -211,6 +211,16 @@ export function initDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS ai_knowledge (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      updated_by TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(guild_id)
+    );
+
+
     CREATE INDEX IF NOT EXISTS idx_tickets_guild_customer_status ON tickets (guild_id, customer_id, status);
     CREATE INDEX IF NOT EXISTS idx_tickets_related_order ON tickets (related_order_code, status);
     CREATE INDEX IF NOT EXISTS idx_tickets_auto_close ON tickets (auto_close_at, status);
@@ -244,6 +254,7 @@ export function initDatabase() {
   ensureColumn('tickets', 'ticket_subject', 'TEXT');
   ensureColumn('tickets', 'auto_close_at', 'TEXT');
   ensureColumn('tickets', 'keep_open_requested', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('tickets', 'ai_status', "TEXT NOT NULL DEFAULT 'ACTIVE'");
 
   ensureColumn('orders', 'total_amount', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('orders', 'amount_paid', 'INTEGER NOT NULL DEFAULT 0');

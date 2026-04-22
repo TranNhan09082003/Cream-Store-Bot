@@ -23,6 +23,10 @@ export async function buildClient() {
     startWebhookServer(readyClient);
   });
 
+  import('./events/messageCreate.js').then((module) => {
+    client.on(module.name, (...args) => module.execute(...args));
+  }).catch(err => console.error('Failed to load messageCreate event', err));
+
   client.salesCommands = commands;
   return client;
 }

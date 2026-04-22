@@ -13,6 +13,8 @@ function getTicketByIdStmt(){return db.prepare('SELECT * FROM tickets WHERE id=?
 function scheduleAutoCloseStmt(){return db.prepare(`UPDATE tickets SET auto_close_at=?, keep_open_requested=0 WHERE id=?`);}
 function clearAutoCloseStmt(){return db.prepare(`UPDATE tickets SET auto_close_at=NULL, keep_open_requested=1 WHERE id=?`);}
 function dueAutoCloseTicketsStmt(){return db.prepare(`SELECT * FROM tickets WHERE status='OPEN' AND auto_close_at IS NOT NULL AND keep_open_requested=0 AND datetime(auto_close_at) <= datetime(?) ORDER BY auto_close_at ASC LIMIT ?`);}
+function updateTicketAiStatusStmt(){return db.prepare(`UPDATE tickets SET ai_status=? WHERE id=?`);}
+
 
 function generateTicketCode(){while(true){const c=`TKT_${randomDigits(6)}`; if(!ticketCodeExistsStmt().get(c)) return c;}}
 
@@ -30,3 +32,5 @@ export const getTicketById = (ticketId) => getTicketByIdStmt().get(ticketId) ?? 
 export function scheduleTicketAutoClose(ticketId, minutes=5){const at=addMinutes(new Date(), minutes).toISOString(); scheduleAutoCloseStmt().run(at, ticketId); return getTicketById(ticketId);}
 export function keepTicketOpen(ticketId){clearAutoCloseStmt().run(ticketId); return getTicketById(ticketId);}
 export const getDueAutoCloseTickets = (limit=20) => dueAutoCloseTicketsStmt().all(nowIso(), limit);
+export function updateTicketAiStatus(ticketId, status){updateTicketAiStatusStmt().run(status, ticketId); return getTicketById(ticketId);}
+

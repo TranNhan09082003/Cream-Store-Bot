@@ -139,6 +139,9 @@ export const config = {
   vipRoleThreshold: Number.parseInt(getEnv('VIP_ROLE_THRESHOLD', '10'), 10),
   pendingPaymentReminderMinutes: Number.parseInt(getEnv('PENDING_PAYMENT_REMINDER_MINUTES', '15'), 10),
   processingReminderMinutes: Number.parseInt(getEnv('PROCESSING_REMINDER_MINUTES', '60'), 10),
+  geminiApiKey: getEnv('GEMINI_API_KEY', ''),
+  aiSystemPrompt: getMultilineEnv('AI_SYSTEM_PROMPT', 'Bạn là trợ lý AI thân thiện của Cream Store. Hãy tư vấn nhiệt tình và ngắn gọn.'),
+
 
   ticketOpenCooldownSeconds: Number.parseInt(getEnv('TICKET_OPEN_COOLDOWN_SECONDS', '120'), 10),
   buttonCooldownSeconds: Number.parseInt(getEnv('BUTTON_COOLDOWN_SECONDS', '3'), 10),
