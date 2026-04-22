@@ -93,7 +93,7 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     const tools = isTicket ? [{ functionDeclarations: [createOrderToolDeclaration] }] : undefined;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       contents: history,
       config: {
         systemInstruction: systemPrompt,
