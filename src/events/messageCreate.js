@@ -42,8 +42,12 @@ export async function execute(message) {
   const isMentioned = message.mentions.has(message.client.user);
   
   // Các từ khóa khách hay hỏi giá, hỏi dịch vụ
-  const purchaseKeywords = ['giá sao', 'bao nhiêu tiền', 'shop ơi', 'cho mình hỏi', 'còn hàng không', 'mua netflix', 'mua spotify', 'tư vấn giúp'];
-  const hasIntent = purchaseKeywords.some(kw => message.content.toLowerCase().includes(kw));
+  const purchaseKeywords = ['giá', 'nhiêu', 'shop ơi', 'hỏi', 'còn hàng', 'mua', 'tư vấn', 'hỗ trợ', 'lỗi', 'bảo hành', 'cách làm', 'thế nào', 'sao', 'không', 'ko'];
+  const contentLower = message.content.toLowerCase();
+  
+  // Kiểm tra xem tin nhắn có chứa ý định mua hàng / cần support không (tránh kích hoạt với tin nhắn quá ngắn gọn trừ khi tag bot)
+  const hasIntent = contentLower.length >= 5 && purchaseKeywords.some(kw => contentLower.includes(kw));
+
 
   if (isMentioned || hasIntent) {
     // Đảm bảo không reply ở các kênh log
