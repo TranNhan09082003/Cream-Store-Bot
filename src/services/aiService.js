@@ -93,7 +93,7 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     const tools = isTicket ? [{ functionDeclarations: [createOrderToolDeclaration] }] : undefined;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents: history,
       config: {
         systemInstruction: systemPrompt,
@@ -121,6 +121,8 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     console.error('[AI SERVICE] Error processing message:', error);
     if (error.status === 503 || error.message?.includes('503')) {
       await message.reply('⚠️ Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!').catch(() => null);
+    } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('exceeded your current quota')) {
+      await message.reply('⚠️ Hệ thống AI đang tạm khóa vì vượt quá giới hạn Miễn Phí của Google (Nhắn quá nhanh hoặc hết lượt dùng trong ngày). Vui lòng đợi 1 phút rồi thử lại!').catch(() => null);
     }
     return false;
   }
