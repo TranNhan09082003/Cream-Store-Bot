@@ -793,7 +793,7 @@ export function buildOutstandingOrdersEmbed(summary, orders, customer = null) {
     embed.addFields({
       name: '📋 Danh Sách',
       value: orders.map(o =>
-        `• \`${o.order_code}\` <@${o.customer_id}> — ${formatOrderProduct(o.quantity, o.product_name)} — ${getOrderStatusLabel(o.status)}`,
+        `• \`${o.order_code}\` <@${o.customer_id}> ${o.ticket_channel_id ? `(<#${o.ticket_channel_id}>)` : ''} — ${formatOrderProduct(o.quantity, o.product_name)} — ${getOrderStatusLabel(o.status)}`,
       ).join('\n').slice(0, 1024),
     });
   }
