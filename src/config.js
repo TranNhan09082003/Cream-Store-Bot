@@ -140,8 +140,8 @@ export const config = {
   vipRoleThreshold: Number.parseInt(getEnv('VIP_ROLE_THRESHOLD', '10'), 10),
   pendingPaymentReminderMinutes: Number.parseInt(getEnv('PENDING_PAYMENT_REMINDER_MINUTES', '15'), 10),
   processingReminderMinutes: Number.parseInt(getEnv('PROCESSING_REMINDER_MINUTES', '60'), 10),
-  openRouterApiKey: getEnv('OPENROUTER_API_KEY', ''),
-  aiModel: getEnv('AI_MODEL', 'google/gemma-3-27b-it:free'),
+  groqApiKey: getEnv('GROQ_API_KEY', getEnv('OPENROUTER_API_KEY', '')), // Dùng chung biến để tiện cho user nếu họ nhác sửa
+  aiModel: getEnv('AI_MODEL', 'llama-3.3-70b-versatile'),
   aiSystemPrompt: getMultilineEnv('AI_SYSTEM_PROMPT', 'Bạn là trợ lý AI thân thiện của Cream Store. Hãy tư vấn nhiệt tình và ngắn gọn.'),
 
 

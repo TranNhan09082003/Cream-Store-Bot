@@ -68,7 +68,7 @@ const createOrderToolDeclaration = {
 };
 
 export async function processAiMessage(message, isTicket, isStaff = false) {
-  if (!config.openRouterApiKey) return false;
+  if (!config.groqApiKey) return false;
 
   await message.channel.sendTyping();
 
@@ -87,7 +87,7 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     ];
 
     const body = {
-      model: config.aiModel || 'google/gemma-3-27b-it:free',
+      model: config.aiModel || 'llama-3.3-70b-versatile',
       messages: messages,
       temperature: 0.7,
     };
@@ -96,21 +96,19 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
       body.tools = [createOrderToolDeclaration];
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.openRouterApiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': config.publicBaseUrl || 'https://discord.com',
-        'X-Title': config.storeName || 'Cream Store Bot',
+        'Authorization': `Bearer ${config.groqApiKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[OPENROUTER API ERROR]', errText);
-      throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText}`);
+      console.error('[GROQ API ERROR]', errText);
+      throw new Error(`Groq API Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();

@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 
 export async function moderateMessage(messageContent) {
-  if (!config.openRouterApiKey) return null;
+  if (!config.groqApiKey) return null;
 
   const prompt = `
 Bạn là một hệ thống kiểm duyệt tự động (Moderator) cho cửa hàng Cream Store trên Discord.
@@ -23,16 +23,14 @@ Hãy trả về kết quả ĐÚNG chuẩn JSON với cấu trúc sau:
 }`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.openRouterApiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': config.publicBaseUrl || 'https://discord.com',
-        'X-Title': config.storeName || 'Cream Store Bot',
+        'Authorization': `Bearer ${config.groqApiKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: config.aiModel || 'google/gemma-3-27b-it:free',
+        model: config.aiModel || 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         response_format: { type: 'json_object' }
@@ -40,7 +38,7 @@ Hãy trả về kết quả ĐÚNG chuẩn JSON với cấu trúc sau:
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API Error: ${response.status}`);
+      throw new Error(`Groq API Error: ${response.status}`);
     }
 
     const data = await response.json();
