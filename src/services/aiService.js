@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { config } from '../config.js';
 import { getAiKnowledge } from './aiKnowledgeService.js';
 import { getGuildConfig } from './guildConfigService.js';
@@ -8,20 +7,6 @@ import { emitStaffLog } from './staffLogService.js';
 import { getTicketByChannelId } from './ticketService.js';
 import { buildOrderActionComponents, buildOrderCreatedEmbed, buildQueuePositionEmbed, buildQueueViewComponents } from '../utils/embeds.js';
 import { buildOrderLogContent } from '../utils/formatters.js';
-
-let aiClients = [];
-let currentClientIndex = 0;
-
-export function getAiClient() {
-  if (aiClients.length === 0 && config.geminiApiKeys && config.geminiApiKeys.length > 0) {
-    aiClients = config.geminiApiKeys.map(key => new GoogleGenAI({ apiKey: key }));
-  }
-  if (aiClients.length === 0) return null;
-
-  const client = aiClients[currentClientIndex];
-  currentClientIndex = (currentClientIndex + 1) % aiClients.length;
-  return client;
-}
 
 export async function generateSystemPrompt(guild, isStaff) {
   const knowledge = getAiKnowledge(guild.id);
@@ -65,70 +50,91 @@ export async function generateSystemPrompt(guild, isStaff) {
 }
 
 const createOrderToolDeclaration = {
-  name: 'create_order',
-  description: 'Sử dụng chức năng này để tạo đơn hàng (xuất mã QR thanh toán) khi khách hàng ĐÃ CHỐT MUA SẢN PHẨM trong kênh Ticket.',
-  parameters: {
-    type: 'OBJECT',
-    properties: {
-      productName: { type: 'STRING', description: 'Tên sản phẩm (vd: Netflix, Spotify)' },
-      quantity: { type: 'INTEGER', description: 'Số lượng sản phẩm khách mua' },
-      amount: { type: 'INTEGER', description: 'Tổng số tiền thanh toán (VND). Ví dụ: 55000' },
-      durationMonths: { type: 'INTEGER', description: 'Số tháng gia hạn/sử dụng. Mặc định là 1 nếu không rõ.' }
-    },
-    required: ['productName', 'quantity', 'amount']
+  type: "function",
+  function: {
+    name: "create_order",
+    description: "Sử dụng chức năng này để tạo đơn hàng (xuất mã QR thanh toán) khi khách hàng ĐÃ CHỐT MUA SẢN PHẨM trong kênh Ticket.",
+    parameters: {
+      type: "object",
+      properties: {
+        productName: { type: "string", description: "Tên sản phẩm (vd: Netflix, Spotify)" },
+        quantity: { type: "integer", description: "Số lượng sản phẩm khách mua" },
+        amount: { type: "integer", description: "Tổng số tiền thanh toán (VND). Ví dụ: 55000" },
+        durationMonths: { type: "integer", description: "Số tháng gia hạn/sử dụng. Mặc định là 1 nếu không rõ." }
+      },
+      required: ["productName", "quantity", "amount"]
+    }
   }
 };
 
 export async function processAiMessage(message, isTicket, isStaff = false) {
-  const ai = getAiClient();
-  if (!ai) return false;
+  if (!config.openRouterApiKey) return false;
 
   await message.channel.sendTyping();
 
   try {
     const systemPrompt = await generateSystemPrompt(message.guild, isStaff);
     
-    // Lấy lịch sử chat
     const fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
     const history = fetchedMessages.reverse().map(msg => ({
-      role: msg.author.id === message.client.user.id ? 'model' : 'user',
-      parts: [{ text: `[${msg.author.username}]: ${msg.content}` }]
+      role: msg.author.id === message.client.user.id ? 'assistant' : 'user',
+      content: `[${msg.author.username}]: ${msg.content}`
     }));
 
-    const tools = isTicket ? [{ functionDeclarations: [createOrderToolDeclaration] }] : undefined;
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history
+    ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: history,
-      config: {
-        systemInstruction: systemPrompt,
-        tools: tools,
-        temperature: 0.7,
-      }
+    const body = {
+      model: config.aiModel || 'google/gemini-2.0-flash-lite-preview-02-05:free',
+      messages: messages,
+      temperature: 0.7,
+    };
+
+    if (isTicket) {
+      body.tools = [createOrderToolDeclaration];
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.openRouterApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': config.publicBaseUrl || 'https://discord.com',
+        'X-Title': config.storeName || 'Cream Store Bot',
+      },
+      body: JSON.stringify(body)
     });
 
-    // Kiểm tra xem AI có gọi tool không
-    if (response.functionCalls && response.functionCalls.length > 0) {
-      const call = response.functionCalls[0];
-      if (call.name === 'create_order') {
-        await handleAutoCreateOrder(message, call.args);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('[OPENROUTER API ERROR]', errText);
+      throw new Error(`OpenRouter API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices[0];
+    const messageResponse = choice.message;
+
+    if (messageResponse.tool_calls && messageResponse.tool_calls.length > 0) {
+      const toolCall = messageResponse.tool_calls[0];
+      if (toolCall.function.name === 'create_order') {
+        const args = JSON.parse(toolCall.function.arguments);
+        await handleAutoCreateOrder(message, args);
         return true;
       }
     }
 
-    if (response.text) {
-      await message.reply(response.text);
+    if (messageResponse.content) {
+      await message.reply(messageResponse.content);
       return true;
     }
     
     return false;
   } catch (error) {
     console.error('[AI SERVICE] Error processing message:', error);
-    if (error.status === 503 || error.message?.includes('503')) {
-      await message.reply('⚠️ Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!').catch(() => null);
-    } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('exceeded your current quota')) {
-      await message.reply('⚠️ Hệ thống AI đang tạm khóa vì vượt quá giới hạn Miễn Phí của Google (Nhắn quá nhanh hoặc hết lượt dùng trong ngày). Vui lòng đợi 1 phút rồi thử lại!').catch(() => null);
-    }
+    await message.reply('⚠️ Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!').catch(() => null);
     return false;
   }
 }
