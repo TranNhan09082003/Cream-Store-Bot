@@ -32,7 +32,7 @@ Hãy trả về kết quả ĐÚNG chuẩn JSON với cấu trúc sau:
         'X-Title': config.storeName || 'Cream Store Bot',
       },
       body: JSON.stringify({
-        model: config.aiModel || 'google/gemini-2.0-flash-lite-preview-02-05:free',
+        model: config.aiModel || 'google/gemma-3-27b-it:free',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         response_format: { type: 'json_object' }

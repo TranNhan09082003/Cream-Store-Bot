@@ -87,7 +87,7 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     ];
 
     const body = {
-      model: config.aiModel || 'google/gemini-2.0-flash-lite-preview-02-05:free',
+      model: config.aiModel || 'google/gemma-3-27b-it:free',
       messages: messages,
       temperature: 0.7,
     };
