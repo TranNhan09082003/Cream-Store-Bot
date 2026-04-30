@@ -9,13 +9,18 @@ import { getTicketByChannelId } from './ticketService.js';
 import { buildOrderActionComponents, buildOrderCreatedEmbed, buildQueuePositionEmbed, buildQueueViewComponents } from '../utils/embeds.js';
 import { buildOrderLogContent } from '../utils/formatters.js';
 
-let aiClient = null;
+let aiClients = [];
+let currentClientIndex = 0;
 
 export function getAiClient() {
-  if (!aiClient && config.geminiApiKey) {
-    aiClient = new GoogleGenAI({ apiKey: config.geminiApiKey });
+  if (aiClients.length === 0 && config.geminiApiKeys && config.geminiApiKeys.length > 0) {
+    aiClients = config.geminiApiKeys.map(key => new GoogleGenAI({ apiKey: key }));
   }
-  return aiClient;
+  if (aiClients.length === 0) return null;
+
+  const client = aiClients[currentClientIndex];
+  currentClientIndex = (currentClientIndex + 1) % aiClients.length;
+  return client;
 }
 
 export async function generateSystemPrompt(guild, isStaff) {

@@ -75,6 +75,11 @@ function pathWithLeadingSlash(value, fallback) {
   return raw;
 }
 
+function getGeminiApiKeys() {
+  const keysStr = getEnv('GEMINI_API_KEYS') || getEnv('GEMINI_API_KEY') || '';
+  return keysStr.split(',').map(k => k.trim()).filter(k => k);
+}
+
 export const environmentInfo = {
   cwd: process.cwd(),
   projectRoot,
@@ -139,7 +144,7 @@ export const config = {
   vipRoleThreshold: Number.parseInt(getEnv('VIP_ROLE_THRESHOLD', '10'), 10),
   pendingPaymentReminderMinutes: Number.parseInt(getEnv('PENDING_PAYMENT_REMINDER_MINUTES', '15'), 10),
   processingReminderMinutes: Number.parseInt(getEnv('PROCESSING_REMINDER_MINUTES', '60'), 10),
-  geminiApiKey: getEnv('GEMINI_API_KEY', ''),
+  geminiApiKeys: getGeminiApiKeys(),
   aiSystemPrompt: getMultilineEnv('AI_SYSTEM_PROMPT', 'Bạn là trợ lý AI thân thiện của Cream Store. Hãy tư vấn nhiệt tình và ngắn gọn.'),
 
 
