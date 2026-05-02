@@ -79,8 +79,9 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
 export async function execute(interaction) {
   const customer = interaction.options.getUser('khach_hang');
   const payload = buildCongnoPanel(interaction.guildId, customer?.id ?? null, 1);
+  // Merge IsComponentsV2 (32768) with Ephemeral (64)
   await interaction.reply({
     ...payload,
-    flags: 64,
+    flags: MessageFlags.IsComponentsV2 | 64,
   });
 }

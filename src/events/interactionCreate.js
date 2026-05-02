@@ -1199,8 +1199,13 @@ export function registerInteractionHandler(client, commands) {
         const customerId = customerIdStr === 'all' ? null : customerIdStr;
         
         import('../commands/congno.js').then(async ({ buildCongnoPanel }) => {
-          const payload = buildCongnoPanel(interaction.guildId, customerId, page);
-          await interaction.update(payload).catch(() => null);
+          import('discord.js').then(async ({ MessageFlags }) => {
+            const payload = buildCongnoPanel(interaction.guildId, customerId, page);
+            await interaction.update({
+              ...payload,
+              flags: MessageFlags.IsComponentsV2,
+            }).catch(() => null);
+          });
         });
         return;
       }
