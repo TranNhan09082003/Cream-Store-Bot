@@ -401,10 +401,14 @@ async function handleProductPurchaseFlow(interaction, productId) {
     const price = product.price * quantity;
     const order = createOrder({
       guildId: interaction.guildId,
+      ticketId: ticket.id,
       ticketChannelId: channel.id,
       customerId: interaction.user.id,
+      productName: product.name,
+      quantity,
       totalAmount: price,
-      items: [{ productName: product.name, quantity, unitPrice: product.price }],
+      durationMonths: product.duration_months,
+      createdById: interaction.client.user.id,
     });
 
     await channel.send({
