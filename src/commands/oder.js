@@ -3,13 +3,11 @@ import { getGuildConfig } from '../services/guildConfigService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
 import { getTicketByChannelId } from '../services/ticketService.js';
 import { createOrder, getQueuePosition, saveOrderLogMessage } from '../services/orderService.js';
-import { sendOrRefreshPaymentQr } from '../services/paymentService.js';
 import { ensureRateLimit } from '../services/abuseService.js';
 import {
-  buildOrderActionComponents,
-  buildOrderCreatedEmbed,
-  buildQueuePositionEmbed,
-  buildQueueViewComponents,
+  buildOrderCreatedV2,
+  buildQueuePositionV2,
+  buildPaymentMethodSelector,
 } from '../utils/embeds.js';
 import { buildOrderLogContent, parseMoneyInput } from '../utils/formatters.js';
 import { config } from '../config.js';
@@ -84,26 +82,23 @@ export async function execute(interaction) {
     const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
     saveOrderLogMessage(order.order_code, logMessage.id);
 
-    await ticketChannel.send({
-      content: `<@${customer.id}>`,
-      embeds: [
-        buildOrderCreatedEmbed(order, guildConfig.order_log_channel_id),
-        buildQueuePositionEmbed(order, queue.position, queue.total),
-      ],
-      components: [
-        ...buildOrderActionComponents(order.order_code),
-        ...buildQueueViewComponents(order.order_code),
-      ],
-    });
+    // Gửi Order Created V2 + Queue V2 trong cùng 1 message
+    const { container: orderContainer, actionRow: orderActionRow, flags: orderFlags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
+    const { container: queueContainer, actionRow: queueActionRow, flags: queueFlags } = buildQueuePositionV2(order, queue.position, queue.total);
 
-    let paymentNotice = 'Đơn này không cần tạo link thanh toán.';
+    await ticketChannel.send({
+      components: [orderContainer, orderActionRow, queueContainer, queueActionRow],
+      flags: orderFlags,
+    });
+    await ticketChannel.send({ content: `<@${customer.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
+
+    // Nếu có tiền → hiện bảng chọn phương thức thanh toán
     if (order.total_amount > 0) {
-      try {
-        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
-        paymentNotice = 'Bot đã gửi QR + link checkout PayOS trong ticket.';
-      } catch (error) {
-        paymentNotice = `Chưa tạo được PayOS checkout: ${error.message}. Hãy kiểm tra /setup-payos rồi dùng /qr để gửi lại.`;
-      }
+      const { container: payContainer, actionRow: payRow, flags: payFlags } = buildPaymentMethodSelector(order);
+      await ticketChannel.send({
+        components: [payContainer, payRow],
+        flags: payFlags,
+      });
     }
 
     await emitStaffLog(interaction.client, {
@@ -116,7 +111,7 @@ export async function execute(interaction) {
       relatedTicketCode: ticket.ticket_code,
     });
 
-    await interaction.editReply(`✅ Đã tạo đơn \`${order.order_code}\` và ghi log vào ${orderLogChannel}. ${paymentNotice}`);
+    await interaction.editReply(`✅ Đã tạo đơn \`${order.order_code}\` và ghi log vào ${orderLogChannel}. Khách hàng chọn phương thức thanh toán trong ticket.`);
   } catch (error) {
     console.error('[ORDER] Lỗi:', error);
     const message = `❌ Có lỗi khi tạo đơn hàng: ${error.message ?? 'Lỗi không xác định'}`;

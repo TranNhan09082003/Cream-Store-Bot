@@ -491,6 +491,49 @@ export function buildOrderCreatedEmbed(order, orderChannelId) {
   );
 }
 
+// ═══ Order Created V2 (Components V2) ═══
+export function buildOrderCreatedV2(order, orderChannelId) {
+  const hasPay = order.total_amount > 0;
+  const container = new ContainerBuilder().setAccentColor(hasPay ? 0x6366f1 : 0x22c55e);
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## ✅ Đơn Hàng \`${order.order_code}\` Đã Được Tạo\n` +
+      (hasPay
+        ? `> 💳 Vui lòng **chọn phương thức thanh toán** để đơn được xử lý`
+        : `> 🎁 Đơn không cần thanh toán — đưa vào hàng xử lý ngay!`)
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `📦 **Sản phẩm:** ${formatOrderProduct(order.quantity, order.product_name)}\n` +
+      `💰 **Số tiền:** ${hasPay ? `\`${formatCurrency(order.total_amount)}\`` : '_Miễn phí_'}\n` +
+      `📊 **Trạng thái:** ${getOrderStatusLabel(order.status)}\n` +
+      `📋 **Theo dõi tại:** <#${orderChannelId}>`
+    )
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`order:cancel:${order.order_code}`)
+      .setLabel('Hủy Đơn')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('❌'),
+    new ButtonBuilder()
+      .setCustomId(`queue:view:${order.order_code}`)
+      .setLabel('Xem Hàng Chờ')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📍'),
+  );
+
+  return { container, actionRow, flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildOrderActionComponents(orderCode) {
   return [
     new ActionRowBuilder().addComponents(
@@ -519,6 +562,47 @@ export function buildQueuePositionEmbed(order, position, totalInQueue) {
   );
 }
 
+// ═══ Queue Position V2 (Components V2) ═══
+export function buildQueuePositionV2(order, position, totalInQueue) {
+  const groupName = normalizeQueueGroup(order.product_name) || 'đơn hàng';
+  const container = new ContainerBuilder().setAccentColor(0x0ea5e9);
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## 📌 Vị Trí Xếp Hàng\n` +
+      `> 🏷️ Mã đơn: \`${order.order_code}\`\n` +
+      `> 📦 Nhóm: \`${groupName}\``
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `⏳ **Vị trí:** \`${position} / ${totalInQueue}\`\n` +
+      `🗂️ **Nhóm xử lý:** \`${groupName}\`\n` +
+      `ℹ️ _Thứ tự xử lý theo ưu tiên và thời gian đặt hàng._`
+    )
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`queue:view:${order.order_code}`)
+      .setLabel('Xem Vị Trí')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('📍'),
+    new ButtonBuilder()
+      .setCustomId(`order:claim:${order.order_code}`)
+      .setLabel('Claim Đơn')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('🛡️'),
+  );
+
+  return { container, actionRow, flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildQueueViewComponents(orderCode) {
   return [
     new ActionRowBuilder().addComponents(
@@ -535,6 +619,8 @@ export function buildQueueViewComponents(orderCode) {
     ),
   ];
 }
+
+
 
 // ═══════════════════════════════════════════════
 // Payment

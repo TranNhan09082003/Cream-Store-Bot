@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AttachmentBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { AttachmentBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, MediaGalleryBuilder, UnfurledMediaItemBuilder } from 'discord.js';
 import QRCode from 'qrcode';
 import { assertPaymentConfig, config, getPayOSCancelUrl, getPayOSReturnUrl, getWebhookUrl } from '../config.js';
 import {
@@ -306,12 +306,18 @@ export async function sendVietQRPayment({ guild, orderCode }) {
     new TextDisplayBuilder().setContent('📱 **Quét mã QR bên dưới để thanh toán:**')
   );
 
+  // Hiển thị QR image trong container bằng MediaGallery
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(
+      new UnfurledMediaItemBuilder().setURL(`attachment://${attachmentName}`)
+    )
+  );
+
   const sentMessage = await ticketChannel.send({
     components: [container],
     files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
     flags: MessageFlags.IsComponentsV2,
   });
-  // Ping user riêng (không dùng content với V2 flag)
   await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR chuyển khoản của bạn!` }).catch(() => null);
 
   savePaymentMessage(order.order_code, sentMessage.id);
@@ -379,6 +385,12 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
     );
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent('📱 **Quét mã QR hoặc bấm nút Thanh Toán Ngay:**')
+    );
+    // Hiển thị QR image trong container bằng MediaGallery
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new UnfurledMediaItemBuilder().setURL(`attachment://${attachmentName}`)
+      )
     );
   }
 
