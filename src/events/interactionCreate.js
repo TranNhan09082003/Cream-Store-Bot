@@ -804,103 +804,6 @@ async function handleKeepOpen(interaction, ticketId) {
 }
 
 // ═══════════════════════════════════════════════
-// Product Catalog Handlers
-// ═══════════════════════════════════════════════
-
-async function handleProductSelect(interaction) {
-  const productId = Number(interaction.values[0]);
-  const product = getProductById(productId);
-
-  if (!product || !product.is_active) {
-    await safeReply(interaction, { content: '⚠️ Sản phẩm này không còn khả dụng.', ephemeral: true });
-    return;
-  }
-
-  // Kiểm tra xem user có đang trong ticket không
-  const ticket = getTicketByChannelId(interaction.channel.id);
-
-  if (!ticket || ticket.status !== 'OPEN') {
-    // Không ở trong ticket → hướng dẫn mở ticket
-    await safeReply(interaction, {
-      content: [
-        `${product.emoji} **${product.name}** — **${Number(product.price).toLocaleString('vi-VN')} VND** / ${product.duration_months} tháng`,
-        '',
-        '> 🎫 Để mua sản phẩm này, bạn cần **mở ticket Mua Hàng** trước!',
-        '> Bấm nút **🛍️ Mua Hàng** ở panel ticket, sau đó chọn lại sản phẩm trong ticket.',
-      ].join('\n'),
-      ephemeral: true,
-    });
-    return;
-  }
-
-  // Đang trong ticket → tự tạo đơn + gửi QR
-  await interaction.deferReply();
-
-  try {
-    const guildConfig = getGuildConfig(interaction.guildId);
-    if (!guildConfig) throw new Error('Server chưa setup.');
-
-    const order = createOrder({
-      guildId: interaction.guildId,
-      ticketId: ticket.id,
-      ticketChannelId: ticket.channel_id,
-      customerId: interaction.user.id,
-      productName: product.name,
-      quantity: 1,
-      note: `Auto-order từ product catalog (ID: ${product.id})`,
-      totalAmount: product.price,
-      durationMonths: product.duration_months,
-      orderLogChannelId: guildConfig.order_log_channel_id,
-      createdById: interaction.client.user.id,
-    });
-
-    // Log đơn hàng
-    const orderLogChannel = await interaction.guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null);
-    if (orderLogChannel?.isTextBased()) {
-      const logMsg = await orderLogChannel.send({ content: buildOrderLogContent(order) }).catch(() => null);
-      if (logMsg) saveOrderLogMessage(order.order_code, logMsg.id);
-    }
-
-    const priceText = `${Number(order.total_amount).toLocaleString('vi-VN')} VND`;
-
-    await interaction.editReply({
-      content: [
-        `<@${interaction.user.id}>`,
-        `### ✅ Đơn hàng \`${order.order_code}\` đã được tạo!`,
-        `> ${product.emoji} **${product.name}** — **${priceText}**`,
-        `> ⏱️ Thời hạn: ${product.duration_months} tháng`,
-        '',
-        order.total_amount > 0 ? '> 💳 Đang tạo QR thanh toán...' : '> 🎁 Đơn miễn phí — đang xử lý!',
-      ].join('\n'),
-    });
-
-    // Gửi QR nếu cần thanh toán
-    if (order.total_amount > 0) {
-      try {
-        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
-      } catch (err) {
-        await interaction.followUp({
-          content: `⚠️ Chưa tạo được QR: ${err.message}. Staff hãy dùng \`/qr\` để gửi lại.`,
-        }).catch(() => null);
-      }
-    }
-
-    await emitStaffLog(interaction.client, {
-      guildId: interaction.guildId,
-      actorId: interaction.client.user.id,
-      targetId: interaction.user.id,
-      action: 'ORDER_CREATE',
-      detail: `[Auto] ${product.name} x1 — từ product catalog`,
-      relatedOrderCode: order.order_code,
-    });
-
-  } catch (error) {
-    console.error('[PRODUCT SELECT] Lỗi:', error);
-    const msg = `❌ Không tạo được đơn: ${error.message}`;
-    if (interaction.deferred) await interaction.editReply(msg).catch(() => null);
-    else await safeReply(interaction, { content: msg, ephemeral: true });
-  }
-}
 
 async function handleProductEditButton(interaction, productId) {
   const product = getProductById(Number(productId));
@@ -1372,12 +1275,6 @@ export function registerInteractionHandler(client, commands) {
       // Warranty product select menu
       if (interaction.isAnySelectMenu() && interaction.customId === 'warranty:product:select') {
         await handleWarrantyProductSelect(interaction);
-        return;
-      }
-
-      // Product catalog select menu
-      if (interaction.isAnySelectMenu() && interaction.customId === 'product:select') {
-        await handleProductSelect(interaction);
         return;
       }
 
