@@ -1194,6 +1194,91 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      // ✏️ Panel Edit button — chỉ manager dùng được
+      if (interaction.isButton() && interaction.customId === 'ticket:panel:edit') {
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const guildConfig = getGuildConfig(interaction.guildId);
+        if (!isManager(member, guildConfig)) {
+          await interaction.reply({ content: '⛔ Chỉ **Manager/Admin** mới được chỉnh sửa Panel.', ephemeral: true });
+          return;
+        }
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+        const modal = new ModalBuilder()
+          .setCustomId('ticket:panel:edit:modal')
+          .setTitle('✏️ Chỉnh Sửa Panel Ticket');
+
+        const titleInput = new TextInputBuilder()
+          .setCustomId('panel_title')
+          .setLabel('Tiêu đề (bỏ trống = mặc định)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder('VD: 🎫 Cream Store — Trung Tâm Hỗ Trợ')
+          .setValue(guildConfig?.panel_title || '');
+
+        const descInput = new TextInputBuilder()
+          .setCustomId('panel_description')
+          .setLabel('Mô tả (bỏ trống = mặc định)')
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(false)
+          .setPlaceholder('VD: > Chào mừng bạn đến với shop!\n> Chọn loại ticket phù hợp bên dưới.')
+          .setValue(guildConfig?.panel_description || '');
+
+        const imageInput = new TextInputBuilder()
+          .setCustomId('panel_image_url')
+          .setLabel('URL Ảnh Banner/Thumbnail (bỏ trống = ẩn)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder('https://i.imgur.com/...')
+          .setValue(guildConfig?.panel_image_url || '');
+
+        const { ActionRowBuilder: AR } = await import('discord.js');
+        modal.addComponents(
+          new AR().addComponents(titleInput),
+          new AR().addComponents(descInput),
+          new AR().addComponents(imageInput),
+        );
+        await interaction.showModal(modal);
+        return;
+      }
+
+      // ✏️ Panel Edit modal submit
+      if (interaction.isModalSubmit() && interaction.customId === 'ticket:panel:edit:modal') {
+        await interaction.deferReply({ ephemeral: true });
+        const panelTitle = interaction.fields.getTextInputValue('panel_title')?.trim() || null;
+        const panelDesc = interaction.fields.getTextInputValue('panel_description')?.trim() || null;
+        const panelImage = interaction.fields.getTextInputValue('panel_image_url')?.trim() || null;
+
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const { upsertGuildConfig } = await import('../services/guildConfigService.js');
+        const updated = upsertGuildConfig({
+          guild_id: interaction.guildId,
+          panel_title: panelTitle,
+          panel_description: panelDesc,
+          panel_image_url: panelImage,
+          updated_by: interaction.user.id,
+        });
+
+        // Cập nhật panel message ngay lập tức
+        try {
+          if (updated.ticket_panel_channel_id && updated.ticket_panel_message_id) {
+            const panelChannel = await interaction.guild.channels.fetch(updated.ticket_panel_channel_id).catch(() => null);
+            if (panelChannel) {
+              const panelMsg = await panelChannel.messages.fetch(updated.ticket_panel_message_id).catch(() => null);
+              if (panelMsg) {
+                const { buildTicketPanelV2 } = await import('../utils/embeds.js');
+                const { container, rows, flags } = buildTicketPanelV2(updated);
+                await panelMsg.edit({ components: [container, ...rows], flags });
+              }
+            }
+          }
+        } catch (editErr) {
+          console.error('[PANEL EDIT] Lỗi cập nhật panel:', editErr);
+        }
+
+        await interaction.editReply('✅ Panel đã được cập nhật thành công!');
+        return;
+      }
+
       // Customer cancel order button
       if (interaction.isButton() && interaction.customId.startsWith('order:cancel_customer:')) {
         await interaction.deferReply({ ephemeral: true });

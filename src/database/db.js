@@ -323,6 +323,11 @@ export function initDatabase() {
   ensureColumn('guild_settings', 'complaint_category_id', 'TEXT');
   ensureColumn('guild_settings', 'partnership_category_id', 'TEXT');
 
+  // Panel customization — title, description, image
+  ensureColumn('guild_settings', 'panel_title', 'TEXT');
+  ensureColumn('guild_settings', 'panel_description', 'TEXT');
+  ensureColumn('guild_settings', 'panel_image_url', 'TEXT');
+
   // Customer flags — mute ticket (ngăn tạo ticket)
   ensureColumn('customer_flags', 'is_ticket_muted', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('customer_flags', 'ticket_mute_reason', 'TEXT');

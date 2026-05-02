@@ -28,6 +28,9 @@ function upsertGuildConfigStmt() {
       bank_bin,
       bank_account_no,
       bank_account_name,
+      panel_title,
+      panel_description,
+      panel_image_url,
       updated_by,
       updated_at
     ) VALUES (
@@ -56,6 +59,9 @@ function upsertGuildConfigStmt() {
       @bank_bin,
       @bank_account_no,
       @bank_account_name,
+      @panel_title,
+      @panel_description,
+      @panel_image_url,
       @updated_by,
       @updated_at
     )
@@ -84,6 +90,9 @@ function upsertGuildConfigStmt() {
       bank_bin = COALESCE(excluded.bank_bin, guild_settings.bank_bin),
       bank_account_no = COALESCE(excluded.bank_account_no, guild_settings.bank_account_no),
       bank_account_name = COALESCE(excluded.bank_account_name, guild_settings.bank_account_name),
+      panel_title = COALESCE(excluded.panel_title, guild_settings.panel_title),
+      panel_description = COALESCE(excluded.panel_description, guild_settings.panel_description),
+      panel_image_url = COALESCE(excluded.panel_image_url, guild_settings.panel_image_url),
       updated_by = excluded.updated_by,
       updated_at = excluded.updated_at
   `);
@@ -121,6 +130,9 @@ export function upsertGuildConfig(payload) {
     bank_bin: payload.bank_bin ?? existing?.bank_bin ?? null,
     bank_account_no: payload.bank_account_no ?? existing?.bank_account_no ?? null,
     bank_account_name: payload.bank_account_name ?? existing?.bank_account_name ?? null,
+    panel_title: payload.panel_title !== undefined ? (payload.panel_title || null) : (existing?.panel_title ?? null),
+    panel_description: payload.panel_description !== undefined ? (payload.panel_description || null) : (existing?.panel_description ?? null),
+    panel_image_url: payload.panel_image_url !== undefined ? (payload.panel_image_url || null) : (existing?.panel_image_url ?? null),
     updated_by: payload.updated_by ?? existing?.updated_by ?? null,
     updated_at: nowIso(),
   };

@@ -83,22 +83,31 @@ export function buildTicketPanelComponents() {
 // ═══════════════════════════════════════════════
 // Ticket Panel V2 (Components V2 — Premium)
 // ═══════════════════════════════════════════════
-export function buildTicketPanelV2() {
+export function buildTicketPanelV2(customConfig = {}) {
   const brand = brandConfig('store');
+  const title = customConfig.panel_title || `🎫 ${brand.name || 'Cream Store'} — Trung Tâm Hỗ Trợ`;
+  const description = customConfig.panel_description ||
+    `> ✨ Chào mừng bạn đến với **${brand.name || 'Cream Store'}**!\n` +
+    `> Bấm nút bên dưới để mở ticket. Chọn **đúng loại** giúp staff phục vụ bạn nhanh hơn.`;
+  const imageUrl = customConfig.panel_image_url || null;
+
   const container = new ContainerBuilder().setAccentColor(0x6366f1); // Indigo
 
   // Header
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `## 🎫 ${brand.name || 'Cream Store'} — Trung Tâm Hỗ Trợ\n` +
-      `> ✨ Chào mừng bạn đến với **${brand.name || 'Cream Store'}**!\n` +
-      `> Bấm nút bên dưới để mở ticket. Chọn **đúng loại** giúp staff phục vụ bạn nhanh hơn.`
-    )
+    new TextDisplayBuilder().setContent(`## ${title}\n${description}`)
   );
 
   container.addSeparatorComponents(
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
+
+  // Image nếu có — hiển thị dưới dạng link trong header
+  if (imageUrl) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`🖼️ [Xem ảnh banner](${imageUrl})`)
+    );
+  }
 
   // Services
   container.addTextDisplayComponents(
@@ -122,7 +131,7 @@ export function buildTicketPanelV2() {
     )
   );
 
-  // Buttons row 1
+  // Buttons row 1 — ticket actions
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛍️'),
     new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji('🆘'),
@@ -130,14 +139,14 @@ export function buildTicketPanelV2() {
     new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji('🤝'),
   );
 
-  // Buttons row 2
+  // Buttons row 2 — warranty + admin edit
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji('🛠️'),
+    new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sửa Panel').setStyle(ButtonStyle.Secondary).setEmoji('✏️'),
   );
 
   return { container, rows: [row1, row2], flags: MessageFlags.IsComponentsV2 };
 }
-
 
 
 // ═══════════════════════════════════════════════
