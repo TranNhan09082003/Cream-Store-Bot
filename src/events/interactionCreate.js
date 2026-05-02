@@ -903,24 +903,9 @@ async function handleProductEditModal(interaction, productId) {
     description: desc || null,
   });
 
-  const messageId = interaction.customId.split(':')[4];
-  if (messageId) {
-    import('../commands/stock.js').then(async ({ buildStockPanelComponents }) => {
-      try {
-        const msg = await interaction.channel.messages.fetch(messageId);
-        if (msg) {
-          const components = buildStockPanelComponents(interaction.guildId);
-          if (components) {
-            import('discord.js').then(({ MessageFlags }) => {
-              msg.edit({ components, flags: MessageFlags.IsComponentsV2 }).catch(() => null);
-            });
-          }
-        }
-      } catch (e) {
-        // Ignore fetch errors
-      }
-    });
-  }
+  import('../commands/stock.js').then(({ refreshStockPanel }) => {
+    refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
+  });
 
   await safeReply(interaction, {
     content: `✅ Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
@@ -963,6 +948,10 @@ async function handleProductAddModal(interaction) {
     durationMonths,
     serviceType: 'other',
     emoji: emoji || '📦',
+  });
+
+  import('../commands/stock.js').then(({ refreshStockPanel }) => {
+    refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
   });
 
   await safeReply(interaction, {
@@ -1039,6 +1028,12 @@ async function handleProductSaleModal(interaction) {
   let replyText = `✅ Đã thêm **${successCount}** sản phẩm thành công!`;
   if (errors.length) {
     replyText += `\n\n⚠️ **Có ${errors.length} lỗi:**\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? '\n...với nhiều lỗi khác' : ''}`;
+  }
+
+  if (successCount > 0) {
+    import('../commands/stock.js').then(({ refreshStockPanel }) => {
+      refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
+    });
   }
 
   await safeReply(interaction, { content: replyText, ephemeral: true });

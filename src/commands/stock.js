@@ -110,6 +110,26 @@ export function buildStockPanelComponents(guildId) {
   return [container, selectRow];
 }
 
+// Registry để lưu vị trí panel theo guildId
+// Map<guildId, { channelId, messageId }>
+export const stockPanelRegistry = new Map();
+
+export async function refreshStockPanel(client, guildId) {
+  const entry = stockPanelRegistry.get(guildId);
+  if (!entry) return;
+  try {
+    const channel = await client.channels.fetch(entry.channelId).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    const msg = await channel.messages.fetch(entry.messageId).catch(() => null);
+    if (!msg) return;
+    const components = buildStockPanelComponents(guildId);
+    if (!components) return;
+    await msg.edit({ components, flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+  } catch (e) {
+    // Bỏ qua lỗi nếu panel đã bị xóa
+  }
+}
+
 export async function execute(interaction) {
   await interaction.deferReply({ flags: 64 });
 
@@ -119,9 +139,15 @@ export async function execute(interaction) {
       return interaction.editReply(`${ICONS.defaultProduct} Chưa có sản phẩm nào. Dùng \`/product add\` hoặc \`/product sale\` để thêm trước.`);
     }
 
-    await interaction.channel.send({
+    const panelMessage = await interaction.channel.send({
       components,
       flags: MessageFlags.IsComponentsV2,
+    });
+
+    // Lưu vị trí panel để các lệnh khác có thể tự reload
+    stockPanelRegistry.set(interaction.guildId, {
+      channelId: interaction.channel.id,
+      messageId: panelMessage.id,
     });
 
     await interaction.editReply(`✅ Panel sản phẩm đã được gửi!`);
