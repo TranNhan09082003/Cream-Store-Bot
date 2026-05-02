@@ -431,21 +431,26 @@ async function handleProductPurchaseFlow(interaction, productId) {
     });
 
     if (price > 0) {
-      import('../services/paymentService.js').then(async ({ sendVietQRPayment }) => {
+      import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr, sendVietQRPayment }) => {
         try {
-          await sendVietQRPayment({ guild: interaction.guild, orderCode: order.order_code });
-
-          const cancelRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`order:cancel_customer:${order.order_code}`)
-              .setLabel('❌ Hủy Đơn Hàng')
-              .setStyle(ButtonStyle.Danger)
-          );
-          await channel.send({ content: 'Nếu bạn đổi ý hoặc chọn nhầm, hãy bấm nút Hủy bên dưới để tự động đóng ticket.', components: [cancelRow] });
-
-        } catch (e) {
-          await channel.send(`⚠️ Không thể tạo QR tự động: ${e.message}`);
+          // Dùng PayOS như bình thường
+          await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
+        } catch (payosErr) {
+          // Nếu PayOS lỗi mới fallback sang VietQR
+          try {
+            await sendVietQRPayment({ guild: interaction.guild, orderCode: order.order_code });
+          } catch (vietqrErr) {
+            await channel.send(`⚠️ Không thể tạo QR: ${vietqrErr.message}`);
+          }
         }
+
+        const cancelRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`order:cancel_customer:${order.order_code}`)
+            .setLabel('❌ Hủy Đơn Hàng')
+            .setStyle(ButtonStyle.Danger)
+        );
+        await channel.send({ content: 'Nếu bạn đổi ý hoặc chọn nhầm, hãy bấm nút Hủy bên dưới để tự động đóng ticket.', components: [cancelRow] });
       });
     }
 
