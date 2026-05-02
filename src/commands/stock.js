@@ -16,6 +16,18 @@ import { getActiveProducts } from '../services/productCatalogService.js';
 import { config } from '../config.js';
 import { formatCurrency } from '../utils/formatters.js';
 
+// 🛒 Thay đổi các icon/emoji dưới đây bằng custom emoji của server bạn
+// Ví dụ custom emoji: '<:ten_emoji:1234567890>'
+const ICONS = {
+  header: '🛍️',
+  price: '💰',
+  duration: '⏱️',
+  footer: '📌',
+  defaultProduct: '📦',
+  cart: '🛒',
+  edit: '✏️',
+};
+
 export const data = new SlashCommandBuilder()
   .setName('stock')
   .setDescription('Hiển thị panel sản phẩm (Components V2) cho khách hàng chọn mua')
@@ -27,7 +39,7 @@ export async function execute(interaction) {
   try {
     const products = getActiveProducts(interaction.guildId);
     if (!products.length) {
-      return interaction.editReply('📦 Chưa có sản phẩm nào. Dùng `/product add` để thêm trước.');
+      return interaction.editReply(`${ICONS.defaultProduct} Chưa có sản phẩm nào. Dùng \`/product add\` để thêm trước.`);
     }
 
     // ═══ Xây dựng Components V2 Panel ═══
@@ -37,8 +49,8 @@ export async function execute(interaction) {
     // Header
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        '# 🛍️  Cream Store — Bảng Giá Sản Phẩm\n' +
-        '> Chào mừng bạn đến với **Cream Store**! Chọn sản phẩm bên dưới để mua hàng.'
+        `# ${ICONS.header}  Cream Store — Bảng Giá Sản Phẩm\n` +
+        `> Chào mừng bạn đến với **Cream Store**! Chọn sản phẩm bên dưới để mua hàng.`
       )
     );
 
@@ -56,14 +68,14 @@ export async function execute(interaction) {
       const section = new SectionBuilder()
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `### ${p.emoji}  ${p.name}\n` +
-            `> 💰 **${priceText}** — ⏱️ ${durationText}${descLine}`
+            `### ${p.emoji || ICONS.defaultProduct}  ${p.name}\n` +
+            `> ${ICONS.price} **${priceText}** — ${ICONS.duration} ${durationText}${descLine}`
           )
         )
         .setButtonAccessory(
           new ButtonBuilder()
             .setCustomId(`product:edit:${p.id}`)
-            .setLabel('✏️ Edit')
+            .setLabel(`${ICONS.edit} Edit`)
             .setStyle(ButtonStyle.Secondary)
         );
 
@@ -83,7 +95,7 @@ export async function execute(interaction) {
     // Footer text
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        '-# 📌 Chọn sản phẩm từ dropdown bên dưới để đặt hàng | Cream Store'
+        `-# ${ICONS.footer} Chọn sản phẩm từ dropdown bên dưới để đặt hàng | Cream Store`
       )
     );
 
@@ -94,14 +106,14 @@ export async function execute(interaction) {
         label: `${p.name} — ${priceShort}`,
         description: p.description ? p.description.slice(0, 60) : `${p.duration_months} tháng`,
         value: `${p.id}`,
-        emoji: p.emoji || '📦',
+        emoji: p.emoji || '📦', // Giữ nguyên fallback emoji chuỗi tĩnh cho select menu
       };
     });
 
     const selectRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('product:select')
-        .setPlaceholder('🛒 Chọn sản phẩm muốn mua...')
+        .setPlaceholder(`${ICONS.cart} Chọn sản phẩm muốn mua...`)
         .addOptions(selectOptions)
     );
 
