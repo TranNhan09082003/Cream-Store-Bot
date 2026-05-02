@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import { getAiKnowledge } from './aiKnowledgeService.js';
+import { generateProductKnowledgeText } from './productCatalogService.js';
 import { getGuildConfig } from './guildConfigService.js';
 import { createOrder, getQueuePosition, saveOrderLogMessage } from './orderService.js';
 import { sendOrRefreshPaymentQr } from './paymentService.js';
@@ -10,6 +11,7 @@ import { buildOrderLogContent } from '../utils/formatters.js';
 
 export async function generateSystemPrompt(guild, isStaff) {
   const knowledge = getAiKnowledge(guild.id);
+  const productKnowledge = generateProductKnowledgeText(guild.id);
   const guildConfig = getGuildConfig(guild.id);
   
   // Quét cấu trúc kênh để AI hiểu server
@@ -17,15 +19,25 @@ export async function generateSystemPrompt(guild, isStaff) {
   const channelList = channels
     .filter(c => c.isTextBased())
     .map(c => `- #${c.name} (<#${c.id}>): ${c.topic ? c.topic.substring(0, 50) : 'Kênh chat/thông báo'}`)
-    .slice(0, 20) // Giới hạn 20 kênh để tránh quá tải
+    .slice(0, 20)
     .join('\n');
 
   let prompt = config.aiSystemPrompt || 'Bạn là nhân viên hỗ trợ nhiệt tình của Cream Store.';
   
   prompt += `\n\n--- THÔNG TIN CỬA HÀNG HIỆN TẠI ---\n`;
+  
+  // Product catalog (auto-generated từ DB)
+  if (productKnowledge) {
+    prompt += productKnowledge + `\n`;
+  }
+  
+  // Custom knowledge (admin nhập thủ công)
   if (knowledge) {
+    prompt += `\n--- KIẾN THỨC BỔ SUNG TỪ ADMIN ---\n`;
     prompt += knowledge + `\n`;
-  } else {
+  }
+  
+  if (!productKnowledge && !knowledge) {
     prompt += `(Chưa có cập nhật mới về giá cả/sản phẩm. Vui lòng hướng dẫn khách chờ Staff)\n`;
   }
 
@@ -34,10 +46,14 @@ export async function generateSystemPrompt(guild, isStaff) {
   prompt += `\n(Hãy hướng dẫn khách sang đúng kênh nếu họ cần, ví dụ bảo họ vào kênh Mua Hàng để tạo ticket).\n`;
 
   prompt += `\n--- QUY TẮC CỦA BẠN ---
-1. Trả lời ngắn gọn, tự nhiên, thân thiện.
-2. Không bịa đặt giá cả hoặc sản phẩm nếu không có trong thông tin cửa hàng.
-3. Nếu khách hàng ở kênh chat chung và muốn mua hàng, hãy hướng dẫn họ tạo Ticket.
-4. Nếu khách hàng đang ở trong kênh Ticket và ĐÃ ĐỒNG Ý CHỐT MUA (biết giá, đồng ý mua), HÃY GỌI TOOL \`create_order\`.
+1. Trả lời ngắn gọn, tự nhiên, thân thiện bằng tiếng Việt.
+2. TUYỆT ĐỐI KHÔNG bịa đặt giá cả hoặc sản phẩm không có trong danh sách trên.
+3. Nếu khách hỏi về sản phẩm KHÔNG CÓ trong danh sách, trả lời "Hiện tại shop chưa có sản phẩm này, bạn có thể liên hệ Admin để hỏi thêm nhé!"
+4. Nếu khách hàng ở kênh chat chung và muốn mua hàng, hãy hướng dẫn họ tạo Ticket.
+5. Nếu khách hàng đang ở trong kênh Ticket và ĐÃ ĐỒNG Ý CHỐT MUA (biết giá, đồng ý mua), HÃY GỌI TOOL \`create_order\` với giá ĐÚNG từ danh sách sản phẩm.
+6. Khi khách hỏi giá, trả lời CHÍNH XÁC theo danh sách sản phẩm, không làm tròn hoặc thay đổi.
+7. Nếu không chắc chắn thông tin, hãy nói "Em không rõ lắm, để em hỏi lại Admin" thay vì bịa.
+8. Khi tạo đơn, phải dùng ĐÚNG tên sản phẩm và giá từ danh sách catalog, KHÔNG ĐƯỢC tự ý đổi.
 `;
 
   if (isStaff) {
@@ -75,7 +91,8 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
   try {
     const systemPrompt = await generateSystemPrompt(message.guild, isStaff);
     
-    const fetchedMessages = await message.channel.messages.fetch({ limit: 15 });
+    // Lấy lịch sử chat (tăng từ 15 lên 25 để AI nhớ nhiều context hơn)
+    const fetchedMessages = await message.channel.messages.fetch({ limit: 25 });
     const history = fetchedMessages.reverse().map(msg => ({
       role: msg.author.id === message.client.user.id ? 'assistant' : 'user',
       content: `[${msg.author.username}]: ${msg.content}`
@@ -159,7 +176,7 @@ async function handleAutoCreateOrder(message, args) {
       totalAmount: amount,
       durationMonths: durationMonths || 1,
       orderLogChannelId: guildConfig.order_log_channel_id,
-      createdById: message.client.user.id, // Bot là người tạo
+      createdById: message.client.user.id,
     });
 
     const queue = getQueuePosition(order);

@@ -1,0 +1,119 @@
+import {
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} from 'discord.js';
+import { getActiveProducts } from '../services/productCatalogService.js';
+import { config } from '../config.js';
+import { formatCurrency } from '../utils/formatters.js';
+
+export const data = new SlashCommandBuilder()
+  .setName('stock')
+  .setDescription('Hiển thị panel sản phẩm (Components V2) cho khách hàng chọn mua')
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+
+export async function execute(interaction) {
+  await interaction.deferReply({ flags: 64 });
+
+  try {
+    const products = getActiveProducts(interaction.guildId);
+    if (!products.length) {
+      return interaction.editReply('📦 Chưa có sản phẩm nào. Dùng `/product add` để thêm trước.');
+    }
+
+    // ═══ Xây dựng Components V2 Panel ═══
+    const container = new ContainerBuilder()
+      .setAccentColor(config.accentColorPrimary);
+
+    // Header
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '# 🛍️  Cream Store — Bảng Giá Sản Phẩm\n' +
+        '> Chào mừng bạn đến với **Cream Store**! Chọn sản phẩm bên dưới để mua hàng.'
+      )
+    );
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+
+    // Render từng sản phẩm
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      const priceText = p.price > 0 ? formatCurrency(p.price) : '🎁 Miễn phí';
+      const durationText = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
+      const descLine = p.description ? `\n> _${p.description}_` : '';
+
+      const section = new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `### ${p.emoji}  ${p.name}\n` +
+            `> 💰 **${priceText}** — ⏱️ ${durationText}${descLine}`
+          )
+        )
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setCustomId(`product:edit:${p.id}`)
+            .setLabel('✏️ Edit')
+            .setStyle(ButtonStyle.Secondary)
+        );
+
+      container.addSectionComponents(section);
+
+      if (i < products.length - 1) {
+        container.addSeparatorComponents(
+          new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+        );
+      }
+    }
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+
+    // Footer text
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '-# 📌 Chọn sản phẩm từ dropdown bên dưới để đặt hàng | Cream Store'
+      )
+    );
+
+    // ═══ Dropdown Select Menu (nằm ngoài Container) ═══
+    const selectOptions = products.slice(0, 25).map(p => {
+      const priceShort = p.price > 0 ? `${Math.round(p.price / 1000)}k` : 'Free';
+      return {
+        label: `${p.name} — ${priceShort}`,
+        description: p.description ? p.description.slice(0, 60) : `${p.duration_months} tháng`,
+        value: `${p.id}`,
+        emoji: p.emoji || '📦',
+      };
+    });
+
+    const selectRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('product:select')
+        .setPlaceholder('🛒 Chọn sản phẩm muốn mua...')
+        .addOptions(selectOptions)
+    );
+
+    // Gửi panel vào channel (message mới, không ephemeral)
+    const panelMessage = await interaction.channel.send({
+      components: [container, selectRow],
+      flags: MessageFlags.IsComponentsV2,
+    });
+
+    await interaction.editReply(`✅ Panel sản phẩm đã được gửi! (${products.length} sản phẩm)`);
+  } catch (error) {
+    console.error('[STOCK] Error:', error);
+    return interaction.editReply(`❌ Lỗi: ${error.message}`);
+  }
+}

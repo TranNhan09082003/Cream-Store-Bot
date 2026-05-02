@@ -220,6 +220,23 @@ export function initDatabase() {
       UNIQUE(guild_id)
     );
 
+    CREATE TABLE IF NOT EXISTS product_catalog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      price INTEGER NOT NULL DEFAULT 0,
+      duration_months INTEGER NOT NULL DEFAULT 1,
+      service_type TEXT DEFAULT 'other',
+      emoji TEXT DEFAULT '📦',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      stock_channel_id TEXT,
+      stock_message_id TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
 
     CREATE INDEX IF NOT EXISTS idx_tickets_guild_customer_status ON tickets (guild_id, customer_id, status);
     CREATE INDEX IF NOT EXISTS idx_tickets_related_order ON tickets (related_order_code, status);
@@ -233,6 +250,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_queue ON orders (guild_id, queue_group, priority_rank, status, created_at);
     CREATE INDEX IF NOT EXISTS idx_orders_expiry_at ON orders (expiry_at, status);
     CREATE INDEX IF NOT EXISTS idx_abuse_events ON abuse_events (guild_id, user_id, action, created_at);
+    CREATE INDEX IF NOT EXISTS idx_product_catalog_guild ON product_catalog (guild_id, is_active, sort_order);
   `);
 
   ensureColumn('guild_settings', 'warranty_category_id', 'TEXT');

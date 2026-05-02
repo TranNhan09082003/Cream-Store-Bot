@@ -135,6 +135,10 @@ export const config = {
   payosCancelPath: pathWithLeadingSlash('PAYOS_CANCEL_PATH', '/payments/payos/cancel'),
   payosAutoConfirmWebhook: getBooleanEnv('PAYOS_AUTO_CONFIRM_WEBHOOK', false),
   payosExpireMinutes: Number.parseInt(getEnv('PAYOS_EXPIRE_MINUTES', '30'), 10),
+  // SePay
+  sepayApiKey: getEnv('SEPAY_API_KEY', ''),
+  sepayWebhookPath: pathWithLeadingSlash('SEPAY_WEBHOOK_PATH', '/webhooks/sepay'),
+  sepayBankAccount: getEnv('SEPAY_BANK_ACCOUNT', ''),
   customerRoleThreshold: Number.parseInt(getEnv('CUSTOMER_ROLE_THRESHOLD', '1'), 10),
   loyalRoleThreshold: Number.parseInt(getEnv('LOYAL_ROLE_THRESHOLD', '3'), 10),
   vipRoleThreshold: Number.parseInt(getEnv('VIP_ROLE_THRESHOLD', '10'), 10),

@@ -29,9 +29,13 @@ import {
   markOrderCompleted,
   setOrderStatus,
   getCompletedOrdersByCustomer,
+  claimOrder,
+  releaseOrderClaim,
+  createOrder,
+  saveOrderLogMessage,
 } from '../services/orderService.js';
 import { publishFeedback } from '../services/feedbackService.js';
-import { cancelPayOSPaymentLink, confirmOrderPaidManually } from '../services/paymentService.js';
+import { cancelPayOSPaymentLink, confirmOrderPaidManually, sendOrRefreshPaymentQr } from '../services/paymentService.js';
 import { deliverTranscript, sendCompletedFlow, updateOrderLogMessage } from '../services/notificationService.js';
 import { closeTicket, createTicket, getOpenTicketByCustomer, getTicketByChannelId, getTicketById } from '../services/ticketService.js';
 import { exportTicketTranscript } from '../services/transcriptService.js';
@@ -52,11 +56,11 @@ import {
   buildWarrantyProductSelectComponents,
   buildWarrantySelectEmbed,
 } from '../utils/embeds.js';
-import { buildTicketChannelName, parseMoneyInput } from '../utils/formatters.js';
+import { buildTicketChannelName, parseMoneyInput, buildOrderLogContent } from '../utils/formatters.js';
 import { TICKET_MEMBER_PERMISSIONS, isStaffMember, isManager, assertStaffCapability } from '../utils/permissions.js';
 import { ensureRateLimit } from '../services/abuseService.js';
 import { keepTicketOpen, scheduleTicketAutoClose } from '../services/ticketService.js';
-import { claimOrder, releaseOrderClaim } from '../services/orderService.js';
+import { getActiveProducts, getProductById, updateProduct } from '../services/productCatalogService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -653,6 +657,185 @@ async function handleKeepOpen(interaction, ticketId) {
   await safeReply(interaction, { content: '✅ Bot sẽ giữ ticket mở, không tự đóng nữa.', ephemeral: true });
 }
 
+// ═══════════════════════════════════════════════
+// Product Catalog Handlers
+// ═══════════════════════════════════════════════
+
+async function handleProductSelect(interaction) {
+  const productId = Number(interaction.values[0]);
+  const product = getProductById(productId);
+
+  if (!product || !product.is_active) {
+    await safeReply(interaction, { content: '⚠️ Sản phẩm này không còn khả dụng.', ephemeral: true });
+    return;
+  }
+
+  // Kiểm tra xem user có đang trong ticket không
+  const ticket = getTicketByChannelId(interaction.channel.id);
+
+  if (!ticket || ticket.status !== 'OPEN') {
+    // Không ở trong ticket → hướng dẫn mở ticket
+    await safeReply(interaction, {
+      content: [
+        `${product.emoji} **${product.name}** — **${Number(product.price).toLocaleString('vi-VN')} VND** / ${product.duration_months} tháng`,
+        '',
+        '> 🎫 Để mua sản phẩm này, bạn cần **mở ticket Mua Hàng** trước!',
+        '> Bấm nút **🛍️ Mua Hàng** ở panel ticket, sau đó chọn lại sản phẩm trong ticket.',
+      ].join('\n'),
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Đang trong ticket → tự tạo đơn + gửi QR
+  await interaction.deferReply();
+
+  try {
+    const guildConfig = getGuildConfig(interaction.guildId);
+    if (!guildConfig) throw new Error('Server chưa setup.');
+
+    const order = createOrder({
+      guildId: interaction.guildId,
+      ticketId: ticket.id,
+      ticketChannelId: ticket.channel_id,
+      customerId: interaction.user.id,
+      productName: product.name,
+      quantity: 1,
+      note: `Auto-order từ product catalog (ID: ${product.id})`,
+      totalAmount: product.price,
+      durationMonths: product.duration_months,
+      orderLogChannelId: guildConfig.order_log_channel_id,
+      createdById: interaction.client.user.id,
+    });
+
+    // Log đơn hàng
+    const orderLogChannel = await interaction.guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null);
+    if (orderLogChannel?.isTextBased()) {
+      const logMsg = await orderLogChannel.send({ content: buildOrderLogContent(order) }).catch(() => null);
+      if (logMsg) saveOrderLogMessage(order.order_code, logMsg.id);
+    }
+
+    const priceText = `${Number(order.total_amount).toLocaleString('vi-VN')} VND`;
+
+    await interaction.editReply({
+      content: [
+        `<@${interaction.user.id}>`,
+        `### ✅ Đơn hàng \`${order.order_code}\` đã được tạo!`,
+        `> ${product.emoji} **${product.name}** — **${priceText}**`,
+        `> ⏱️ Thời hạn: ${product.duration_months} tháng`,
+        '',
+        order.total_amount > 0 ? '> 💳 Đang tạo QR thanh toán...' : '> 🎁 Đơn miễn phí — đang xử lý!',
+      ].join('\n'),
+    });
+
+    // Gửi QR nếu cần thanh toán
+    if (order.total_amount > 0) {
+      try {
+        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
+      } catch (err) {
+        await interaction.followUp({
+          content: `⚠️ Chưa tạo được QR: ${err.message}. Staff hãy dùng \`/qr\` để gửi lại.`,
+        }).catch(() => null);
+      }
+    }
+
+    await emitStaffLog(interaction.client, {
+      guildId: interaction.guildId,
+      actorId: interaction.client.user.id,
+      targetId: interaction.user.id,
+      action: 'ORDER_CREATE',
+      detail: `[Auto] ${product.name} x1 — từ product catalog`,
+      relatedOrderCode: order.order_code,
+    });
+
+  } catch (error) {
+    console.error('[PRODUCT SELECT] Lỗi:', error);
+    const msg = `❌ Không tạo được đơn: ${error.message}`;
+    if (interaction.deferred) await interaction.editReply(msg).catch(() => null);
+    else await safeReply(interaction, { content: msg, ephemeral: true });
+  }
+}
+
+async function handleProductEditButton(interaction, productId) {
+  const product = getProductById(Number(productId));
+  if (!product) {
+    await safeReply(interaction, { content: '⚠️ Sản phẩm không tồn tại.', ephemeral: true });
+    return;
+  }
+
+  // Chỉ staff/admin mới được edit
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!isStaffMember(member, guildConfig)) {
+    await safeReply(interaction, { content: '⛔ Chỉ staff mới có thể chỉnh sửa sản phẩm.', ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`product:edit:modal:${product.id}`)
+    .setTitle(`✏️ Sửa: ${product.name.slice(0, 30)}`);
+
+  const nameInput = new TextInputBuilder()
+    .setCustomId('product_name')
+    .setLabel('Tên sản phẩm')
+    .setStyle(TextInputStyle.Short)
+    .setValue(product.name)
+    .setRequired(true)
+    .setMaxLength(80);
+
+  const priceInput = new TextInputBuilder()
+    .setCustomId('product_price')
+    .setLabel('Giá tiền (VD: 55000 hoặc 55k)')
+    .setStyle(TextInputStyle.Short)
+    .setValue(String(product.price))
+    .setRequired(true);
+
+  const descInput = new TextInputBuilder()
+    .setCustomId('product_desc')
+    .setLabel('Mô tả (bỏ trống nếu không cần)')
+    .setStyle(TextInputStyle.Short)
+    .setValue(product.description || '')
+    .setRequired(false)
+    .setMaxLength(200);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(nameInput),
+    new ActionRowBuilder().addComponents(priceInput),
+    new ActionRowBuilder().addComponents(descInput),
+  );
+
+  await interaction.showModal(modal);
+}
+
+async function handleProductEditModal(interaction, productId) {
+  const product = getProductById(Number(productId));
+  if (!product) {
+    await safeReply(interaction, { content: '⚠️ Sản phẩm không tồn tại.', ephemeral: true });
+    return;
+  }
+
+  const name = interaction.fields.getTextInputValue('product_name');
+  const rawPrice = interaction.fields.getTextInputValue('product_price');
+  const desc = interaction.fields.getTextInputValue('product_desc');
+
+  const price = parseMoneyInput(rawPrice);
+  if (price === null) {
+    await safeReply(interaction, { content: '❌ Giá tiền không hợp lệ.', ephemeral: true });
+    return;
+  }
+
+  const updated = updateProduct(Number(productId), {
+    name,
+    price,
+    description: desc || null,
+  });
+
+  await safeReply(interaction, {
+    content: `✅ Đã cập nhật **${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND**`,
+    ephemeral: true,
+  });
+}
+
 function parsePrefixCommand(content) {
   if (!content.startsWith('+')) return null;
   const [command, ...args] = content.trim().split(/\s+/);
@@ -727,6 +910,13 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('warranty:reason:modal:')) {
         const orderCode = interaction.customId.split(':').slice(3).join(':');
         await handleWarrantyReasonModalSubmit(interaction, orderCode);
+        return;
+      }
+
+      // Product edit modal: product:edit:modal:${productId}
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('product:edit:modal:')) {
+        const productId = interaction.customId.split(':')[3];
+        await handleProductEditModal(interaction, productId);
         return;
       }
 
@@ -813,6 +1003,12 @@ export function registerInteractionHandler(client, commands) {
       // Warranty product select menu
       if (interaction.isAnySelectMenu() && interaction.customId === 'warranty:product:select') {
         await handleWarrantyProductSelect(interaction);
+        return;
+      }
+
+      // Product catalog select menu
+      if (interaction.isAnySelectMenu() && interaction.customId === 'product:select') {
+        await handleProductSelect(interaction);
         return;
       }
 
@@ -983,6 +1179,12 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId.startsWith('ticket:keepopen:')) {
         const [, , ticketId] = interaction.customId.split(':');
         await handleKeepOpen(interaction, ticketId);
+        return;
+      }
+
+      if (interaction.customId.startsWith('product:edit:')) {
+        const [, , productId] = interaction.customId.split(':');
+        await handleProductEditButton(interaction, productId);
         return;
       }
 
