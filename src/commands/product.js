@@ -17,30 +17,12 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand(sub =>
     sub.setName('add')
-      .setDescription('Thêm sản phẩm mới vào catalog')
-      .addStringOption(opt => opt.setName('ten').setDescription('Tên sản phẩm (VD: Netflix 1 Tháng)').setRequired(true).setMaxLength(80))
-      .addStringOption(opt => opt.setName('gia').setDescription('Giá tiền (VD: 55000 hoặc 55k)').setRequired(true))
-      .addIntegerOption(opt => opt.setName('thang').setDescription('Thời hạn sử dụng (tháng)').setMinValue(1).setMaxValue(36).setRequired(false))
-      .addStringOption(opt => opt.setName('mo_ta').setDescription('Mô tả ngắn').setRequired(false).setMaxLength(200))
-      .addStringOption(opt => opt.setName('loai').setDescription('Loại dịch vụ').setRequired(false)
-        .addChoices(
-          { name: '🎬 Netflix', value: 'netflix' },
-          { name: '🎵 Spotify', value: 'spotify' },
-          { name: '📺 YouTube', value: 'youtube' },
-          { name: '💎 Discord', value: 'discord' },
-          { name: '📦 Khác', value: 'other' },
-        ))
-      .addStringOption(opt => opt.setName('emoji').setDescription('Emoji đại diện (VD: 🎬)').setRequired(false).setMaxLength(4))
+      .setDescription('Thêm sản phẩm mới bằng Form (Modal)')
   )
   .addSubcommand(sub =>
     sub.setName('edit')
-      .setDescription('Chỉnh sửa sản phẩm')
-      .addIntegerOption(opt => opt.setName('id').setDescription('ID sản phẩm (xem bằng /product list)').setRequired(true))
-      .addStringOption(opt => opt.setName('ten').setDescription('Tên mới').setRequired(false).setMaxLength(80))
-      .addStringOption(opt => opt.setName('gia').setDescription('Giá mới (VD: 55000 hoặc 55k)').setRequired(false))
-      .addIntegerOption(opt => opt.setName('thang').setDescription('Thời hạn mới (tháng)').setMinValue(1).setMaxValue(36).setRequired(false))
-      .addStringOption(opt => opt.setName('mo_ta').setDescription('Mô tả mới').setRequired(false).setMaxLength(200))
-      .addStringOption(opt => opt.setName('emoji').setDescription('Emoji mới').setRequired(false).setMaxLength(4))
+      .setDescription('Sửa sản phẩm bằng Form (Modal)')
+      .addIntegerOption(opt => opt.setName('id').setDescription('ID sản phẩm cần sửa').setRequired(true))
   )
   .addSubcommand(sub =>
     sub.setName('remove')
@@ -52,7 +34,7 @@ export const data = new SlashCommandBuilder()
       .setDescription('Xem danh sách tất cả sản phẩm')
   );
 
-function parsePrice(raw) {
+export function parsePrice(raw) {
   if (!raw) return null;
   const cleaned = String(raw).trim().toLowerCase();
   let multiplier = 1;
@@ -67,104 +49,125 @@ function parsePrice(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
-const SERVICE_EMOJI = {
-  netflix: '🎬',
-  spotify: '🎵',
-  youtube: '📺',
-  discord: '💎',
-  other: '📦',
-};
-
 export async function execute(interaction) {
-  await interaction.deferReply({ flags: 64 });
-
   const sub = interaction.options.getSubcommand();
 
   try {
     if (sub === 'add') {
-      const name = interaction.options.getString('ten', true);
-      const rawPrice = interaction.options.getString('gia', true);
-      const price = parsePrice(rawPrice);
-      if (price === null || price <= 0) {
-        return interaction.editReply('❌ Giá tiền không hợp lệ. Ví dụ: `55000` hoặc `55k`.');
-      }
-      const durationMonths = interaction.options.getInteger('thang') ?? 1;
-      const description = interaction.options.getString('mo_ta');
-      const serviceType = interaction.options.getString('loai') ?? 'other';
-      const emoji = interaction.options.getString('emoji') ?? SERVICE_EMOJI[serviceType] ?? '📦';
+      import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
+        const modal = new ModalBuilder()
+          .setCustomId('product:add:modal')
+          .setTitle('Thêm Sản Phẩm Mới');
 
-      const existing = getProductByName(interaction.guildId, name);
-      if (existing) {
-        return interaction.editReply(`⚠️ Sản phẩm **${name}** đã tồn tại (ID: ${existing.id}). Dùng \`/product edit\` để chỉnh sửa.`);
-      }
-
-      const product = addProduct({
-        guildId: interaction.guildId,
-        name,
-        description,
-        price,
-        durationMonths,
-        serviceType,
-        emoji,
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('name')
+              .setLabel('Tên sản phẩm')
+              .setPlaceholder('VD: Netflix Premium 1 Tháng')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(80)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('price')
+              .setLabel('Giá tiền')
+              .setPlaceholder('VD: 55000 hoặc 55k')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('duration')
+              .setLabel('Thời hạn (tháng)')
+              .setPlaceholder('VD: 1')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('emoji')
+              .setLabel('Icon / Emoji')
+              .setPlaceholder('VD: 📦 hoặc <:netflix:123456>')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('description')
+              .setLabel('Mô tả (tùy chọn)')
+              .setPlaceholder('Mô tả ngắn hiển thị trên panel')
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+              .setMaxLength(200)
+          )
+        );
+        interaction.showModal(modal).catch(console.error);
       });
-
-      const embed = new EmbedBuilder()
-        .setColor(config.accentColorSuccess)
-        .setTitle('✅ Đã Thêm Sản Phẩm')
-        .addFields(
-          { name: '🆔 ID', value: `${product.id}`, inline: true },
-          { name: `${product.emoji} Tên`, value: product.name, inline: true },
-          { name: '💰 Giá', value: formatCurrency(product.price), inline: true },
-          { name: '📅 Thời Hạn', value: `${product.duration_months} tháng`, inline: true },
-          { name: '📂 Loại', value: product.service_type, inline: true },
-        )
-        .setTimestamp();
-
-      if (product.description) embed.setDescription(`> ${product.description}`);
-      return interaction.editReply({ embeds: [embed] });
+      return;
     }
 
     if (sub === 'edit') {
       const productId = interaction.options.getInteger('id', true);
       const product = getProductById(productId);
       if (!product || product.guild_id !== interaction.guildId) {
-        return interaction.editReply('❌ Không tìm thấy sản phẩm với ID này.');
+        return interaction.reply({ content: '❌ Không tìm thấy sản phẩm với ID này.', ephemeral: true });
       }
 
-      const fields = {};
-      const newName = interaction.options.getString('ten');
-      const rawPrice = interaction.options.getString('gia');
-      const newMonths = interaction.options.getInteger('thang');
-      const newDesc = interaction.options.getString('mo_ta');
-      const newEmoji = interaction.options.getString('emoji');
+      import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
+        const modal = new ModalBuilder()
+          .setCustomId(`product:edit:modal:${product.id}`)
+          .setTitle(`Sửa: ${product.name}`.slice(0, 45));
 
-      if (newName) fields.name = newName;
-      if (rawPrice) {
-        const price = parsePrice(rawPrice);
-        if (price === null) return interaction.editReply('❌ Giá tiền không hợp lệ.');
-        fields.price = price;
-      }
-      if (newMonths) fields.durationMonths = newMonths;
-      if (newDesc !== null && newDesc !== undefined) fields.description = newDesc;
-      if (newEmoji) fields.emoji = newEmoji;
-
-      if (Object.keys(fields).length === 0) {
-        return interaction.editReply('⚠️ Bạn chưa thay đổi gì. Hãy cung cấp ít nhất 1 trường cần sửa.');
-      }
-
-      const updated = updateProduct(productId, fields);
-      const embed = new EmbedBuilder()
-        .setColor(config.accentColorSuccess)
-        .setTitle('✅ Đã Cập Nhật Sản Phẩm')
-        .addFields(
-          { name: '🆔 ID', value: `${updated.id}`, inline: true },
-          { name: `${updated.emoji} Tên`, value: updated.name, inline: true },
-          { name: '💰 Giá', value: formatCurrency(updated.price), inline: true },
-          { name: '📅 Thời Hạn', value: `${updated.duration_months} tháng`, inline: true },
-        )
-        .setTimestamp();
-      return interaction.editReply({ embeds: [embed] });
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('name')
+              .setLabel('Tên sản phẩm')
+              .setValue(product.name)
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('price')
+              .setLabel('Giá tiền')
+              .setValue(String(product.price))
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('duration')
+              .setLabel('Thời hạn (tháng)')
+              .setValue(String(product.duration_months))
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('emoji')
+              .setLabel('Icon / Emoji')
+              .setValue(product.emoji || '📦')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('description')
+              .setLabel('Mô tả')
+              .setValue(product.description || '')
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+          )
+        );
+        interaction.showModal(modal).catch(console.error);
+      });
+      return;
     }
+
+    await interaction.deferReply({ flags: 64 });
 
     if (sub === 'remove') {
       const productId = interaction.options.getInteger('id', true);

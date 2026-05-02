@@ -773,35 +773,49 @@ async function handleProductEditButton(interaction, productId) {
 
   const modal = new ModalBuilder()
     .setCustomId(`product:edit:modal:${product.id}`)
-    .setTitle(`✏️ Sửa: ${product.name.slice(0, 30)}`);
-
-  const nameInput = new TextInputBuilder()
-    .setCustomId('product_name')
-    .setLabel('Tên sản phẩm')
-    .setStyle(TextInputStyle.Short)
-    .setValue(product.name)
-    .setRequired(true)
-    .setMaxLength(80);
-
-  const priceInput = new TextInputBuilder()
-    .setCustomId('product_price')
-    .setLabel('Giá tiền (VD: 55000 hoặc 55k)')
-    .setStyle(TextInputStyle.Short)
-    .setValue(String(product.price))
-    .setRequired(true);
-
-  const descInput = new TextInputBuilder()
-    .setCustomId('product_desc')
-    .setLabel('Mô tả (bỏ trống nếu không cần)')
-    .setStyle(TextInputStyle.Short)
-    .setValue(product.description || '')
-    .setRequired(false)
-    .setMaxLength(200);
+    .setTitle(`✏️ Sửa: ${product.name}`.slice(0, 45));
 
   modal.addComponents(
-    new ActionRowBuilder().addComponents(nameInput),
-    new ActionRowBuilder().addComponents(priceInput),
-    new ActionRowBuilder().addComponents(descInput),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('name')
+        .setLabel('Tên sản phẩm')
+        .setValue(product.name)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('price')
+        .setLabel('Giá tiền')
+        .setValue(String(product.price))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('duration')
+        .setLabel('Thời hạn (tháng)')
+        .setValue(String(product.duration_months))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('emoji')
+        .setLabel('Icon / Emoji')
+        .setValue(product.emoji || '📦')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel('Mô tả')
+        .setValue(product.description || '')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+    )
   );
 
   await interaction.showModal(modal);
@@ -814,9 +828,11 @@ async function handleProductEditModal(interaction, productId) {
     return;
   }
 
-  const name = interaction.fields.getTextInputValue('product_name');
-  const rawPrice = interaction.fields.getTextInputValue('product_price');
-  const desc = interaction.fields.getTextInputValue('product_desc');
+  const name = interaction.fields.getTextInputValue('name');
+  const rawPrice = interaction.fields.getTextInputValue('price');
+  const rawDuration = interaction.fields.getTextInputValue('duration');
+  const emoji = interaction.fields.getTextInputValue('emoji');
+  const desc = interaction.fields.getTextInputValue('description');
 
   const price = parseMoneyInput(rawPrice);
   if (price === null) {
@@ -824,14 +840,65 @@ async function handleProductEditModal(interaction, productId) {
     return;
   }
 
+  const durationMonths = Number.parseInt(rawDuration, 10);
+  if (Number.isNaN(durationMonths) || durationMonths <= 0) {
+    await safeReply(interaction, { content: '❌ Thời hạn không hợp lệ.', ephemeral: true });
+    return;
+  }
+
   const updated = updateProduct(Number(productId), {
     name,
     price,
+    durationMonths,
+    emoji: emoji || '📦',
     description: desc || null,
   });
 
   await safeReply(interaction, {
-    content: `✅ Đã cập nhật **${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND**`,
+    content: `✅ Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
+    ephemeral: true,
+  });
+}
+
+import { addProduct, getProductByName } from '../services/productCatalogService.js';
+
+async function handleProductAddModal(interaction) {
+  const name = interaction.fields.getTextInputValue('name');
+  const rawPrice = interaction.fields.getTextInputValue('price');
+  const rawDuration = interaction.fields.getTextInputValue('duration');
+  const emoji = interaction.fields.getTextInputValue('emoji');
+  const desc = interaction.fields.getTextInputValue('description');
+
+  const price = parseMoneyInput(rawPrice);
+  if (price === null || price <= 0) {
+    await safeReply(interaction, { content: '❌ Giá tiền không hợp lệ.', ephemeral: true });
+    return;
+  }
+
+  const durationMonths = Number.parseInt(rawDuration, 10);
+  if (Number.isNaN(durationMonths) || durationMonths <= 0) {
+    await safeReply(interaction, { content: '❌ Thời hạn không hợp lệ.', ephemeral: true });
+    return;
+  }
+
+  const existing = getProductByName(interaction.guildId, name);
+  if (existing) {
+    await safeReply(interaction, { content: `⚠️ Sản phẩm **${name}** đã tồn tại (ID: ${existing.id}).`, ephemeral: true });
+    return;
+  }
+
+  const product = addProduct({
+    guildId: interaction.guildId,
+    name,
+    description: desc || null,
+    price,
+    durationMonths,
+    serviceType: 'other',
+    emoji: emoji || '📦',
+  });
+
+  await safeReply(interaction, {
+    content: `✅ Đã thêm sản phẩm **${product.emoji} ${product.name}** (ID: ${product.id}) thành công!`,
     ephemeral: true,
   });
 }
@@ -917,6 +984,12 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('product:edit:modal:')) {
         const productId = interaction.customId.split(':')[3];
         await handleProductEditModal(interaction, productId);
+        return;
+      }
+
+      // Product add modal: product:add:modal
+      if (interaction.isModalSubmit() && interaction.customId === 'product:add:modal') {
+        await handleProductAddModal(interaction);
         return;
       }
 
