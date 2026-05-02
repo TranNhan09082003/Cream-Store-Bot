@@ -212,6 +212,90 @@ export async function confirmPayOSWebhookUrl() {
   return callPayOSApi('POST', '/confirm-webhook', { webhookUrl });
 }
 
+// ═══ VietQR — Tạo QR chuyển khoản ngân hàng (SePay bắt webhook) ═══
+
+import { getGuildConfig, hasBankConfig } from './guildConfigService.js';
+
+function getBankInfo(guildId) {
+  const gc = getGuildConfig(guildId);
+  if (hasBankConfig(gc)) {
+    return {
+      bankBin: gc.bank_bin,
+      accountNo: gc.bank_account_no,
+      accountName: gc.bank_account_name,
+    };
+  }
+  // Fallback: dùng SEPAY_BANK_ACCOUNT từ .env nếu có
+  const sepayAccount = config.sepayBankAccount;
+  if (sepayAccount) {
+    return {
+      bankBin: config.vietqrBankBin || '970418', // BIDV mặc định
+      accountNo: sepayAccount,
+      accountName: config.vietqrAccountName || 'CREAM STORE',
+    };
+  }
+  return null;
+}
+
+export function buildVietQRUrl({ bankBin, accountNo, amount, content, accountName }) {
+  // Chuẩn VietQR: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=X&addInfo=Y&accountName=Z
+  const template = 'compact2';
+  const encodedContent = encodeURIComponent(content || '');
+  const encodedName = encodeURIComponent(accountName || '');
+  return `https://img.vietqr.io/image/${bankBin}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodedContent}&accountName=${encodedName}`;
+}
+
+export async function sendVietQRPayment({ guild, orderCode }) {
+  const order = getOrderByCode(orderCode);
+  if (!order) throw new Error('Không tìm thấy đơn hàng.');
+  if (order.total_amount <= 0) throw new Error('Đơn này không có số tiền cần thanh toán.');
+  if (order.payment_status === 'PAID') throw new Error('Đơn này đã thanh toán rồi.');
+
+  const bankInfo = getBankInfo(order.guild_id);
+  if (!bankInfo) {
+    throw new Error('Chưa cấu hình ngân hàng. Dùng `/setup-bank` hoặc thêm SEPAY_BANK_ACCOUNT vào .env.');
+  }
+
+  const transferContent = order.payment_code || order.order_code;
+  const vietqrUrl = buildVietQRUrl({
+    bankBin: bankInfo.bankBin,
+    accountNo: bankInfo.accountNo,
+    amount: order.total_amount,
+    content: transferContent,
+    accountName: bankInfo.accountName,
+  });
+
+  // Fetch ảnh QR từ VietQR API
+  const response = await fetch(vietqrUrl);
+  if (!response.ok) throw new Error(`VietQR API lỗi: ${response.status}`);
+  const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+  const ticketChannel = await guild.channels.fetch(order.ticket_channel_id).catch(() => null);
+  if (!ticketChannel?.isTextBased()) throw new Error('Ticket của đơn hàng không còn khả dụng.');
+
+  const attachmentName = `vietqr-${order.order_code}.png`;
+  const embed = buildPaymentRequestEmbed(order, {
+    provider: 'VIETQR',
+    bankInfo: {
+      bankName: bankInfo.bankBin,
+      accountNo: bankInfo.accountNo,
+      accountName: bankInfo.accountName,
+    },
+  }, `attachment://${attachmentName}`);
+
+  const files = [new AttachmentBuilder(imageBuffer, { name: attachmentName })];
+
+  const sentMessage = await ticketChannel.send({
+    content: `<@${order.customer_id}> 💳 **Thanh toán bằng chuyển khoản ngân hàng**\n> Nội dung CK: \`${transferContent}\`\n> Sau khi chuyển, hệ thống sẽ **tự động xác nhận** qua SePay.`,
+    embeds: [embed],
+    files,
+  });
+
+  savePaymentMessage(order.order_code, sentMessage.id);
+
+  return { order, message: sentMessage, vietqrUrl };
+}
+
 export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   assertPaymentConfig();
 
