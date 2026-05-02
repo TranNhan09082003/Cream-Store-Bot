@@ -1,4 +1,4 @@
-import { PermissionFlagsBits, SlashCommandBuilder, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { PermissionFlagsBits, SlashCommandBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { getOutstandingOrders, getOutstandingSummary } from '../services/orderService.js';
 import { config } from '../config.js';
 import { formatCurrency, getOrderStatusLabel } from '../utils/formatters.js';
@@ -38,16 +38,14 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   for (let i = 0; i < orders.length; i++) {
     const o = orders[i];
     const ticketLink = o.ticket_channel_id ? `(<#${o.ticket_channel_id}>)` : '';
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          `### 🆔 \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
-          `> 👤 Khách: <@${o.customer_id}> ${ticketLink}\n` +
-          `> 🛍️ **${o.quantity}x** ${o.product_name}`
-        )
-      );
-    container.addSectionComponents(section);
-    
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### 🆔 \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
+        `> 👤 Khách: <@${o.customer_id}> ${ticketLink}\n` +
+        `> 🛍️ **${o.quantity}x** ${o.product_name}`
+      )
+    );
+
     if (i < orders.length - 1) {
       container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
     }
@@ -83,6 +81,6 @@ export async function execute(interaction) {
   const payload = buildCongnoPanel(interaction.guildId, customer?.id ?? null, 1);
   await interaction.reply({
     ...payload,
-    ephemeral: true,
+    flags: 64,
   });
 }
