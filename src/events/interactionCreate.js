@@ -420,6 +420,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
       quantity,
       totalAmount: price,
       durationMonths: product.duration_months,
+      orderLogChannelId: guildConfig.order_log_channel_id ?? null,
       createdById: interaction.client.user.id,
     });
 
