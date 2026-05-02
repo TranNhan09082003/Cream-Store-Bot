@@ -290,6 +290,154 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   });
 }
 
+import { getProductById } from '../services/productCatalogService.js';
+import { createOrder, cancelOrder, getOrderByCode } from '../services/orderService.js';
+
+async function handleProductSelect(interaction) {
+  const productId = interaction.values[0];
+  const product = getProductById(Number(productId));
+  if (!product) {
+    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    return;
+  }
+
+  const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
+  if (Number(flag.is_blacklisted) === 1) {
+    await safeReply(interaction, { content: `⛔ Bạn đang bị chặn.`, ephemeral: true });
+    return;
+  }
+  const muteStatus = getTicketMuteStatus(interaction.guildId, interaction.user.id);
+  if (muteStatus.is_ticket_muted) {
+    await safeReply(interaction, { content: `🔇 Bạn đã bị admin ngăn tạo ticket.`, ephemeral: true });
+    return;
+  }
+
+  import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
+    const modal = new ModalBuilder()
+      .setCustomId(`product:purchase:modal:${product.id}`)
+      .setTitle(`Mua: ${product.name}`.slice(0, 45));
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('quantity')
+          .setLabel('Số lượng')
+          .setValue('1')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('discount_code')
+          .setLabel('Mã giảm giá (nếu có)')
+          .setPlaceholder('VD: SALE10')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+      )
+    );
+
+    interaction.showModal(modal).catch(console.error);
+  });
+}
+
+async function handleProductPurchaseFlow(interaction, productId) {
+  const product = getProductById(Number(productId));
+  if (!product) {
+    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    return;
+  }
+
+  const rawQty = interaction.fields.getTextInputValue('quantity');
+  // const discountCode = interaction.fields.getTextInputValue('discount_code'); // For future
+
+  const quantity = Number.parseInt(rawQty, 10);
+  if (Number.isNaN(quantity) || quantity <= 0) {
+    await safeReply(interaction, { content: '❌ Số lượng không hợp lệ.', ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  if (!guildConfig) {
+    await interaction.editReply('⚠️ Server chưa setup ticket.');
+    return;
+  }
+
+  const normalizedType = 'ORDER';
+  ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_ORDER`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ.` });
+  
+  const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
+  if (existingTicket) {
+    await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
+    return;
+  }
+
+  import('discord.js').then(async ({ PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle }) => {
+    const overwrites = [
+      { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
+      { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] },
+    ];
+    if (guildConfig.support_role_id) overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+
+    const categoryId = getTicketCategoryId(guildConfig, normalizedType);
+    const channel = await interaction.guild.channels.create({
+      name: `tmp-${Math.random().toString().slice(2, 8)}`,
+      type: ChannelType.GuildText,
+      parent: categoryId,
+      permissionOverwrites: overwrites,
+    });
+
+    const ticket = createTicket({
+      guildId: interaction.guildId,
+      channelId: channel.id,
+      customerId: interaction.user.id,
+      openedById: interaction.user.id,
+      ticketType: normalizedType,
+    });
+
+    const prefix = product.service_type.toLowerCase();
+    await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
+
+    const price = product.price * quantity;
+    const order = createOrder({
+      guildId: interaction.guildId,
+      ticketChannelId: channel.id,
+      customerId: interaction.user.id,
+      totalAmount: price,
+      items: [{ productName: product.name, quantity, unitPrice: product.price }],
+    });
+
+    await channel.send({
+      content: `<@${interaction.user.id}> | Đơn hàng **${order.order_code}**`,
+      embeds: [buildTicketWelcomeEmbed(ticket.ticket_code, interaction.user.id, normalizedType)],
+      components: buildTicketControlComponents(ticket.id, interaction.user.id),
+    });
+
+    if (price > 0) {
+      import('../services/paymentService.js').then(async ({ sendVietQRPayment }) => {
+        try {
+          await sendVietQRPayment({ guild: interaction.guild, orderCode: order.order_code });
+
+          const cancelRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`order:cancel_customer:${order.order_code}`)
+              .setLabel('❌ Hủy Đơn Hàng')
+              .setStyle(ButtonStyle.Danger)
+          );
+          await channel.send({ content: 'Nếu bạn đổi ý hoặc chọn nhầm, hãy bấm nút Hủy bên dưới để tự động đóng ticket.', components: [cancelRow] });
+
+        } catch (e) {
+          await channel.send(`⚠️ Không thể tạo QR tự động: ${e.message}`);
+        }
+      });
+    }
+
+    await interaction.editReply(`✅ Đã tạo đơn hàng tại <#${channel.id}>`);
+  });
+}
+
 // Bước 1: Hiện confirmation embed (chỉ admin/manager)
 async function handleTicketCloseRequest(interaction, ticketId) {
   const guildConfig = getGuildConfig(interaction.guildId);
@@ -772,7 +920,7 @@ async function handleProductEditButton(interaction, productId) {
   }
 
   const modal = new ModalBuilder()
-    .setCustomId(`product:edit:modal:${product.id}`)
+    .setCustomId(`product:edit:modal:${product.id}:${interaction.message?.id || ''}`)
     .setTitle(`✏️ Sửa: ${product.name}`.slice(0, 45));
 
   modal.addComponents(
@@ -854,6 +1002,25 @@ async function handleProductEditModal(interaction, productId) {
     description: desc || null,
   });
 
+  const messageId = interaction.customId.split(':')[4];
+  if (messageId) {
+    import('../commands/stock.js').then(async ({ buildStockPanelComponents }) => {
+      try {
+        const msg = await interaction.channel.messages.fetch(messageId);
+        if (msg) {
+          const components = buildStockPanelComponents(interaction.guildId);
+          if (components) {
+            import('discord.js').then(({ MessageFlags }) => {
+              msg.edit({ components, flags: MessageFlags.IsComponentsV2 }).catch(() => null);
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore fetch errors
+      }
+    });
+  }
+
   await safeReply(interaction, {
     content: `✅ Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
     ephemeral: true,
@@ -903,7 +1070,7 @@ async function handleProductAddModal(interaction) {
   });
 }
 
-async function handleProductBulkAddModal(interaction) {
+async function handleProductSaleModal(interaction) {
   const bulkData = interaction.fields.getTextInputValue('bulk_data');
   const lines = bulkData.split('\n').map(l => l.trim()).filter(l => l);
 
@@ -1066,9 +1233,46 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
-      // Product bulk add modal: product:bulkadd:modal
-      if (interaction.isModalSubmit() && interaction.customId === 'product:bulkadd:modal') {
-        await handleProductBulkAddModal(interaction);
+      // Product sale modal: product:sale:modal
+      if (interaction.isModalSubmit() && interaction.customId === 'product:sale:modal') {
+        await handleProductSaleModal(interaction);
+        return;
+      }
+
+      // Product select dropdown
+      if (interaction.isStringSelectMenu() && interaction.customId === 'product:select') {
+        await handleProductSelect(interaction);
+        return;
+      }
+
+      // Product purchase modal
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('product:purchase:modal:')) {
+        const productId = interaction.customId.split(':')[3];
+        await handleProductPurchaseFlow(interaction, productId);
+        return;
+      }
+
+      // Customer cancel order button
+      if (interaction.isButton() && interaction.customId.startsWith('order:cancel_customer:')) {
+        await interaction.deferReply({ ephemeral: true });
+        const orderCode = interaction.customId.split(':')[2];
+        try {
+          cancelOrder(orderCode);
+          const order = getOrderByCode(orderCode);
+          if (order) {
+            const ticket = getTicketByChannelId(interaction.channelId);
+            if (ticket && ticket.status !== 'CLOSED') {
+              closeTicket(ticket.id, interaction.client.user.id);
+              await interaction.channel.send('❌ Khách hàng đã hủy đơn. Channel sẽ đóng trong giây lát...');
+              setTimeout(() => {
+                interaction.channel.delete('Customer cancelled order').catch(() => null);
+              }, 5000);
+            }
+          }
+          await interaction.editReply('✅ Đã hủy đơn hàng và đóng ticket.');
+        } catch (e) {
+          await interaction.editReply(`⚠️ Lỗi: ${e.message}`);
+        }
         return;
       }
 
@@ -1082,6 +1286,21 @@ export function registerInteractionHandler(client, commands) {
         const result = await openWarrantyTicket({ guild: interaction.guild, customerId: interaction.user.id, actorId: interaction.user.id, orderCode, reason: reason ?? 'Bảo hành từ panel.' });
         await updateOrderLogMessage(interaction.guild, result.order);
         await interaction.reply({ content: result.reused ? `ℹ️ Ticket bảo hành đã tồn tại tại ${result.channel}.` : `✅ Ticket bảo hành đã mở tại ${result.channel}.`, ephemeral: true }).catch(() => null);
+        return;
+      }
+
+      if (interaction.isButton() && interaction.customId.startsWith('congno:')) {
+        const [, action, customerIdStr, pageStr] = interaction.customId.split(':');
+        let page = parseInt(pageStr, 10);
+        if (action === 'prev') page--;
+        if (action === 'next') page++;
+        
+        const customerId = customerIdStr === 'all' ? null : customerIdStr;
+        
+        import('../commands/congno.js').then(async ({ buildCongnoPanel }) => {
+          const payload = buildCongnoPanel(interaction.guildId, customerId, page);
+          await interaction.update(payload).catch(() => null);
+        });
         return;
       }
 

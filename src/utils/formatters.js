@@ -97,11 +97,11 @@ export function parseMoneyInput(rawAmount) {
   return Number.isFinite(value) ? value : null;
 }
 
-export function buildTicketChannelName(ticketCode) {
+export function buildTicketChannelName(ticketCode, prefix = 'ticket') {
   const shortId = String(ticketCode ?? '')
     .replace(/^TKT_/, '')
     .toLowerCase();
-  return `ticket-${shortId}`;
+  return sanitizeChannelName(`${prefix}-${shortId}`);
 }
 
 export function buildWarrantyChannelName(orderCode) {

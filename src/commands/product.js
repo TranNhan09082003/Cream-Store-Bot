@@ -30,8 +30,8 @@ export const data = new SlashCommandBuilder()
       .addIntegerOption(opt => opt.setName('id').setDescription('ID sản phẩm cần xóa').setRequired(true))
   )
   .addSubcommand(sub =>
-    sub.setName('bulk-add')
-      .setDescription('Thêm nhiều sản phẩm cùng lúc bằng Form (Modal)')
+    sub.setName('sale')
+      .setDescription('Tạo chương trình Sale / Thêm nhiều sản phẩm cùng lúc bằng Form (Modal)')
   )
   .addSubcommand(sub =>
     sub.setName('list')
@@ -171,11 +171,11 @@ export async function execute(interaction) {
       return;
     }
 
-    if (sub === 'bulk-add') {
+    if (sub === 'sale') {
       import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
         const modal = new ModalBuilder()
-          .setCustomId('product:bulkadd:modal')
-          .setTitle('Thêm Nhiều Sản Phẩm');
+          .setCustomId('product:sale:modal')
+          .setTitle('Thêm Nhiều Sản Phẩm (Chạy Sale)');
 
         const formatPlaceholder = `Nhập mỗi dòng 1 sản phẩm theo mẫu:
 [Icon] Tên Sản Phẩm | Giá | Tháng | Mô tả
