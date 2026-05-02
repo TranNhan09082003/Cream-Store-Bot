@@ -232,11 +232,17 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_${normalizedType}`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ ${config.ticketOpenCooldownSeconds} giây rồi thử lại.` });
   const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
   if (existingTicket) {
-    await safeReply(interaction, {
-      content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
-      ephemeral: true,
-    });
-    return;
+    // Kiểm tra channel còn tồn tại không
+    const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
+    if (existingChannel) {
+      await safeReply(interaction, {
+        content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
+        ephemeral: true,
+      });
+      return;
+    }
+    // Channel bị xóa thủ công → tự đóng ticket trong DB
+    closeTicket(existingTicket.id, interaction.client.user.id);
   }
 
   const overwrites = [
@@ -367,8 +373,14 @@ async function handleProductPurchaseFlow(interaction, productId) {
   
   const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
   if (existingTicket) {
-    await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
-    return;
+    // Kiểm tra channel còn tồn tại không
+    const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
+    if (existingChannel) {
+      await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
+      return;
+    }
+    // Channel bị xóa thủ công → tự đóng ticket trong DB
+    closeTicket(existingTicket.id, interaction.client.user.id);
   }
 
   import('discord.js').then(async ({ PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle }) => {
