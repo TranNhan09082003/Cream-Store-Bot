@@ -307,11 +307,12 @@ export async function sendVietQRPayment({ guild, orderCode }) {
   );
 
   const sentMessage = await ticketChannel.send({
-    content: `<@${order.customer_id}>`,
     components: [container],
     files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
     flags: MessageFlags.IsComponentsV2,
   });
+  // Ping user riêng (không dùng content với V2 flag)
+  await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR chuyển khoản của bạn!` }).catch(() => null);
 
   savePaymentMessage(order.order_code, sentMessage.id);
   return { order, message: sentMessage, vietqrUrl };
@@ -392,7 +393,6 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   );
 
   const messagePayload = {
-    content: `<@${order.customer_id}>`,
     components: [container, ...(actionRow.components.length ? [actionRow] : [])],
     files,
     flags: MessageFlags.IsComponentsV2,
@@ -408,6 +408,8 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
 
   if (!sentMessage) {
     sentMessage = await ticketChannel.send(messagePayload);
+    // Ping user riêng (không dùng content với V2 flag)
+    await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR PayOS của bạn!` }).catch(() => null);
   }
 
   const updated = savePaymentMessage(order.order_code, sentMessage.id);
