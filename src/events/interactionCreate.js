@@ -290,8 +290,6 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   });
 }
 
-import { getProductById } from '../services/productCatalogService.js';
-import { createOrder, cancelOrder, getOrderByCode } from '../services/orderService.js';
 
 async function handleProductSelect(interaction) {
   const productId = interaction.values[0];
