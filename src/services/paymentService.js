@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import QRCode from 'qrcode';
 import { assertPaymentConfig, config, getPayOSCancelUrl, getPayOSReturnUrl, getWebhookUrl } from '../config.js';
 import {
@@ -265,7 +265,6 @@ export async function sendVietQRPayment({ guild, orderCode }) {
     accountName: bankInfo.accountName,
   });
 
-  // Fetch ảnh QR từ VietQR API
   const response = await fetch(vietqrUrl);
   if (!response.ok) throw new Error(`VietQR API lỗi: ${response.status}`);
   const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -274,25 +273,47 @@ export async function sendVietQRPayment({ guild, orderCode }) {
   if (!ticketChannel?.isTextBased()) throw new Error('Ticket của đơn hàng không còn khả dụng.');
 
   const attachmentName = `vietqr-${order.order_code}.png`;
-  const embed = buildPaymentRequestEmbed(order, {
-    provider: 'VIETQR',
-    bankInfo: {
-      bankName: bankInfo.bankBin,
-      accountNo: bankInfo.accountNo,
-      accountName: bankInfo.accountName,
-    },
-  }, `attachment://${attachmentName}`);
 
-  const files = [new AttachmentBuilder(imageBuffer, { name: attachmentName })];
+  // ═══ Components V2 — VietQR Card ═══
+  const container = new ContainerBuilder()
+    .setAccentColor(0x00b4d8); // Xanh ngân hàng
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## 🏦 Thanh Toán Chuyển Khoản — VietQR\n` +
+      `> 💬 Nội dung CK: \`${transferContent}\`\n` +
+      `> ✅ Hệ thống **tự động xác nhận** sau khi nhận giao dịch (qua SePay)`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `📦 **Sản phẩm:** ${order.quantity}x ${order.product_name}\n` +
+      `💰 **Số tiền:** \`${formatCurrency(order.total_amount)}\`\n` +
+      `🏦 **Ngân hàng:** \`${bankInfo.accountName}\` — \`${bankInfo.accountNo}\``
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('📱 **Quét mã QR bên dưới để thanh toán:**')
+  );
 
   const sentMessage = await ticketChannel.send({
-    content: `<@${order.customer_id}> 💳 **Thanh toán bằng chuyển khoản ngân hàng**\n> Nội dung CK: \`${transferContent}\`\n> Sau khi chuyển, hệ thống sẽ **tự động xác nhận** qua SePay.`,
-    embeds: [embed],
-    files,
+    content: `<@${order.customer_id}>`,
+    components: [container],
+    files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
+    flags: MessageFlags.IsComponentsV2,
   });
 
   savePaymentMessage(order.order_code, sentMessage.id);
-
   return { order, message: sentMessage, vietqrUrl };
 }
 
@@ -320,32 +341,73 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
 
   const attachmentName = `payos-${order.order_code}.png`;
   const imageBuffer = await renderPaymentQrImage(order);
-  const embedImageUrl = imageBuffer ? `attachment://${attachmentName}` : null;
-  const embed = buildPaymentRequestEmbed(order, {
-    paymentLinkId: order.payment_link_id,
-  }, embedImageUrl);
-  const components = buildPaymentPendingComponents(order.order_code, order.payment_checkout_url);
   const files = imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [];
+
+  // ═══ Components V2 — PayOS Card ═══
+  const container = new ContainerBuilder()
+    .setAccentColor(0x7c3aed); // Tím PayOS
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## 💳 Thanh Toán Đơn Hàng — PayOS\n` +
+      `> 🔑 Mã đơn: \`${order.order_code}\`\n` +
+      `> 🔖 Mã thanh toán: \`${order.payment_code ?? order.order_code}\`\n` +
+      `> ✅ Bot sẽ **tự động xác nhận** sau khi nhận giao dịch`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  const expireText = order.payment_expired_at
+    ? `<t:${Math.floor(new Date(order.payment_expired_at).getTime() / 1000)}:R>`
+    : '_Theo mặc định PayOS_';
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `📦 **Sản phẩm:** ${order.quantity}x ${order.product_name}\n` +
+      `💰 **Số tiền:** \`${formatCurrency(order.total_amount)}\`\n` +
+      `⏰ **Hết hạn:** ${expireText}`
+    )
+  );
+
+  if (imageBuffer) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('📱 **Quét mã QR hoặc bấm nút Thanh Toán Ngay:**')
+    );
+  }
+
+  const actionRow = new ActionRowBuilder();
+  if (order.payment_checkout_url && /^https?:\/\//i.test(order.payment_checkout_url)) {
+    actionRow.addComponents(
+      new ButtonBuilder().setLabel('💳 Thanh Toán Ngay').setStyle(ButtonStyle.Link).setURL(order.payment_checkout_url)
+    );
+  }
+  actionRow.addComponents(
+    new ButtonBuilder().setCustomId(`queue:view:${order.order_code}`).setLabel('📍 Xem Hàng Chờ').setStyle(ButtonStyle.Secondary)
+  );
+
+  const messagePayload = {
+    content: `<@${order.customer_id}>`,
+    components: [container, ...(actionRow.components.length ? [actionRow] : [])],
+    files,
+    flags: MessageFlags.IsComponentsV2,
+  };
 
   let sentMessage = null;
   if (order.payment_message_id) {
     const existing = await ticketChannel.messages.fetch(order.payment_message_id).catch(() => null);
     if (existing) {
-      sentMessage = await existing.edit({
-        embeds: [embed, buildPaymentWaitingAckEmbed(order)],
-        components,
-        files,
-      }).catch(() => null);
+      sentMessage = await existing.edit(messagePayload).catch(() => null);
     }
   }
 
   if (!sentMessage) {
-    sentMessage = await ticketChannel.send({
-      content: `<@${order.customer_id}>`,
-      embeds: [embed, buildPaymentWaitingAckEmbed(order)],
-      components,
-      files,
-    });
+    sentMessage = await ticketChannel.send(messagePayload);
   }
 
   const updated = savePaymentMessage(order.order_code, sentMessage.id);
