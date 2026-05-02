@@ -903,6 +903,79 @@ async function handleProductAddModal(interaction) {
   });
 }
 
+async function handleProductBulkAddModal(interaction) {
+  const bulkData = interaction.fields.getTextInputValue('bulk_data');
+  const lines = bulkData.split('\n').map(l => l.trim()).filter(l => l);
+
+  let successCount = 0;
+  const errors = [];
+
+  for (const line of lines) {
+    const parts = line.split('|').map(s => s.trim());
+    if (parts.length < 2) {
+      errors.push(`- Thiếu giá: \`${line}\``);
+      continue;
+    }
+
+    const firstPart = parts[0];
+    let icon = '📦';
+    let name = firstPart;
+
+    // Phân tích emoji (Custom Emoji hoặc Unicode Emoji)
+    const customEmojiMatch = firstPart.match(/^(<a?:\w+:\d+>)\s*(.*)$/);
+    if (customEmojiMatch) {
+      icon = customEmojiMatch[1];
+      name = customEmojiMatch[2] || 'Sản phẩm';
+    } else {
+      const words = firstPart.split(' ');
+      if (words.length > 1 && !/[a-zA-Z0-9\u00C0-\u1EF9]/.test(words[0])) {
+        icon = words[0];
+        name = words.slice(1).join(' ');
+      }
+    }
+
+    const rawPrice = parts[1];
+    const rawDuration = parts[2] || '1';
+    const desc = parts[3] || null;
+
+    const price = parseMoneyInput(rawPrice);
+    if (price === null || price <= 0) {
+      errors.push(`- Lỗi giá: \`${line}\``);
+      continue;
+    }
+
+    const durationMonths = Number.parseInt(rawDuration, 10);
+    if (Number.isNaN(durationMonths) || durationMonths <= 0) {
+      errors.push(`- Lỗi thời hạn: \`${line}\``);
+      continue;
+    }
+
+    const existing = getProductByName(interaction.guildId, name);
+    if (existing) {
+      errors.push(`- Đã tồn tại: \`${name}\``);
+      continue;
+    }
+
+    addProduct({
+      guildId: interaction.guildId,
+      name,
+      description: desc,
+      price,
+      durationMonths,
+      serviceType: 'other',
+      emoji: icon,
+    });
+    successCount++;
+  }
+
+  let replyText = `✅ Đã thêm **${successCount}** sản phẩm thành công!`;
+  if (errors.length) {
+    replyText += `\n\n⚠️ **Có ${errors.length} lỗi:**\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? '\n...với nhiều lỗi khác' : ''}`;
+  }
+
+  await safeReply(interaction, { content: replyText, ephemeral: true });
+}
+
 function parsePrefixCommand(content) {
   if (!content.startsWith('+')) return null;
   const [command, ...args] = content.trim().split(/\s+/);
@@ -990,6 +1063,12 @@ export function registerInteractionHandler(client, commands) {
       // Product add modal: product:add:modal
       if (interaction.isModalSubmit() && interaction.customId === 'product:add:modal') {
         await handleProductAddModal(interaction);
+        return;
+      }
+
+      // Product bulk add modal: product:bulkadd:modal
+      if (interaction.isModalSubmit() && interaction.customId === 'product:bulkadd:modal') {
+        await handleProductBulkAddModal(interaction);
         return;
       }
 

@@ -30,6 +30,10 @@ export const data = new SlashCommandBuilder()
       .addIntegerOption(opt => opt.setName('id').setDescription('ID sản phẩm cần xóa').setRequired(true))
   )
   .addSubcommand(sub =>
+    sub.setName('bulk-add')
+      .setDescription('Thêm nhiều sản phẩm cùng lúc bằng Form (Modal)')
+  )
+  .addSubcommand(sub =>
     sub.setName('list')
       .setDescription('Xem danh sách tất cả sản phẩm')
   );
@@ -160,6 +164,35 @@ export async function execute(interaction) {
               .setValue(product.description || '')
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(false)
+          )
+        );
+        interaction.showModal(modal).catch(console.error);
+      });
+      return;
+    }
+
+    if (sub === 'bulk-add') {
+      import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
+        const modal = new ModalBuilder()
+          .setCustomId('product:bulkadd:modal')
+          .setTitle('Thêm Nhiều Sản Phẩm');
+
+        const formatPlaceholder = `Nhập mỗi dòng 1 sản phẩm theo mẫu:
+[Icon] Tên Sản Phẩm | Giá | Tháng | Mô tả
+
+Ví dụ:
+🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng
+<:nflx:123> Netflix 3T | 150k | 3
+Spotify Premium | 25k | 1`;
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('bulk_data')
+              .setLabel('Danh sách sản phẩm')
+              .setPlaceholder(formatPlaceholder)
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
           )
         );
         interaction.showModal(modal).catch(console.error);
