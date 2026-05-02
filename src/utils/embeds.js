@@ -4,6 +4,11 @@ import {
   ButtonStyle,
   EmbedBuilder,
   StringSelectMenuBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags,
 } from 'discord.js';
 import { config, getWebhookUrl, getPayOSReturnUrl, getPayOSCancelUrl } from '../config.js';
 import { formatDateTime, formatDurationSince } from './time.js';
@@ -151,6 +156,138 @@ export function buildTicketWelcomeEmbed(ticketCode, customerId, ticketType = 'OR
       })
       .setTimestamp(),
   );
+}
+
+// ═══════════════════════════════════════════════
+// Ticket Welcome V2 (Components V2)
+// ═══════════════════════════════════════════════
+const TICKET_V2_ACCENT = {
+  ORDER:       0x6366f1, // indigo
+  SUPPORT:     0x0ea5e9, // sky blue
+  COMPLAINT:   0xef4444, // red
+  PARTNERSHIP: 0x22c55e, // green
+  WARRANTY:    0xf59e0b, // amber
+};
+
+const TICKET_V2_STEPS = {
+  ORDER: [
+    '🛒 **Bước 1** — Chọn sản phẩm và số lượng muốn mua',
+    '💳 **Bước 2** — Chọn phương thức thanh toán (PayOS / VietQR)',
+    '✅ **Bước 3** — Thanh toán xong, bot tự xác nhận và giao hàng qua DM',
+  ],
+  SUPPORT: [
+    '📝 **Mô tả rõ** — Thiết bị gì, lỗi gì, xảy ra khi nào?',
+    '📸 **Gửi bằng chứng** — Ảnh/video lỗi để staff xử lý nhanh hơn',
+    '⏳ **Kiên nhẫn chờ** — Staff sẽ phản hồi sớm nhất có thể',
+  ],
+  COMPLAINT: [
+    '📝 **Mô tả sự cố** — Nêu rõ vấn đề và thời điểm xảy ra',
+    '📸 **Gửi bằng chứng** — Ảnh, video, screenshot liên quan',
+    '⚖️ **Quản lý xử lý** — Cam kết giải quyết công bằng, nhanh chóng',
+  ],
+  PARTNERSHIP: [
+    '👤 **Giới thiệu bản thân** — Tên, lĩnh vực và quy mô hoạt động',
+    '💡 **Đề xuất hợp tác** — Ý tưởng và mong muốn cụ thể của bạn',
+    '📬 **Chờ phản hồi** — Quản lý sẽ liên hệ trong vòng 48 giờ',
+  ],
+  WARRANTY: [
+    '🔧 **Mô tả lỗi** — Gặp lỗi gì? Xảy ra khi nào?',
+    '📸 **Gửi bằng chứng** — Ảnh/video lỗi giúp staff xử lý nhanh hơn',
+    '⏱️ **Thời gian xử lý** — Thường từ 5–30 phút tùy mức độ',
+  ],
+};
+
+export function buildTicketWelcomeV2(ticketCode, customerId, ticketType = 'ORDER', relatedOrderCode = null, productName = null) {
+  const meta = TICKET_TYPE_META[ticketType] ?? TICKET_TYPE_META.ORDER;
+  const accentColor = TICKET_V2_ACCENT[ticketType] ?? 0x6366f1;
+  const steps = TICKET_V2_STEPS[ticketType] ?? TICKET_V2_STEPS.ORDER;
+  const brand = brandConfig('store');
+
+  const container = new ContainerBuilder().setAccentColor(accentColor);
+
+  // Header
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## ${meta.title}\n` +
+      `> 👋 Xin chào <@${customerId}>!\n` +
+      `> 🎫 Mã Ticket: \`${ticketCode}\`` +
+      (relatedOrderCode ? `\n> 📋 Liên kết Đơn: \`${relatedOrderCode}\`` : '') +
+      (productName ? `\n> 📦 Sản phẩm: **${productName}**` : '')
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Steps
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `**ℹ️ ${meta.intro}**\n\n` +
+      steps.join('\n')
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Footer brand
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `\u2014 *${brand.footer || brand.name}*`
+    )
+  );
+
+  return { container, flags: MessageFlags.IsComponentsV2 };
+}
+
+// ═══════════════════════════════════════════════
+// Payment Method Selector (Components V2)
+// ═══════════════════════════════════════════════
+export function buildPaymentMethodSelector(order) {
+  const container = new ContainerBuilder().setAccentColor(0xf59e0b); // Amber
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## 💳 Chọn Phương Thức Thanh Toán\n` +
+      `> 📦 **Sản phẩm:** ${order.quantity}x ${order.product_name}\n` +
+      `> 💰 **Số tiền:** \`${formatCurrency(order.total_amount)}\`\n` +
+      `> 🎫 **Mã đơn:** \`${order.order_code}\`\n\n` +
+      `Chọn phương thức thanh toán phù hợp bên dưới:`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `💳 **PayOS** — Quét QR từ app ngân hàng, tự động xác nhận qua PayOS webhook\n` +
+      `🏦 **VietQR / Chuyển khoản** — Quét QR hoặc chuyển tay, tự động xác nhận qua SePay`
+    )
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`payment:method:payos:${order.order_code}`)
+      .setLabel('PayOS')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('💳'),
+    new ButtonBuilder()
+      .setCustomId(`payment:method:vietqr:${order.order_code}`)
+      .setLabel('VietQR / Chuyển khoản')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('🏦'),
+    new ButtonBuilder()
+      .setCustomId(`order:cancel_customer:${order.order_code}`)
+      .setLabel('Hủy Đơn')
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('❌'),
+  );
+
+  return { container, actionRow, flags: MessageFlags.IsComponentsV2 };
 }
 
 // ═══════════════════════════════════════════════

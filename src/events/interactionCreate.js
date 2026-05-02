@@ -56,6 +56,7 @@ import {
   buildWarrantyProductSelectComponents,
   buildWarrantySelectEmbed,
 } from '../utils/embeds.js';
+import { buildTicketWelcomeV2, buildPaymentMethodSelector } from '../utils/embeds.js';
 import { buildTicketChannelName, parseMoneyInput, buildOrderLogContent } from '../utils/formatters.js';
 import { TICKET_MEMBER_PERMISSIONS, isStaffMember, isManager, assertStaffCapability } from '../utils/permissions.js';
 import { ensureRateLimit } from '../services/abuseService.js';
@@ -424,33 +425,26 @@ async function handleProductPurchaseFlow(interaction, productId) {
       createdById: interaction.client.user.id,
     });
 
+    // Gửi welcome ticket V2
+    const { container: welcomeContainer, flags: welcomeFlags } = buildTicketWelcomeV2(
+      ticket.ticket_code,
+      interaction.user.id,
+      normalizedType,
+      order.order_code,
+      product.name
+    );
     await channel.send({
-      content: `<@${interaction.user.id}> | Đơn hàng **${order.order_code}**`,
-      embeds: [buildTicketWelcomeEmbed(ticket.ticket_code, interaction.user.id, normalizedType)],
-      components: buildTicketControlComponents(ticket.id, interaction.user.id),
+      content: `<@${interaction.user.id}>`,
+      components: [welcomeContainer, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
+      flags: welcomeFlags,
     });
 
+    // Nếu có tiền → hiện bảng chọn phương thức thanh toán
     if (price > 0) {
-      import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr, sendVietQRPayment }) => {
-        try {
-          // Dùng PayOS như bình thường
-          await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
-        } catch (payosErr) {
-          // Nếu PayOS lỗi mới fallback sang VietQR
-          try {
-            await sendVietQRPayment({ guild: interaction.guild, orderCode: order.order_code });
-          } catch (vietqrErr) {
-            await channel.send(`⚠️ Không thể tạo QR: ${vietqrErr.message}`);
-          }
-        }
-
-        const cancelRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`order:cancel_customer:${order.order_code}`)
-            .setLabel('❌ Hủy Đơn Hàng')
-            .setStyle(ButtonStyle.Danger)
-        );
-        await channel.send({ content: 'Nếu bạn đổi ý hoặc chọn nhầm, hãy bấm nút Hủy bên dưới để tự động đóng ticket.', components: [cancelRow] });
+      const { container: payContainer, actionRow, flags: payFlags } = buildPaymentMethodSelector(order);
+      await channel.send({
+        components: [payContainer, actionRow],
+        flags: payFlags,
       });
     }
 
@@ -1167,6 +1161,31 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('product:purchase:modal:')) {
         const productId = interaction.customId.split(':')[3];
         await handleProductPurchaseFlow(interaction, productId);
+        return;
+      }
+
+      // Payment method selection buttons
+      if (interaction.isButton() && interaction.customId.startsWith('payment:method:')) {
+        const parts = interaction.customId.split(':'); // payment:method:<type>:<orderCode>
+        const method = parts[2]; // 'payos' or 'vietqr'
+        const orderCode = parts[3];
+        await interaction.deferReply({ flags: 64 });
+        try {
+          import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr, sendVietQRPayment }) => {
+            try {
+              if (method === 'payos') {
+                await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode });
+              } else {
+                await sendVietQRPayment({ guild: interaction.guild, orderCode });
+              }
+              await interaction.editReply('✅ Đã tạo mã QR thanh toán! Kiểm tra trong ticket nhé.');
+            } catch (err) {
+              await interaction.editReply(`⚠️ Không tạo được QR: ${err.message}`);
+            }
+          });
+        } catch (e) {
+          await interaction.editReply(`⚠️ Lỗi: ${e.message}`);
+        }
         return;
       }
 
