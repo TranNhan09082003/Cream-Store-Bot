@@ -45,7 +45,7 @@ function unixTs(dateStr) {
 }
 
 // ═══════════════════════════════════════════════
-// Ticket Panel
+// Ticket Panel (Legacy embed — kept for compat)
 // ═══════════════════════════════════════════════
 export function buildTicketPanelEmbed() {
   return applyBranding(
@@ -79,6 +79,66 @@ export function buildTicketPanelComponents() {
     ),
   ];
 }
+
+// ═══════════════════════════════════════════════
+// Ticket Panel V2 (Components V2 — Premium)
+// ═══════════════════════════════════════════════
+export function buildTicketPanelV2() {
+  const brand = brandConfig('store');
+  const container = new ContainerBuilder().setAccentColor(0x6366f1); // Indigo
+
+  // Header
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## 🎫 ${brand.name || 'Cream Store'} — Trung Tâm Hỗ Trợ\n` +
+      `> ✨ Chào mừng bạn đến với **${brand.name || 'Cream Store'}**!\n` +
+      `> Bấm nút bên dưới để mở ticket. Chọn **đúng loại** giúp staff phục vụ bạn nhanh hơn.`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Services
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `🛍️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
+      `🆘  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
+      `⚠️  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
+      `🤝  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
+      `🛠️  **Bảo Hành** — Yêu cầu bảo hành sản phẩm đã mua`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `> 💡 *Sau khi mở ticket, bot sẽ hướng dẫn bạn từng bước.*\n` +
+      `— *${brand.footer || brand.name}*`
+    )
+  );
+
+  // Buttons row 1
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛍️'),
+    new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji('🆘'),
+    new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji('⚠️'),
+    new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji('🤝'),
+  );
+
+  // Buttons row 2
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji('🛠️'),
+  );
+
+  return { container, rows: [row1, row2], flags: MessageFlags.IsComponentsV2 };
+}
+
+
 
 // ═══════════════════════════════════════════════
 // Ticket Welcome

@@ -276,11 +276,15 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   });
 
   await channel.setName(buildTicketChannelName(ticket.ticket_code)).catch(() => null);
+  const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+    ticket.ticket_code, interaction.user.id, normalizedType
+  );
   await channel.send({
-    content: `<@${interaction.user.id}>`,
-    embeds: [buildTicketWelcomeEmbed(ticket.ticket_code, interaction.user.id, normalizedType)],
-    components: buildTicketControlComponents(ticket.id, interaction.user.id),
+    components: [welcomeV2, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
+    flags: welcomeV2Flags,
   });
+  // Ping user separately (no content allowed with V2)
+  await channel.send({ content: `<@${interaction.user.id}> — Ticket của bạn đã được tạo!` }).catch(() => null);
 
   await emitStaffLog(interaction.client, {
     guildId: interaction.guildId,
@@ -425,7 +429,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
       createdById: interaction.client.user.id,
     });
 
-    // Gửi welcome ticket V2
+    // Gửi welcome ticket V2 (không dùng content với IsComponentsV2)
     const { container: welcomeContainer, flags: welcomeFlags } = buildTicketWelcomeV2(
       ticket.ticket_code,
       interaction.user.id,
@@ -434,10 +438,11 @@ async function handleProductPurchaseFlow(interaction, productId) {
       product.name
     );
     await channel.send({
-      content: `<@${interaction.user.id}>`,
       components: [welcomeContainer, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
       flags: welcomeFlags,
     });
+    // Ping riêng (content không được dùng với V2 flag)
+    await channel.send({ content: `<@${interaction.user.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
 
     // Nếu có tiền → hiện bảng chọn phương thức thanh toán
     if (price > 0) {

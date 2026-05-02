@@ -1,5 +1,5 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { buildTicketPanelComponents, buildTicketPanelEmbed } from '../utils/embeds.js';
+import { buildTicketPanelComponents, buildTicketPanelEmbed, buildTicketPanelV2 } from '../utils/embeds.js';
 import { upsertGuildConfig } from '../services/guildConfigService.js';
 import { config } from '../config.js';
 
@@ -46,9 +46,10 @@ export async function execute(interaction) {
     const staffLogChannel = interaction.options.getChannel('staff_log_channel');
     const reminderChannel = interaction.options.getChannel('reminder_channel');
 
+    const { container: panelContainer, rows: panelRows, flags: panelFlags } = buildTicketPanelV2();
     const panelMessage = await panelChannel.send({
-      embeds: [buildTicketPanelEmbed()],
-      components: buildTicketPanelComponents(),
+      components: [panelContainer, ...panelRows],
+      flags: panelFlags,
     });
 
     const cfg = upsertGuildConfig({
