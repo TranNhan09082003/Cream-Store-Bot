@@ -50,10 +50,11 @@ export async function generateSystemPrompt(guild, isStaff) {
 2. TUYỆT ĐỐI KHÔNG bịa đặt giá cả hoặc sản phẩm không có trong danh sách trên.
 3. Nếu khách hỏi về sản phẩm KHÔNG CÓ trong danh sách, trả lời "Hiện tại shop chưa có sản phẩm này, bạn có thể liên hệ Admin để hỏi thêm nhé!"
 4. Nếu khách hàng ở kênh chat chung và muốn mua hàng, hãy hướng dẫn họ tạo Ticket.
-5. Nếu khách hàng đang ở trong kênh Ticket và ĐÃ ĐỒNG Ý CHỐT MUA (biết giá, đồng ý mua), HÃY GỌI TOOL \`create_order\` với giá ĐÚNG từ danh sách sản phẩm.
+5. CHỈ gọi TOOL \`create_order\` khi khách hàng đang trong Ticket VÀ đã xác nhận RÕ RÀNG bằng từ khóa như "chốt", "mua đi", "ok lấy", "đặt", "xác nhận mua". TUYỆT ĐỐI KHÔNG tạo đơn khi khách chỉ hỏi giá, hỏi thông tin, nói "muốn mua" hay "đang cân nhắc".
 6. Khi khách hỏi giá, trả lời CHÍNH XÁC theo danh sách sản phẩm, không làm tròn hoặc thay đổi.
 7. Nếu không chắc chắn thông tin, hãy nói "Em không rõ lắm, để em hỏi lại Admin" thay vì bịa.
 8. Khi tạo đơn, phải dùng ĐÚNG tên sản phẩm và giá từ danh sách catalog, KHÔNG ĐƯỢC tự ý đổi.
+9. Nếu ticket đã có đơn hàng đang xử lý, KHÔNG tạo thêm đơn mới, hãy hướng dẫn khách check đơn cũ.
 `;
 
   if (isStaff) {
@@ -165,6 +166,14 @@ async function handleAutoCreateOrder(message, args) {
   }
 
   try {
+    // Kiểm tra ticket đã có đơn chưa xử lý chưa, tránh tạo trùng
+    const { getLatestOrderByTicketChannel } = await import('./orderService.js');
+    const existingOrder = getLatestOrderByTicketChannel(ticket.channel_id);
+    if (existingOrder && !['COMPLETED', 'CANCELLED'].includes(existingOrder.status)) {
+      await message.channel.send(`⚠️ Ticket này đã có đơn hàng \`${existingOrder.order_code}\` đang xử lý rồi. Không tạo thêm.`);
+      return;
+    }
+
     const order = createOrder({
       guildId: message.guildId,
       ticketId: ticket.id,
@@ -197,10 +206,16 @@ async function handleAutoCreateOrder(message, args) {
     });
 
     if (order.total_amount > 0) {
+      // Thử PayOS trước, nếu lỗi thì fallback sang VietQR
       try {
         await sendOrRefreshPaymentQr({ guild: message.guild, orderCode: order.order_code });
-      } catch (error) {
-        await message.channel.send(`⚠️ AI không tạo được mã QR PayOS: ${error.message}`);
+      } catch (payosError) {
+        try {
+          const { sendVietQRPayment } = await import('./paymentService.js');
+          await sendVietQRPayment({ guild: message.guild, orderCode: order.order_code });
+        } catch (vietqrError) {
+          await message.channel.send(`⚠️ Không tạo được QR: ${vietqrError.message}`);
+        }
       }
     }
 
