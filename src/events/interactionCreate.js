@@ -1117,6 +1117,17 @@ async function handlePrefixDone(message, args) {
 export function registerInteractionHandler(client, commands) {
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
+      // ── Autocomplete handler ──
+      if (interaction.isAutocomplete()) {
+        const command = commands.get(interaction.commandName);
+        if (command?.handleAutocomplete) {
+          await command.handleAutocomplete(interaction).catch(() =>
+            interaction.respond([]).catch(() => null)
+          );
+        }
+        return;
+      }
+
       if (interaction.isChatInputCommand()) {
         const command = commands.get(interaction.commandName);
         if (!command) return;
