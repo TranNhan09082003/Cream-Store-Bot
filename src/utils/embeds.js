@@ -23,6 +23,7 @@ import {
   numericEmoji,
   resolveTicketLabel,
 } from './formatters.js';
+import { getEmojiMap } from '../services/emojiService.js';
 
 // ═══════════════════════════════════════════════
 // Brand helpers
@@ -68,16 +69,18 @@ export function buildTicketPanelEmbed() {
   );
 }
 
-export function buildTicketPanelComponents() {
+export function buildTicketPanelComponents(guildId = null) {
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛍️'),
-      new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji('🆘'),
-      new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji('⚠️'),
-      new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji('🤝'),
+      new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji(E('panel_order', '🛍️')),
+      new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji(E('panel_support', '🆘')),
+      new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji(E('panel_complaint', '⚠️')),
+      new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji(E('panel_partnership', '🤝')),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji('🛠️'),
+      new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji(E('panel_warranty', '🛠️')),
     ),
   ];
 }
@@ -90,6 +93,11 @@ export function buildTicketPanelV2(customConfig = {}) {
   const hasCustomDesc = Boolean(customConfig.panel_description);
   const title = customConfig.panel_title || `🎫 ${brand.name || 'Cream Store'} — Trung Tâm Hỗ Trợ`;
   const imageUrl = customConfig.panel_image_url || null;
+  const guildId = customConfig.guild_id;
+
+  // Load emoji map (custom > default)
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
 
   const container = new ContainerBuilder().setAccentColor(0x6366f1);
 
@@ -126,11 +134,11 @@ export function buildTicketPanelV2(customConfig = {}) {
   if (!hasCustomDesc) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `🛍️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
-        `🆘  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
-        `⚠️  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
-        `🤝  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
-        `🛠️  **Bảo Hành** — Yêu cầu bảo hành sản phẩm đã mua`
+        `${E('panel_order','🛍️')}  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
+        `${E('panel_support','🆘')}  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
+        `${E('panel_complaint','⚠️')}  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
+        `${E('panel_partnership','🤝')}  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
+        `${E('panel_warranty','🛠️')}  **Bảo Hành** — Yêu cầu bảo hành sản phẩm đã mua`
       )
     );
     container.addSeparatorComponents(
@@ -146,22 +154,23 @@ export function buildTicketPanelV2(customConfig = {}) {
   );
 
 
-  // Buttons row 1 — ticket actions
+  // Buttons row 1 (dùng custom emoji)
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛒'),
-    new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji('🆘'),
-    new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji('⚠️'),
-    new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji('🤝'),
+    new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji(E('panel_order', '🛍️')),
+    new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji(E('panel_support', '🆘')),
+    new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji(E('panel_complaint', '⚠️')),
+    new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji(E('panel_partnership', '🤝')),
   );
 
-  // Buttons row 2 — warranty + admin edit
+  // Buttons row 2
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji('🛠️'),
-    new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sửa Panel').setStyle(ButtonStyle.Secondary).setEmoji('✏️'),
+    new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary).setEmoji(E('panel_warranty', '🛠️')),
+    new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sửa Panel').setStyle(ButtonStyle.Secondary).setEmoji(E('panel_edit', '✏️')),
   );
 
   return { container, rows: [row1, row2], flags: MessageFlags.IsComponentsV2 };
 }
+
 
 
 // ═══════════════════════════════════════════════
@@ -539,11 +548,6 @@ export function buildOrderCreatedV2(order, orderChannelId) {
       .setLabel('Hủy Đơn')
       .setStyle(ButtonStyle.Danger)
       .setEmoji('❌'),
-    new ButtonBuilder()
-      .setCustomId(`queue:view:${order.order_code}`)
-      .setLabel('Xem Hàng Chờ')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('📍'),
   );
 
   return { container, actionRow, flags: MessageFlags.IsComponentsV2 };

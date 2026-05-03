@@ -331,6 +331,9 @@ export function initDatabase() {
   // Customer flags — mute ticket (ngăn tạo ticket)
   ensureColumn('customer_flags', 'is_ticket_muted', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('customer_flags', 'ticket_mute_reason', 'TEXT');
+
+  // Custom emoji slots cho từng guild
+  ensureColumn('guild_settings', 'custom_emojis', 'TEXT');
 }
 
 export function nowIso() {
