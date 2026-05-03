@@ -87,18 +87,27 @@ export function buildTicketPanelComponents() {
 // ═══════════════════════════════════════════════
 export function buildTicketPanelV2(customConfig = {}) {
   const brand = brandConfig('store');
+  const hasCustomDesc = Boolean(customConfig.panel_description);
   const title = customConfig.panel_title || `🎫 ${brand.name || 'Cream Store'} — Trung Tâm Hỗ Trợ`;
-  const description = customConfig.panel_description ||
-    `> ✨ Chào mừng bạn đến với **${brand.name || 'Cream Store'}**!\n` +
-    `> Bấm nút bên dưới để mở ticket. Chọn **đúng loại** giúp staff phục vụ bạn nhanh hơn.`;
   const imageUrl = customConfig.panel_image_url || null;
 
-  const container = new ContainerBuilder().setAccentColor(0x6366f1); // Indigo
+  const container = new ContainerBuilder().setAccentColor(0x6366f1);
 
-  // Header
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${title}\n${description}`)
-  );
+  if (hasCustomDesc) {
+    // Chế độ tuỳ chỉnh: chỉ hiện tiêu đề + nội dung user nhập (không kèm services mặc định)
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`## ${title}\n${customConfig.panel_description}`)
+    );
+  } else {
+    // Chế độ mặc định
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${title}\n` +
+        `> ✨ Chào mừng bạn đến với **${brand.name || 'Cream Store'}**!\n` +
+        `> Bấm nút bên dưới để mở ticket. Chọn **đúng loại** giúp staff phục vụ bạn nhanh hơn.`
+      )
+    );
+  }
 
   // Ảnh banner hiển thị inline qua MediaGallery
   if (imageUrl) {
@@ -113,20 +122,21 @@ export function buildTicketPanelV2(customConfig = {}) {
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
-  // Services
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `🛒️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
-      `🆘  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
-      `⚠️  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
-      `🤝  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
-      `🛠️  **Bảo Hành** — Yêu cầu bảo hành sản phẩm đã mua`
-    )
-  );
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
+  // Chỉ hiện services mặc định khi user CHƯA tuỳ chỉnh nội dung
+  if (!hasCustomDesc) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `🛍️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
+        `🆘  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
+        `⚠️  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
+        `🤝  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
+        `🛠️  **Bảo Hành** — Yêu cầu bảo hành sản phẩm đã mua`
+      )
+    );
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+  }
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
@@ -134,6 +144,7 @@ export function buildTicketPanelV2(customConfig = {}) {
       `— *${brand.footer || brand.name}*`
     )
   );
+
 
   // Buttons row 1 — ticket actions
   const row1 = new ActionRowBuilder().addComponents(
