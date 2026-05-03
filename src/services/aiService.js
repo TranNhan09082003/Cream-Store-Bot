@@ -111,8 +111,10 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     };
 
     if (isTicket) {
-      body.tools = [createOrderToolDeclaration];
+      // Tạm thời vô hiệu hóa AI tự động tạo đơn theo yêu cầu
+      // body.tools = [createOrderToolDeclaration];
     }
+
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
