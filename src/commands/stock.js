@@ -51,34 +51,20 @@ export function buildStockPanelComponents(guildId) {
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
+  // Gom tất cả sản phẩm vào 1 TextDisplay để tránh vượt 40 components
+  const productLines = products.map((p, i) => {
     const priceText = p.price > 0 ? formatCurrency(p.price) : '🎁 Miễn phí';
     const durationText = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
     const descLine = p.description ? `\n> _${p.description}_` : '';
+    return (
+      `### ${p.emoji || ICONS.defaultProduct}  ${p.name}\n` +
+      `> ${ICONS.price} **${priceText}** — ${ICONS.duration} ${durationText}${descLine}`
+    );
+  }).join('\n\n');
 
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          `### ${p.emoji || ICONS.defaultProduct}  ${p.name}\n` +
-          `> ${ICONS.price} **${priceText}** — ${ICONS.duration} ${durationText}${descLine}`
-        )
-      )
-      .setButtonAccessory(
-        new ButtonBuilder()
-          .setCustomId(`product:edit:${p.id}`)
-          .setLabel(`${ICONS.edit} Edit`)
-          .setStyle(ButtonStyle.Secondary)
-      );
-
-    container.addSectionComponents(section);
-
-    if (i < products.length - 1) {
-      container.addSeparatorComponents(
-        new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-      );
-    }
-  }
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(productLines)
+  );
 
   container.addSeparatorComponents(
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
@@ -89,6 +75,21 @@ export function buildStockPanelComponents(guildId) {
       `-# ${ICONS.footer} Chọn sản phẩm từ dropdown bên dưới để đặt hàng | Cream Store`
     )
   );
+
+  // Nút Edit từng sản phẩm — chia thành các hàng (tối đa 5 nút/hàng)
+  const editRows = [];
+  for (let i = 0; i < products.length; i += 5) {
+    const chunk = products.slice(i, i + 5);
+    const row = new ActionRowBuilder().addComponents(
+      chunk.map(p =>
+        new ButtonBuilder()
+          .setCustomId(`product:edit:${p.id}`)
+          .setLabel(`${p.emoji || '📦'} ${p.name}`.slice(0, 80))
+          .setStyle(ButtonStyle.Secondary)
+      )
+    );
+    editRows.push(row);
+  }
 
   const selectOptions = products.slice(0, 25).map(p => {
     const priceShort = p.price > 0 ? `${Math.round(p.price / 1000)}k` : 'Free';
@@ -107,8 +108,9 @@ export function buildStockPanelComponents(guildId) {
       .addOptions(selectOptions)
   );
 
-  return [container, selectRow];
+  return [container, selectRow, ...editRows];
 }
+
 
 // Registry để lưu vị trí panel theo guildId
 // Map<guildId, { channelId, messageId }>
