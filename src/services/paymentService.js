@@ -274,15 +274,31 @@ export async function sendVietQRPayment({ guild, orderCode }) {
 
   const attachmentName = `vietqr-${order.order_code}.png`;
 
-  // ═══ Components V2 — VietQR Card ═══
-  const container = new ContainerBuilder()
-    .setAccentColor(0x00b4d8); // Xanh ngân hàng
+  // ╔═══ VietQR Payment Card (Components V2) ═══╗
+  const container = new ContainerBuilder().setAccentColor(0x00b4d8);
 
+  // ━ Tiêu đề + mã giao dịch
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## 🏦 Thanh Toán Chuyển Khoản — VietQR\n` +
-      `> 💬 Nội dung CK: \`${transferContent}\`\n` +
-      `> ✅ Hệ thống **tự động xác nhận** sau khi nhận giao dịch (qua SePay)`
+      `## 🏦 Thông Tin Thanh Toán — Chuyển Khoản\n` +
+      `🗞️ **Mã đơn:** \`${order.order_code}\`\n` +
+      `✅ Bạn có thể quét mã QR hoặc chuyển khoản đúng thông tin — hệ thống tự động gi đóng key sau khi nhận giao dịch.`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // ━ Bảng thông tin ngân hàng
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `**Ngân hàng** \u2003\u2003\u2003\u2003 **Số tài khoản** \u2003\u2003\u2003\u2003\u2003\u2003 **Chủ tài khoản**\n` +
+      `\`${(bankInfo.bankName || bankInfo.bankBin || 'BANK').toUpperCase()}\` \u2003 \`${bankInfo.accountNo}\` \u2003 \`${(bankInfo.accountName || 'CHỦ TK').toUpperCase()}\`\n\n` +
+      `**Nội dung chuyển khoản**\n` +
+      `\`${transferContent}\`\n\n` +
+      `**Sản phẩm** \u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003 **Số tiền**\n` +
+      `\`${order.quantity}x ${order.product_name}\` \u2003 \`${formatCurrency(order.total_amount)}\``
     )
   );
 
@@ -292,18 +308,8 @@ export async function sendVietQRPayment({ guild, orderCode }) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `📦 **Sản phẩm:** ${order.quantity}x ${order.product_name}\n` +
-      `💰 **Số tiền:** \`${formatCurrency(order.total_amount)}\`\n` +
-      `🏦 **Ngân hàng:** \`${bankInfo.accountName}\` — \`${bankInfo.accountNo}\``
+      `⚠️ **Lưu ý:** Vui lòng chuyển **đúng nội dung** để hệ thống tự động xác nhận. ảnh QR đính kèm bên dưới.`
     )
-  );
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
-
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('📱 **Quét mã QR bên dưới để thanh toán (ảnh đính kèm):**')
   );
 
   const sentMessage = await ticketChannel.send({
@@ -311,7 +317,7 @@ export async function sendVietQRPayment({ guild, orderCode }) {
     files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
     flags: MessageFlags.IsComponentsV2,
   });
-  await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR chuyển khoản của bạn!` }).catch(() => null);
+  await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR chuyển khoản của bạn đã sẵn sàng!` }).catch(() => null);
 
   savePaymentMessage(order.order_code, sentMessage.id);
   return { order, message: sentMessage, vietqrUrl };
@@ -343,16 +349,15 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   const imageBuffer = await renderPaymentQrImage(order);
   const files = imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [];
 
-  // ═══ Components V2 — PayOS Card ═══
-  const container = new ContainerBuilder()
-    .setAccentColor(0x7c3aed); // Tím PayOS
+  // ╔═══ PayOS Payment Card (Components V2) ═══╗
+  const container = new ContainerBuilder().setAccentColor(0x7c3aed);
 
+  // ━ Tiêu đề + mã giao dịch
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## 💳 Thanh Toán Đơn Hàng — PayOS\n` +
-      `> 🔑 Mã đơn: \`${order.order_code}\`\n` +
-      `> 🔖 Mã thanh toán: \`${order.payment_code ?? order.order_code}\`\n` +
-      `> ✅ Bot sẽ **tự động xác nhận** sau khi nhận giao dịch`
+      `## 💳 Thông Tin Thanh Toán — PayOS\n` +
+      `🗞️ **Mã đơn:** \`${order.order_code}\`\n` +
+      `✅ Bạn có thể quét mã QR hoặc bấm **Thanh Toán Ngay** — hệ thống tự động giải phóng key sau khi nhận giao dịch.`
     )
   );
 
@@ -360,14 +365,17 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
+  // ━ Bảng thông tin thanh toán
   const expireText = order.payment_expired_at
     ? `<t:${Math.floor(new Date(order.payment_expired_at).getTime() / 1000)}:R>`
-    : '_Theo mặc định PayOS_';
+    : '`Theo mặc định PayOS`';
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `📦 **Sản phẩm:** ${order.quantity}x ${order.product_name}\n` +
-      `💰 **Số tiền:** \`${formatCurrency(order.total_amount)}\`\n` +
+      `**Nội dung thanh toán**\n` +
+      `\`${order.payment_code ?? order.order_code}\`\n\n` +
+      `**Sản phẩm** \u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003 **Số tiền**\n` +
+      `\`${order.quantity}x ${order.product_name}\` \u2003 \`${formatCurrency(order.total_amount)}\`\n\n` +
       `⏰ **Hết hạn:** ${expireText}`
     )
   );
@@ -377,7 +385,9 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
       new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
     );
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('📱 **Quét mã QR hoặc bấm nút Thanh Toán Ngay (ảnh QR đính kèm bên dưới):**')
+      new TextDisplayBuilder().setContent(
+        `⚠️ **Lưu ý:** Giao dịch sẽ hết hạn nếu không thanh toán kịp thời. Ảnh QR đính kèm bên dưới.`
+      )
     );
   }
 
