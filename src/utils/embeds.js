@@ -8,6 +8,8 @@ import {
   TextDisplayBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
 } from 'discord.js';
 import { config, getWebhookUrl, getPayOSReturnUrl, getPayOSCancelUrl } from '../config.js';
@@ -98,21 +100,23 @@ export function buildTicketPanelV2(customConfig = {}) {
     new TextDisplayBuilder().setContent(`## ${title}\n${description}`)
   );
 
+  // Ảnh banner hiển thị inline qua MediaGallery
+  if (imageUrl) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(imageUrl)
+      )
+    );
+  }
+
   container.addSeparatorComponents(
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
-  // Image nếu có — hiển thị dưới dạng link trong header
-  if (imageUrl) {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`🖼️ [Xem ảnh banner](${imageUrl})`)
-    );
-  }
-
   // Services
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `🛍️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
+      `🛒️  **Mua Hàng** — Netflix, Spotify, YouTube Premium, Nicho...\n` +
       `🆘  **Hỗ Trợ** — Tài khoản lỗi, thắc mắc về dịch vụ\n` +
       `⚠️  **Khiếu Nại** — Phản ánh trải nghiệm chưa tốt\n` +
       `🤝  **Hợp Tác** — Đề xuất hợp tác kinh doanh\n` +
@@ -133,7 +137,7 @@ export function buildTicketPanelV2(customConfig = {}) {
 
   // Buttons row 1 — ticket actions
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛍️'),
+    new ButtonBuilder().setCustomId('ticket:create:ORDER').setLabel('Mua Hàng').setStyle(ButtonStyle.Primary).setEmoji('🛒'),
     new ButtonBuilder().setCustomId('ticket:create:SUPPORT').setLabel('Hỗ Trợ').setStyle(ButtonStyle.Secondary).setEmoji('🆘'),
     new ButtonBuilder().setCustomId('ticket:create:COMPLAINT').setLabel('Khiếu Nại').setStyle(ButtonStyle.Danger).setEmoji('⚠️'),
     new ButtonBuilder().setCustomId('ticket:create:PARTNERSHIP').setLabel('Hợp Tác').setStyle(ButtonStyle.Success).setEmoji('🤝'),

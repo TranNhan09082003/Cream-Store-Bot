@@ -1258,24 +1258,34 @@ export function registerInteractionHandler(client, commands) {
           updated_by: interaction.user.id,
         });
 
-        // Cập nhật panel message ngay lập tức
+        // Xóa panel cũ → gửi panel mới
         try {
-          if (updated.ticket_panel_channel_id && updated.ticket_panel_message_id) {
+          if (updated.ticket_panel_channel_id) {
             const panelChannel = await interaction.guild.channels.fetch(updated.ticket_panel_channel_id).catch(() => null);
             if (panelChannel) {
-              const panelMsg = await panelChannel.messages.fetch(updated.ticket_panel_message_id).catch(() => null);
-              if (panelMsg) {
-                const { buildTicketPanelV2 } = await import('../utils/embeds.js');
-                const { container, rows, flags } = buildTicketPanelV2(updated);
-                await panelMsg.edit({ components: [container, ...rows], flags });
+              // Xóa tin nhắn cũ nếu còn tồn tại
+              if (updated.ticket_panel_message_id) {
+                const oldMsg = await panelChannel.messages.fetch(updated.ticket_panel_message_id).catch(() => null);
+                if (oldMsg) await oldMsg.delete().catch(() => null);
               }
+
+              // Gửi panel mới
+              const { buildTicketPanelV2 } = await import('../utils/embeds.js');
+              const { container, rows, flags } = buildTicketPanelV2(updated);
+              const newMsg = await panelChannel.send({ components: [container, ...rows], flags });
+
+              // Lưu message ID mới vào DB
+              upsertGuildConfig({
+                guild_id: interaction.guildId,
+                ticket_panel_message_id: newMsg.id,
+              });
             }
           }
         } catch (editErr) {
           console.error('[PANEL EDIT] Lỗi cập nhật panel:', editErr);
         }
 
-        await interaction.editReply('✅ Panel đã được cập nhật thành công!');
+        await interaction.editReply('✅ Panel đã được làm mới thành công! Nội dung cũ đã bị xóa.');
         return;
       }
 
