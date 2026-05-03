@@ -106,17 +106,23 @@ export function setEmoji(guildId, slot, emojiString) {
     current[slot] = emojiString;
   }
 
-  db.prepare(`
-    INSERT INTO guild_settings (guild_id, custom_emojis, updated_at)
-    VALUES (@guild_id, @custom_emojis, @updated_at)
-    ON CONFLICT(guild_id) DO UPDATE SET
-      custom_emojis = excluded.custom_emojis,
-      updated_at = excluded.updated_at
-  `).run({
-    guild_id: guildId,
-    custom_emojis: JSON.stringify(current),
-    updated_at: nowIso(),
-  });
+  const now = nowIso();
+
+  // Thử UPDATE trước (row đã tồn tại sau /setup)
+  const result = db.prepare(`
+    UPDATE guild_settings
+    SET custom_emojis = @custom_emojis, updated_at = @now
+    WHERE guild_id = @guild_id
+  `).run({ custom_emojis: JSON.stringify(current), now, guild_id: guildId });
+
+  // Nếu chưa có row nào (guild chưa /setup) → INSERT với giá trị rỗng cho cột bắt buộc
+  if (result.changes === 0) {
+    db.prepare(`
+      INSERT INTO guild_settings (guild_id, custom_emojis, updated_at, ticket_category_id)
+      VALUES (@guild_id, @custom_emojis, @now, '')
+    `).run({ guild_id: guildId, custom_emojis: JSON.stringify(current), now });
+  }
+
 
   refreshCache(guildId);
   return current;
