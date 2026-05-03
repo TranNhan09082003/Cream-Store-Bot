@@ -92,12 +92,12 @@ export async function execute(interaction) {
     });
     await ticketChannel.send({ content: `<@${customer.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
 
-    // Nếu có tiền → hiện bảng chọn phương thức thanh toán
+    // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
     if (order.total_amount > 0) {
-      const { container: payContainer, actionRow: payRow, flags: payFlags } = buildPaymentMethodSelector(order);
-      await ticketChannel.send({
-        components: [payContainer, payRow],
-        flags: payFlags,
+      const { sendOrRefreshPaymentQr } = await import('../services/paymentService.js');
+      await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
+        console.error('[ORDER] Lỗi tạo QR PayOS:', err);
+        ticketChannel.send(`⚠️ Lỗi tạo mã QR thanh toán: ${err.message}`);
       });
     }
 

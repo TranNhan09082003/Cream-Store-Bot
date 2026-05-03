@@ -6,12 +6,15 @@ import { startScheduler } from './services/schedulerService.js';
 import { startWebhookServer } from './services/webhookServer.js';
 import { startPresenceRotation } from './services/presenceService.js';
 
+import { initErrorLogger } from './services/errorLogService.js';
+
 export async function buildClient() {
   initDatabase();
 
   const commands = await loadCommands();
   const client = new Client(getClientOptions());
 
+  initErrorLogger(client);
   registerInteractionHandler(client, commands);
 
   client.once(Events.ClientReady, (readyClient) => {

@@ -357,22 +357,15 @@ export function buildPaymentMethodSelector(order) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `💳 **PayOS** — Quét QR từ app ngân hàng, tự động xác nhận qua PayOS webhook\n` +
-      `🏦 **VietQR / Chuyển khoản** — Quét QR hoặc chuyển tay, tự động xác nhận qua SePay`
+      `💳 **Thanh Toán Tự Động** — Vui lòng quét QR từ app ngân hàng, hệ thống sẽ tự động xác nhận sau 1-2 phút.`
     )
   );
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`payment:method:payos:${order.order_code}`)
-      .setLabel('PayOS')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('💳'),
-    new ButtonBuilder()
-      .setCustomId(`payment:method:vietqr:${order.order_code}`)
-      .setLabel('VietQR / Chuyển khoản')
-      .setStyle(ButtonStyle.Success)
-      .setEmoji('🏦'),
+      .setLabel('💳 Lấy Mã QR Thanh Toán')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`order:cancel_customer:${order.order_code}`)
       .setLabel('Hủy Đơn')

@@ -444,12 +444,13 @@ async function handleProductPurchaseFlow(interaction, productId) {
     // Ping riêng (content không được dùng với V2 flag)
     await channel.send({ content: `<@${interaction.user.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
 
-    // Nếu có tiền → hiện bảng chọn phương thức thanh toán
+    // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
     if (price > 0) {
-      const { container: payContainer, actionRow, flags: payFlags } = buildPaymentMethodSelector(order);
-      await channel.send({
-        components: [payContainer, actionRow],
-        flags: payFlags,
+      import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr }) => {
+        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
+          console.error('[ORDER] Lỗi tạo QR PayOS:', err);
+          channel.send(`⚠️ Lỗi tạo mã QR thanh toán: ${err.message}`);
+        });
       });
     }
 
@@ -1622,6 +1623,9 @@ export function registerInteractionHandler(client, commands) {
       }
 
       console.error('[INTERACTION] Lỗi:', error);
+      import('../services/errorLogService.js').then(({ sendErrorLog }) => {
+        sendErrorLog('Interaction Error', error, interaction);
+      }).catch(() => null);
 
       const payload = {
         content: '❌ Có lỗi xảy ra khi xử lý thao tác này. Hãy kiểm tra log console.',
