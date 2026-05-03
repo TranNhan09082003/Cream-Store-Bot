@@ -274,50 +274,30 @@ export async function sendVietQRPayment({ guild, orderCode }) {
 
   const attachmentName = `vietqr-${order.order_code}.png`;
 
-  // ╔═══ VietQR Payment Card (Components V2) ═══╗
-  const container = new ContainerBuilder().setAccentColor(0x00b4d8);
-
-  // ━ Tiêu đề + mã giao dịch
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `## 🏦 Thông Tin Thanh Toán — Chuyển Khoản\n` +
-      `🗞️ **Mã đơn:** \`${order.order_code}\`\n` +
-      `✅ Bạn có thể quét mã QR hoặc chuyển khoản đúng thông tin — hệ thống tự động gi đóng key sau khi nhận giao dịch.`
+  // ═══ VietQR Embed — QR hiển thị inline ═══
+  const bankName = (bankInfo.bankName || bankInfo.bankBin || 'BANK').toUpperCase();
+  const embed = new EmbedBuilder()
+    .setColor(0x00b4d8)
+    .setTitle('🏦 Thông Tin Thanh Toán Đơn Hàng')
+    .setDescription(
+      `Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động giải phóng key. Trong trường hợp chuyển sai nội dung vui lòng tạo ticket!`
     )
-  );
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
-
-  // ━ Bảng thông tin ngân hàng
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `**Ngân hàng** \u2003\u2003\u2003\u2003 **Số tài khoản** \u2003\u2003\u2003\u2003\u2003\u2003 **Chủ tài khoản**\n` +
-      `\`${(bankInfo.bankName || bankInfo.bankBin || 'BANK').toUpperCase()}\` \u2003 \`${bankInfo.accountNo}\` \u2003 \`${(bankInfo.accountName || 'CHỦ TK').toUpperCase()}\`\n\n` +
-      `**Nội dung chuyển khoản**\n` +
-      `\`${transferContent}\`\n\n` +
-      `**Sản phẩm** \u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003 **Số tiền**\n` +
-      `\`${order.quantity}x ${order.product_name}\` \u2003 \`${formatCurrency(order.total_amount)}\``
+    .addFields(
+      { name: 'Ngân hàng', value: `\`${bankName}\``, inline: true },
+      { name: 'Số tài khoản', value: `\`${bankInfo.accountNo}\``, inline: true },
+      { name: 'Chủ tài khoản', value: `\`${(bankInfo.accountName || 'CHỦ TK').toUpperCase()}\``, inline: true },
+      { name: 'Nội dung', value: `\`${transferContent}\``, inline: false },
+      { name: 'Sản phẩm', value: `\`${order.quantity}x ${order.product_name}\``, inline: true },
+      { name: 'Số tiền', value: `\`${formatCurrency(order.total_amount)}\``, inline: true },
     )
-  );
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
-
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `⚠️ **Lưu ý:** Vui lòng chuyển **đúng nội dung** để hệ thống tự động xác nhận. ảnh QR đính kèm bên dưới.`
-    )
-  );
+    .setImage(`attachment://${attachmentName}`)
+    .setFooter({ text: '⚠️ Lưu ý: Giao dịch sẽ hết hạn sau 10p nếu chưa thanh toán. Bạn có thể tạo lại hóa đơn mới.' });
 
   const sentMessage = await ticketChannel.send({
-    components: [container],
+    content: `<@${order.customer_id}>`,
+    embeds: [embed],
     files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
-    flags: MessageFlags.IsComponentsV2,
   });
-  await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR chuyển khoản của bạn đã sẵn sàng!` }).catch(() => null);
 
   savePaymentMessage(order.order_code, sentMessage.id);
   return { order, message: sentMessage, vietqrUrl };
@@ -349,46 +329,27 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   const imageBuffer = await renderPaymentQrImage(order);
   const files = imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [];
 
-  // ╔═══ PayOS Payment Card (Components V2) ═══╗
-  const container = new ContainerBuilder().setAccentColor(0x7c3aed);
-
-  // ━ Tiêu đề + mã giao dịch
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `## 💳 Thông Tin Thanh Toán — PayOS\n` +
-      `🗞️ **Mã đơn:** \`${order.order_code}\`\n` +
-      `✅ Bạn có thể quét mã QR hoặc bấm **Thanh Toán Ngay** — hệ thống tự động giải phóng key sau khi nhận giao dịch.`
-    )
-  );
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
-
-  // ━ Bảng thông tin thanh toán
+  // ═══ PayOS Embed (hiển thị QR inline) ═══
   const expireText = order.payment_expired_at
     ? `<t:${Math.floor(new Date(order.payment_expired_at).getTime() / 1000)}:R>`
-    : '`Theo mặc định PayOS`';
+    : '_30 phút_';
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `**Nội dung thanh toán**\n` +
-      `\`${order.payment_code ?? order.order_code}\`\n\n` +
-      `**Sản phẩm** \u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003 **Số tiền**\n` +
-      `\`${order.quantity}x ${order.product_name}\` \u2003 \`${formatCurrency(order.total_amount)}\`\n\n` +
-      `⏰ **Hết hạn:** ${expireText}`
+  const embed = new EmbedBuilder()
+    .setColor(0x7c3aed)
+    .setTitle('💳 Thông Tin Thanh Toán Đơn Hàng :shop:')
+    .setDescription(
+      `Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động giải phóng key sau khi nhận giao dịch.`
     )
-  );
+    .addFields(
+      { name: 'Nội dung', value: `\`${order.payment_code ?? order.order_code}\``, inline: false },
+      { name: 'Sản phẩm', value: `\`${order.quantity}x ${order.product_name}\``, inline: true },
+      { name: 'Số tiền', value: `\`${formatCurrency(order.total_amount)}\``, inline: true },
+      { name: 'Hết hạn', value: expireText, inline: false },
+    )
+    .setFooter({ text: '⚠️ Lưu ý: Giao dịch sẽ hết hạn sau 10p nếu chưa thanh toán. Bạn có thể tạo lại hóa đơn mới.' });
 
   if (imageBuffer) {
-    container.addSeparatorComponents(
-      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `⚠️ **Lưu ý:** Giao dịch sẽ hết hạn nếu không thanh toán kịp thời. Ảnh QR đính kèm bên dưới.`
-      )
-    );
+    embed.setImage(`attachment://${attachmentName}`);
   }
 
   const actionRow = new ActionRowBuilder();
@@ -402,9 +363,10 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   );
 
   const messagePayload = {
-    components: [container, ...(actionRow.components.length ? [actionRow] : [])],
-    files,
-    flags: MessageFlags.IsComponentsV2,
+    content: `<@${order.customer_id}>`,
+    embeds: [embed],
+    files: imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [],
+    components: actionRow.components.length ? [actionRow] : [],
   };
 
   let sentMessage = null;
@@ -417,8 +379,6 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
 
   if (!sentMessage) {
     sentMessage = await ticketChannel.send(messagePayload);
-    // Ping user riêng (không dùng content với V2 flag)
-    await ticketChannel.send({ content: `<@${order.customer_id}> — Mã QR PayOS của bạn!` }).catch(() => null);
   }
 
   const updated = savePaymentMessage(order.order_code, sentMessage.id);
