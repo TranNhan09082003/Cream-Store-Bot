@@ -189,7 +189,7 @@ Spotify Premium | 25k | 1`;
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('bulk_data')
-              .setLabel('Mỗi dòng: [Icon] Tên | Giá | Tháng | Mô tả (tùy chọn)')
+              .setLabel('Sản phẩm: Icon Tên | Giá | Tháng | Mô tả')
               .setPlaceholder('🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng')
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
