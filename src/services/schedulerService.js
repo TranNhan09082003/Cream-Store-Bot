@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { runDeepNotifications } from './deepNotificationService.js';
+import { runDeepNotifications, runSubscriptionNotifications } from './deepNotificationService.js';
 import { getDatabasePath } from '../database/db.js';
 import { getDueAutoCloseTickets, closeTicket } from './ticketService.js';
 import { exportTicketTranscript } from './transcriptService.js';
@@ -60,6 +60,12 @@ export function startScheduler(client) {
       await runDeepNotifications(client);
     } catch (error) {
       console.error('[SCHEDULER] Lỗi deep notifications:', error);
+    }
+
+    try {
+      await runSubscriptionNotifications(client);
+    } catch (error) {
+      console.error('[SCHEDULER] Lỗi subscription notifications:', error);
     }
 
     try {

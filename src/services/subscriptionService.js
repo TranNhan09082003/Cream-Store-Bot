@@ -1,0 +1,431 @@
+import { db, nowIso } from '../database/db.js';
+
+// ═══════════════════════════════════════════════
+//  Prepared statement factories
+// ═══════════════════════════════════════════════
+
+function insertStmt() {
+  return db.prepare(`
+    INSERT INTO subscription_accounts (
+      guild_id, service_type, renewal_mode,
+      gmail_email, gmail_password,
+      customer_id, customer_discord_name, related_order_code,
+      purchase_date, total_duration_months, renewal_cycle_months,
+      next_renewal_at, expiry_at, times_renewed,
+      spotify_family_name, spotify_slots_used,
+      status, note, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+}
+
+function getByIdStmt() {
+  return db.prepare('SELECT * FROM subscription_accounts WHERE id = ?');
+}
+
+function getAllActiveStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE'
+    ORDER BY service_type ASC, next_renewal_at ASC
+  `);
+}
+
+function getActiveByTypeStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE' AND service_type = ?
+    ORDER BY next_renewal_at ASC
+  `);
+}
+
+function getDueForRenewalStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE'
+      AND renewal_mode = 'auto_cycle'
+      AND next_renewal_at IS NOT NULL
+      AND datetime(next_renewal_at) <= datetime('now', ?)
+      AND datetime(next_renewal_at) > datetime('now', '-1 day')
+      AND renewal_remind_sent_at IS NULL
+    ORDER BY next_renewal_at ASC
+  `);
+}
+
+function getExpiringOneTimeStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE'
+      AND renewal_mode IN ('one_time', 'full_paid')
+      AND datetime(expiry_at) <= datetime('now', ?)
+      AND datetime(expiry_at) > datetime('now', '-1 day')
+      AND renewal_remind_sent_at IS NULL
+    ORDER BY expiry_at ASC
+  `);
+}
+
+function getAllDueGlobalStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE status = 'ACTIVE'
+      AND renewal_mode = 'auto_cycle'
+      AND next_renewal_at IS NOT NULL
+      AND datetime(next_renewal_at) <= datetime('now', ?)
+      AND renewal_remind_sent_at IS NULL
+    ORDER BY next_renewal_at ASC
+    LIMIT ?
+  `);
+}
+
+function getAllExpiringGlobalStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE status = 'ACTIVE'
+      AND renewal_mode IN ('one_time', 'full_paid')
+      AND datetime(expiry_at) <= datetime('now', ?)
+      AND renewal_remind_sent_at IS NULL
+    ORDER BY expiry_at ASC
+    LIMIT ?
+  `);
+}
+
+function getYoutubeAutoCycleGlobalStmt() {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE status = 'ACTIVE'
+      AND service_type = 'youtube'
+      AND renewal_mode = 'auto_cycle'
+      AND next_renewal_at IS NOT NULL
+      AND datetime(next_renewal_at) <= datetime('now', ?)
+      AND renewal_remind_sent_at IS NULL
+    ORDER BY next_renewal_at ASC
+    LIMIT ?
+  `);
+}
+
+function markRenewedStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET times_renewed = times_renewed + 1,
+        next_renewal_at = ?,
+        renewal_remind_sent_at = NULL,
+        customer_response = NULL,
+        updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+function markExpiredStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET status = 'EXPIRED', updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+function markRemindSentStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET renewal_remind_sent_at = ?, updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+function markCustomerResponseStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET customer_response = ?, status = CASE WHEN ? = 'NO' THEN 'EXPIRED' ELSE status END, updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+function deleteStmt() {
+  return db.prepare('DELETE FROM subscription_accounts WHERE id = ?');
+}
+
+function countByGuildStmt() {
+  return db.prepare(`
+    SELECT service_type, COUNT(*) AS total
+    FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE'
+    GROUP BY service_type
+  `);
+}
+
+function resetRemindStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET renewal_remind_sent_at = NULL, updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+function updateFieldsStmt() {
+  return db.prepare(`
+    UPDATE subscription_accounts
+    SET gmail_email = ?,
+        gmail_password = ?,
+        customer_id = ?,
+        customer_discord_name = ?,
+        total_duration_months = ?,
+        renewal_cycle_months = ?,
+        spotify_family_name = ?,
+        spotify_slots_used = ?,
+        note = ?,
+        updated_at = ?
+    WHERE id = ?
+  `);
+}
+
+// ═══════════════════════════════════════════════
+//  Helper: tính ngày
+// ═══════════════════════════════════════════════
+
+function addMonths(baseDate, months) {
+  const d = new Date(baseDate);
+  d.setMonth(d.getMonth() + Math.max(0, Number(months || 0)));
+  return d.toISOString();
+}
+
+function computeNextRenewal(purchaseDate, cycleMonths, timesRenewed = 0) {
+  if (!cycleMonths || cycleMonths <= 0) return null;
+  const nextCycle = timesRenewed + 1;
+  return addMonths(purchaseDate, cycleMonths * nextCycle);
+}
+
+function computeExpiry(purchaseDate, totalMonths) {
+  return addMonths(purchaseDate, totalMonths);
+}
+
+// ═══════════════════════════════════════════════
+//  Public API
+// ═══════════════════════════════════════════════
+
+/**
+ * Thêm subscription mới
+ */
+export function addSubscription({
+  guildId,
+  serviceType,
+  renewalMode,
+  gmailEmail,
+  gmailPassword,
+  customerId = null,
+  customerDiscordName = null,
+  relatedOrderCode = null,
+  purchaseDate,
+  totalDurationMonths,
+  renewalCycleMonths = 0,
+  spotifyFamilyName = null,
+  spotifySlotsUsed = 0,
+  note = null,
+}) {
+  const ts = nowIso();
+  const expiryAt = computeExpiry(purchaseDate, totalDurationMonths);
+  let nextRenewalAt = null;
+
+  if (renewalMode === 'auto_cycle' && renewalCycleMonths > 0) {
+    nextRenewalAt = computeNextRenewal(purchaseDate, renewalCycleMonths, 0);
+  }
+
+  const result = insertStmt().run(
+    guildId,
+    serviceType,
+    renewalMode,
+    gmailEmail,
+    gmailPassword,
+    customerId,
+    customerDiscordName,
+    relatedOrderCode,
+    purchaseDate,
+    totalDurationMonths,
+    renewalCycleMonths,
+    nextRenewalAt,
+    expiryAt,
+    0, // times_renewed
+    spotifyFamilyName,
+    spotifySlotsUsed,
+    'ACTIVE',
+    note,
+    ts,
+    ts,
+  );
+
+  return getByIdStmt().get(Number(result.lastInsertRowid));
+}
+
+/**
+ * Lấy subscription theo ID
+ */
+export function getSubscriptionById(id) {
+  return getByIdStmt().get(id) ?? null;
+}
+
+/**
+ * Lấy tất cả subscriptions active
+ */
+export function getAllActiveSubscriptions(guildId, serviceType = null) {
+  if (serviceType) {
+    return getActiveByTypeStmt().all(guildId, serviceType);
+  }
+  return getAllActiveStmt().all(guildId);
+}
+
+/**
+ * Lấy subscriptions cần gia hạn (auto_cycle) trong khoảng N giờ tới
+ */
+export function getDueForRenewal(guildId, withinHours = 72) {
+  return getDueForRenewalStmt().all(guildId, `+${withinHours} hours`);
+}
+
+/**
+ * Lấy gói lẻ/full_paid sắp hết hạn
+ */
+export function getExpiringOneTime(guildId, withinHours = 72) {
+  return getExpiringOneTimeStmt().all(guildId, `+${withinHours} hours`);
+}
+
+/**
+ * Lấy tất cả (global) cần gia hạn — cho scheduler
+ */
+export function getAllDueForRenewalGlobal(withinHours = 72, limit = 50) {
+  return getAllDueGlobalStmt().all(`+${withinHours} hours`, limit);
+}
+
+/**
+ * Lấy tất cả (global) gói lẻ sắp hết hạn — cho scheduler
+ */
+export function getAllExpiringOneTimeGlobal(withinHours = 72, limit = 50) {
+  return getAllExpiringGlobalStmt().all(`+${withinHours} hours`, limit);
+}
+
+/**
+ * Lấy YouTube auto_cycle cần nhắc cả khách + shop — cho scheduler
+ */
+export function getYoutubeAutoCycleDueGlobal(withinHours = 72, limit = 50) {
+  return getYoutubeAutoCycleGlobalStmt().all(`+${withinHours} hours`, limit);
+}
+
+/**
+ * Đánh dấu đã gia hạn → tính next_renewal_at mới
+ */
+export function markRenewed(id) {
+  const sub = getSubscriptionById(id);
+  if (!sub) return null;
+
+  const newTimesRenewed = (sub.times_renewed || 0) + 1;
+  let newNextRenewal = computeNextRenewal(sub.purchase_date, sub.renewal_cycle_months, newTimesRenewed);
+
+  // Nếu next_renewal vượt quá expiry_at → đánh dấu hết hạn
+  if (newNextRenewal && new Date(newNextRenewal) > new Date(sub.expiry_at)) {
+    newNextRenewal = null;
+    markExpiredStmt().run(nowIso(), id);
+    return getSubscriptionById(id);
+  }
+
+  markRenewedStmt().run(newNextRenewal, nowIso(), id);
+  return getSubscriptionById(id);
+}
+
+/**
+ * Đánh dấu đã gửi nhắc
+ */
+export function markRemindSent(id) {
+  const ts = nowIso();
+  markRemindSentStmt().run(ts, ts, id);
+  return getSubscriptionById(id);
+}
+
+/**
+ * Ghi nhận khách trả lời YES/NO
+ */
+export function markCustomerResponse(id, response) {
+  const ts = nowIso();
+  markCustomerResponseStmt().run(response, response, ts, id);
+  return getSubscriptionById(id);
+}
+
+/**
+ * Đánh dấu hết hạn
+ */
+export function markExpired(id) {
+  markExpiredStmt().run(nowIso(), id);
+  return getSubscriptionById(id);
+}
+
+/**
+ * Xóa subscription
+ */
+export function deleteSubscription(id) {
+  return deleteStmt().run(id);
+}
+
+/**
+ * Reset cờ nhắc
+ */
+export function resetRemindFlag(id) {
+  resetRemindStmt().run(nowIso(), id);
+  return getSubscriptionById(id);
+}
+
+/**
+ * Cập nhật thông tin
+ */
+export function updateSubscription(id, data) {
+  const sub = getSubscriptionById(id);
+  if (!sub) return null;
+
+  updateFieldsStmt().run(
+    data.gmailEmail ?? sub.gmail_email,
+    data.gmailPassword ?? sub.gmail_password,
+    data.customerId ?? sub.customer_id,
+    data.customerDiscordName ?? sub.customer_discord_name,
+    data.totalDurationMonths ?? sub.total_duration_months,
+    data.renewalCycleMonths ?? sub.renewal_cycle_months,
+    data.spotifyFamilyName ?? sub.spotify_family_name,
+    data.spotifySlotsUsed ?? sub.spotify_slots_used,
+    data.note ?? sub.note,
+    nowIso(),
+    id,
+  );
+
+  return getSubscriptionById(id);
+}
+
+/**
+ * Đếm subscriptions theo guild
+ */
+export function getSubscriptionCounts(guildId) {
+  return countByGuildStmt().all(guildId);
+}
+
+/**
+ * Check gói Nitro lẻ
+ */
+export function isRetailNitro(sub) {
+  return sub.service_type === 'nitro' && sub.renewal_mode === 'one_time';
+}
+
+/**
+ * Tính số lần gia hạn cần thiết
+ */
+export function getTotalRenewalsNeeded(sub) {
+  if (sub.renewal_mode !== 'auto_cycle' || !sub.renewal_cycle_months) return 0;
+  return Math.max(0, Math.floor(sub.total_duration_months / sub.renewal_cycle_months) - 1);
+}
+
+/**
+ * Lấy danh sách cần gia hạn trong N ngày (cho command check)
+ */
+export function getSubscriptionsDueInDays(guildId, days = 7) {
+  return db.prepare(`
+    SELECT * FROM subscription_accounts
+    WHERE guild_id = ? AND status = 'ACTIVE'
+      AND (
+        (renewal_mode = 'auto_cycle' AND next_renewal_at IS NOT NULL AND datetime(next_renewal_at) <= datetime('now', ?))
+        OR
+        (renewal_mode IN ('one_time', 'full_paid') AND datetime(expiry_at) <= datetime('now', ?))
+      )
+    ORDER BY
+      CASE WHEN renewal_mode = 'auto_cycle' THEN next_renewal_at ELSE expiry_at END ASC
+  `).all(guildId, `+${days} days`, `+${days} days`);
+}

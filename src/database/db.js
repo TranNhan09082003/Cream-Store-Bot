@@ -237,6 +237,31 @@ export function initDatabase() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS subscription_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      service_type TEXT NOT NULL DEFAULT 'nitro',
+      renewal_mode TEXT NOT NULL DEFAULT 'auto_cycle',
+      gmail_email TEXT NOT NULL,
+      gmail_password TEXT NOT NULL,
+      customer_id TEXT,
+      customer_discord_name TEXT,
+      related_order_code TEXT,
+      purchase_date TEXT NOT NULL,
+      total_duration_months INTEGER NOT NULL DEFAULT 2,
+      renewal_cycle_months INTEGER NOT NULL DEFAULT 2,
+      next_renewal_at TEXT,
+      expiry_at TEXT NOT NULL,
+      times_renewed INTEGER NOT NULL DEFAULT 0,
+      spotify_family_name TEXT,
+      spotify_slots_used INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      renewal_remind_sent_at TEXT,
+      customer_response TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 
     CREATE INDEX IF NOT EXISTS idx_tickets_guild_customer_status ON tickets (guild_id, customer_id, status);
     CREATE INDEX IF NOT EXISTS idx_tickets_related_order ON tickets (related_order_code, status);
@@ -251,6 +276,9 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_expiry_at ON orders (expiry_at, status);
     CREATE INDEX IF NOT EXISTS idx_abuse_events ON abuse_events (guild_id, user_id, action, created_at);
     CREATE INDEX IF NOT EXISTS idx_product_catalog_guild ON product_catalog (guild_id, is_active, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_sub_accounts_guild_status ON subscription_accounts (guild_id, status, service_type);
+    CREATE INDEX IF NOT EXISTS idx_sub_accounts_renewal ON subscription_accounts (next_renewal_at, status);
+    CREATE INDEX IF NOT EXISTS idx_sub_accounts_expiry ON subscription_accounts (expiry_at, status);
   `);
 
   ensureColumn('guild_settings', 'warranty_category_id', 'TEXT');
