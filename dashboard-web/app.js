@@ -1011,12 +1011,16 @@ function removeToast(el) {
 function switchView(viewName) {
     document.getElementById('nav-accounts').classList.toggle('active', viewName === 'accounts');
     document.getElementById('nav-customers').classList.toggle('active', viewName === 'customers');
+    document.getElementById('nav-subscriptions').classList.toggle('active', viewName === 'subscriptions');
     
     document.getElementById('view-accounts').style.display = viewName === 'accounts' ? 'block' : 'none';
     document.getElementById('view-customers').style.display = viewName === 'customers' ? 'block' : 'none';
+    document.getElementById('view-subscriptions').style.display = viewName === 'subscriptions' ? 'block' : 'none';
 
     if (viewName === 'customers') {
         loadCustomers();
+    } else if (viewName === 'subscriptions') {
+        loadSubscriptions();
     } else {
         renderAll();
     }
@@ -1180,3 +1184,128 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderAll();
     }
 });
+
+// ═══════════════ SUBSCRIPTIONS TAB ═══════════════
+
+let subsData = [];
+let subFilter = 'all';
+
+const SUB_SERVICE_META = {
+    netflix: { emoji: '🎬', label: 'Netflix', color: '#E50914' },
+    nitro: { emoji: '🚀', label: 'Discord Nitro', color: '#5865F2' },
+    spotify_family: { emoji: '🎵', label: 'Spotify Family', color: '#1DB954' },
+    youtube: { emoji: '📺', label: 'YouTube Premium', color: '#FF0000' },
+};
+
+const SUB_MODE_LABEL = {
+    auto_cycle: '🔄 Định kỳ',
+    one_time: '🔂 Mua lẻ',
+    full_paid: '✅ Trả hết',
+};
+
+async function loadSubscriptions() {
+    showLoader('Đang tải Subscriptions...');
+    try {
+        const [subRes, statsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/dashboard/api/subscriptions`, { headers: { 'x-dashboard-token': API_TOKEN } }),
+            fetch(`${API_BASE_URL}/dashboard/api/subscriptions/stats`, { headers: { 'x-dashboard-token': API_TOKEN } }),
+        ]);
+        const subJson = await subRes.json();
+        const statsJson = await statsRes.json();
+        if (subJson.ok) subsData = subJson.subscriptions;
+        if (statsJson.ok) {
+            const s = statsJson.stats;
+            document.getElementById('sub-stat-active').textContent = s.totalActive;
+            document.getElementById('sub-stat-expired').textContent = s.totalExpired;
+            document.getElementById('sub-stat-due').textContent = s.dueIn7Days;
+            document.getElementById('sub-stat-total').textContent = s.totalActive + s.totalExpired;
+        }
+        renderSubscriptions();
+    } catch (e) {
+        showToast('Lỗi tải subscriptions: ' + e.message, 'error');
+    }
+    hideLoader();
+}
+
+function setSubFilter(f) {
+    subFilter = f;
+    document.querySelectorAll('[data-sub-filter]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.subFilter === f);
+    });
+    renderSubscriptions();
+}
+
+function renderSubscriptions() {
+    const tbody = document.getElementById('sub-tbody');
+    const emptyEl = document.getElementById('sub-empty');
+    if (!tbody) return;
+
+    let filtered = subsData;
+    if (subFilter !== 'all') {
+        filtered = subsData.filter(s => s.serviceType === subFilter);
+    }
+
+    // Update tab counts
+    const tabAll = document.getElementById('sub-tab-all');
+    if (tabAll) tabAll.textContent = subsData.length;
+    ['netflix', 'nitro', 'spotify_family', 'youtube'].forEach(t => {
+        const el = document.getElementById('sub-tab-' + t);
+        if (el) el.textContent = subsData.filter(s => s.serviceType === t).length;
+    });
+
+    if (!filtered.length) {
+        tbody.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'flex';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = filtered.map(s => {
+        const meta = SUB_SERVICE_META[s.serviceType] || { emoji: '📦', label: s.serviceType, color: '#888' };
+        const mode = SUB_MODE_LABEL[s.renewalMode] || s.renewalMode;
+        const isExpired = s.status === 'EXPIRED';
+        const nextDate = s.nextRenewalAt ? new Date(s.nextRenewalAt) : null;
+        const expiryDate = s.expiryAt ? new Date(s.expiryAt) : null;
+        const now = new Date();
+
+        let statusClass = 'sub-status-active';
+        let statusLabel = '✅ Active';
+        if (isExpired) {
+            statusClass = 'sub-status-expired';
+            statusLabel = '❌ Hết hạn';
+        } else if (nextDate && nextDate <= new Date(now.getTime() + 7 * 86400000)) {
+            statusClass = 'sub-status-warning';
+            statusLabel = '⚠️ Sắp gia hạn';
+        } else if (expiryDate && expiryDate <= new Date(now.getTime() + 7 * 86400000)) {
+            statusClass = 'sub-status-warning';
+            statusLabel = '⚠️ Sắp hết hạn';
+        }
+
+        const customer = s.customerName || (s.customerId ? `<${s.customerId}>` : '—');
+        const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
+        const spotifyExtra = s.spotifyFamilyName ? ` 🏠${s.spotifyFamilyName}` : '';
+        const noteText = s.note ? escHtml(s.note) + spotifyExtra : spotifyExtra || '—';
+
+        return `<tr class="${statusClass}">
+            <td><strong>${s.id}</strong></td>
+            <td><span class="sub-type-badge" style="--svc-color:${meta.color}">${meta.emoji} ${meta.label}</span></td>
+            <td class="sub-email-cell">
+                <span class="sub-email-text">${escHtml(s.gmail)}</span>
+                <button class="sub-copy-btn" onclick="copyText('${escHtml(s.gmail)}')">📋</button>
+            </td>
+            <td class="sub-pw-cell">
+                <span class="sub-pw-hidden" id="pw-${s.id}">••••••</span>
+                <button class="sub-copy-btn" onclick="this.previousElementSibling.textContent=this.previousElementSibling.textContent==='••••••'?'${escHtml(s.password)}':'••••••'">
+                    👁️
+                </button>
+                <button class="sub-copy-btn" onclick="copyText('${escHtml(s.password)}')">📋</button>
+            </td>
+            <td>${escHtml(customer)}</td>
+            <td>${mode}</td>
+            <td>${fmtDate(s.nextRenewalAt)}</td>
+            <td>${fmtDate(s.expiryAt)}</td>
+            <td class="sub-note-cell">${noteText}</td>
+            <td><span class="sub-status-chip ${statusClass}">${statusLabel}</span></td>
+        </tr>`;
+    }).join('');
+}

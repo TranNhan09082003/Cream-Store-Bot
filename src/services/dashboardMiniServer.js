@@ -493,4 +493,72 @@ td,th{border-bottom:1px solid #334155;padding:8px;text-align:left}
     }
   });
 
+  // ═══════ Subscription Accounts API ═══════
+
+  app.get('/dashboard/api/subscriptions', (req, res) => {
+    try {
+      const rows = safeAll("SELECT * FROM subscription_accounts ORDER BY service_type ASC, status ASC, next_renewal_at ASC");
+      const mapped = rows.map(s => ({
+        id: s.id,
+        serviceType: s.service_type,
+        renewalMode: s.renewal_mode,
+        gmail: s.gmail_email,
+        password: s.gmail_password,
+        customerId: s.customer_id,
+        customerName: s.customer_discord_name,
+        relatedOrderCode: s.related_order_code,
+        purchaseDate: s.purchase_date,
+        totalDurationMonths: s.total_duration_months,
+        renewalCycleMonths: s.renewal_cycle_months,
+        nextRenewalAt: s.next_renewal_at,
+        expiryAt: s.expiry_at,
+        timesRenewed: s.times_renewed,
+        spotifyFamilyName: s.spotify_family_name,
+        spotifySlotsUsed: s.spotify_slots_used,
+        status: s.status,
+        customerResponse: s.customer_response,
+        note: s.note,
+        createdAt: s.created_at,
+        updatedAt: s.updated_at,
+      }));
+      res.json({ ok: true, subscriptions: mapped });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/dashboard/api/subscriptions/stats', (req, res) => {
+    try {
+      const byType = safeAll(`
+        SELECT service_type, status, COUNT(*) AS total
+        FROM subscription_accounts
+        GROUP BY service_type, status
+      `);
+      const dueIn7 = safeCount(`
+        SELECT COUNT(*) AS total FROM subscription_accounts
+        WHERE status = 'ACTIVE'
+          AND (
+            (renewal_mode = 'auto_cycle' AND next_renewal_at IS NOT NULL AND datetime(next_renewal_at) <= datetime('now', '+7 days'))
+            OR
+            (renewal_mode IN ('one_time', 'full_paid') AND datetime(expiry_at) <= datetime('now', '+7 days'))
+          )
+      `);
+      const totalActive = safeCount("SELECT COUNT(*) AS total FROM subscription_accounts WHERE status = 'ACTIVE'");
+      const totalExpired = safeCount("SELECT COUNT(*) AS total FROM subscription_accounts WHERE status = 'EXPIRED'");
+
+      res.json({
+        ok: true,
+        stats: {
+          byType,
+          dueIn7Days: dueIn7,
+          totalActive,
+          totalExpired,
+          generatedAt: new Date().toISOString(),
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
 }

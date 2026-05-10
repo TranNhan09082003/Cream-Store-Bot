@@ -12,6 +12,10 @@ npm-debug.log*
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Temp / zip files
 *.zip
+
+# Gemini workspace
+.gemini/

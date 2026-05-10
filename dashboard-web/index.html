@@ -77,6 +77,10 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 Khách Hàng Tương Tác
             </button>
+            <button class="nav-btn" id="nav-subscriptions" onclick="switchView('subscriptions')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                Quản Lý Subscriptions
+            </button>
             
             <div class="nav-spacer"></div>
             
@@ -249,6 +253,79 @@
                     <p>Khách hàng ẩn danh hoặc chưa có ai nạp tiền.</p>
                 </div>
             </div> <!-- /view-customers -->
+
+            <!-- GÓC NHÌN: SUBSCRIPTIONS -->
+            <div id="view-subscriptions" class="view-section" style="display: none;">
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-indigo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Tổng Active</div>
+                            <div class="stat-value" id="sub-stat-active">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-amber"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Cần Gia Hạn (7 ngày)</div>
+                            <div class="stat-value text-amber" id="sub-stat-due">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-rose"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Hết Hạn</div>
+                            <div class="stat-value text-rose" id="sub-stat-expired">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-emerald"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                        <div class="stat-info">
+                            <div class="stat-label">Tổng Cộng</div>
+                            <div class="stat-value" id="sub-stat-total">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header-controls">
+                        <div class="tabs-group">
+                            <button class="tab-btn active" data-sub-filter="all" onclick="setSubFilter('all')">Tất Cả <span class="badge" id="sub-tab-all">0</span></button>
+                            <button class="tab-btn" data-sub-filter="netflix" onclick="setSubFilter('netflix')">🎬 Netflix <span class="badge" id="sub-tab-netflix">0</span></button>
+                            <button class="tab-btn" data-sub-filter="nitro" onclick="setSubFilter('nitro')">🚀 Nitro <span class="badge" id="sub-tab-nitro">0</span></button>
+                            <button class="tab-btn" data-sub-filter="spotify_family" onclick="setSubFilter('spotify_family')">🎵 Spotify <span class="badge" id="sub-tab-spotify_family">0</span></button>
+                            <button class="tab-btn" data-sub-filter="youtube" onclick="setSubFilter('youtube')">📺 YouTube <span class="badge" id="sub-tab-youtube">0</span></button>
+                        </div>
+                    </div>
+
+                    <div class="sub-table-wrapper">
+                        <table class="sub-table" id="sub-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Loại</th>
+                                    <th>Email</th>
+                                    <th>Mật Khẩu</th>
+                                    <th>Khách Hàng</th>
+                                    <th>Chế Độ</th>
+                                    <th>Gia Hạn Tiếp</th>
+                                    <th>Hết Hạn</th>
+                                    <th>Ghi Chú</th>
+                                    <th>Trạng Thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sub-tbody">
+                                <!-- Data injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state" id="sub-empty" style="display: none;">
+                        <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></div>
+                        <h3>Chưa có subscription nào</h3>
+                        <p>Dùng /subscription add-netflix trên Discord để thêm.</p>
+                    </div>
+                </div>
+            </div> <!-- /view-subscriptions -->
 
         </div> <!-- /main-scroll -->
     </main>

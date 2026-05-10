@@ -3,8 +3,8 @@ import { runDeepNotifications, runSubscriptionNotifications } from '../services/
 import { getExpiringOrdersRaw } from '../services/v11DbHelpers.js';
 import { getSubscriptionsDueInDays } from '../services/subscriptionService.js';
 
-const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺' };
-const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium' };
+const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺', netflix: '🎬' };
+const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
 const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: '✅ Đã trả hết' };
 
 export const data = new SlashCommandBuilder()

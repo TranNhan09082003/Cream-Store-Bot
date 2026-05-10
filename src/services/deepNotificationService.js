@@ -40,9 +40,9 @@ function getReminderChannel(client, guildId) {
 
 // ═══════════════ Subscription Notification Embeds ═══════════════
 
-const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺' };
-const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium' };
-const SERVICE_COLOR = { nitro: 0x5865F2, spotify_family: 0x1DB954, youtube: 0xFF0000 };
+const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺', netflix: '🎬' };
+const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
+const SERVICE_COLOR = { nitro: 0x5865F2, spotify_family: 0x1DB954, youtube: 0xFF0000, netflix: 0xE50914 };
 
 function buildRenewalEmbed(sub) {
   const emoji = SERVICE_EMOJI[sub.service_type] || '📦';

@@ -1093,7 +1093,7 @@ async function handleSubscriptionAddModal(interaction) {
     }
 
     let customerField = null, customerName = null, duration = 2, purchaseDate, renewalMode, renewalCycle = 0;
-    let spotifyFamilyName = null, spotifySlotsUsed = 0;
+    let spotifyFamilyName = null, spotifySlotsUsed = 0, note = null;
 
     if (type === 'nitro') {
       customerField = interaction.fields.getTextInputValue('customer')?.trim() || null;
@@ -1121,6 +1121,15 @@ async function handleSubscriptionAddModal(interaction) {
         renewalMode = 'auto_cycle';
         renewalCycle = 1;
       }
+    } else if (type === 'netflix') {
+      customerField = interaction.fields.getTextInputValue('customer')?.trim() || null;
+      const profileName = interaction.fields.getTextInputValue('profile')?.trim() || null;
+      duration = Number.parseInt(interaction.fields.getTextInputValue('duration')?.trim(), 10) || 1;
+      purchaseDate = new Date().toISOString();
+      // Netflix lẻ (1-2 tháng) = one_time, dài hạn = auto_cycle (1 tháng/lần)
+      renewalMode = duration <= 2 ? 'one_time' : 'auto_cycle';
+      renewalCycle = duration <= 2 ? 0 : 1;
+      if (profileName) note = profileName;
     }
 
     // Parse customer ID vs name
@@ -1148,10 +1157,11 @@ async function handleSubscriptionAddModal(interaction) {
       renewalCycleMonths: renewalCycle,
       spotifyFamilyName,
       spotifySlotsUsed,
+      note,
     });
 
-    const EMOJI = { nitro: '🚀', spotify: '🎵', youtube: '📺' };
-    const LABEL = { nitro: 'Discord Nitro', spotify: 'Spotify Family', youtube: 'YouTube Premium' };
+    const EMOJI = { nitro: '🚀', spotify: '🎵', youtube: '📺', netflix: '🎬' };
+    const LABEL = { nitro: 'Discord Nitro', spotify: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
     const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: '✅ Đã trả hết' };
 
     const embed = new EmbedBuilder()
@@ -1167,6 +1177,7 @@ async function handleSubscriptionAddModal(interaction) {
         `**Hết hạn:** <t:${Math.floor(new Date(sub.expiry_at).getTime() / 1000)}:F>`,
         customerId ? `**Khách:** <@${customerId}>` : (customerName ? `**Khách:** ${customerName}` : null),
         spotifyFamilyName ? `**Family:** ${spotifyFamilyName} (${spotifySlotsUsed}/5 slots)` : null,
+        note ? `**Profile:** ${note}` : null,
       ].filter(Boolean).join('\n'))
       .setTimestamp();
 
