@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { randomDigits } from '../utils/id.js';
 import { syncCustomerStats, getCustomerProfile } from './customerService.js';
 import { normalizeQueueGroup } from '../utils/formatters.js';
+import { broadcastDashboardEvent } from './dashboardMiniServer.js';
 
 function createOrderStmt() {
   return db.prepare(`
@@ -85,6 +86,7 @@ export function createOrder({ guildId, ticketId, ticketChannelId, customerId, pr
 
   const result = createOrderStmt().run(orderCode,guildId,ticketId,ticketChannelId,customerId,productName,quantity,note ?? null,safeAmount,safeAmount > 0 ? 0 : safeAmount,config.paymentProvider,paymentCode,payosOrderCode,paymentStatus,status,timestamp,queueGroup,priorityRank,safeDurationMonths,orderLogChannelId,createdById,timestamp,timestamp,serviceType);
   syncCustomerStats(guildId, customerId);
+  broadcastDashboardEvent('order_update', `Đơn hàng mới: ${orderCode}`);
   return getOrderById(Number(result.lastInsertRowid));
 }
 
@@ -108,7 +110,9 @@ export function markOrderCompleted(orderCode, completedById, timeoutHours = conf
   completeOrderStmt().run(completedAt, completedById, completedAt, completedAt, dueAt, completedAt, orderCode);
   clearClaimStmt().run(completedAt, orderCode);
   ensureOrderExpiry(orderCode, new Date(completedAt));
-  const updated = getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;
+  const updated = getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id);
+  broadcastDashboardEvent('order_update');
+  return updated;
 }
 export function cancelOrder(orderCode, reason = null){const order=getOrderByCode(orderCode); if(!order) return null; cancelOrderStmt().run(nowIso(), reason ?? null, nowIso(), orderCode); clearClaimStmt().run(nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;}
 export function saveDelivery(orderCode,deliveredById,credentialEmail,credentialPassword,credentialProfile,credentialPin,deliveryLoginUrl,claimNotes,dmChannelId,dmMessageId){const timestamp=nowIso(); saveDeliveryStmt().run(deliveredById,timestamp,credentialEmail ?? null,credentialPassword ?? null,credentialProfile ?? null,credentialPin ?? null,deliveryLoginUrl ?? null,claimNotes ?? null,dmChannelId ?? null,dmMessageId ?? null,timestamp,orderCode); return getOrderByCode(orderCode);}
@@ -137,8 +141,8 @@ export function getQueuePosition(order) {
 export function claimOrder(orderCode, actorId) { claimOrderStmt().run(actorId, nowIso(), nowIso(), orderCode); return getOrderByCode(orderCode); }
 export function releaseOrderClaim(orderCode) { clearClaimStmt().run(nowIso(), orderCode); return getOrderByCode(orderCode); }
 
-export function markOrderPaid(orderCode,{amountPaid,transactionId,transactionContent}){const order=getOrderByCode(orderCode); if(!order) return null; const amount=Math.max(ensureAmountValue(amountPaid), ensureAmountValue(order.total_amount)); const paidAt=nowIso(); markOrderPaidStmt().run(amount,paidAt,transactionId ?? null,transactionContent ?? null, paidAt, paidAt, orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;}
-export function setOrderStatus(orderCode,status){const order=getOrderByCode(orderCode); if(!order) return null; setOrderStatusStmt().run(status, nowIso(), nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;}
+export function markOrderPaid(orderCode,{amountPaid,transactionId,transactionContent}){const order=getOrderByCode(orderCode); if(!order) return null; const amount=Math.max(ensureAmountValue(amountPaid), ensureAmountValue(order.total_amount)); const paidAt=nowIso(); markOrderPaidStmt().run(amount,paidAt,transactionId ?? null,transactionContent ?? null, paidAt, paidAt, orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); broadcastDashboardEvent('order_update'); return updated;}
+export function setOrderStatus(orderCode,status){const order=getOrderByCode(orderCode); if(!order) return null; setOrderStatusStmt().run(status, nowIso(), nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); broadcastDashboardEvent('order_update'); return updated;}
 export function updateOrderEditableFields(orderCode,{productName,quantity,totalAmount,priorityRank}){const order=getOrderByCode(orderCode); if(!order) return null; const nextName=productName ?? order.product_name; const nextQty=quantity ?? order.quantity; const nextAmount=totalAmount === undefined ? order.total_amount : ensureAmountValue(totalAmount); const nextPriority=priorityRank === undefined ? Number(order.priority_rank ?? 0) : Number(priorityRank); updateOrderFieldsStmt().run(nextName, nextQty, nextAmount, normalizeQueueGroup(nextName) || 'mac-dinh', nextPriority, nowIso(), orderCode); return getOrderByCode(orderCode);}
 
 export const getOutstandingOrders = (guildId, customerId=null, limit=20, offset=0) => getOutstandingOrdersStmt().all(guildId, customerId, customerId, limit, offset);

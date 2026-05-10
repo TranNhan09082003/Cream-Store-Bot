@@ -102,62 +102,9 @@ export function registerDashboardRoutes(app) {
     return res.json({ ok: true, data: getDashboardSnapshotRaw() });
   });
 
-  // --- HTML Dashboard Preview Route (Cũ) ---
+  // --- Redirect Old Route ---
   app.get('/dashboard', (req, res) => {
-    if (!isDashboardAuthorized(req)) {
-      return res.status(401).send('Unauthorized');
-    }
-
-    const data = getDashboardSnapshotRaw();
-    res.setHeader('content-type', 'text/html; charset=utf-8');
-    res.end(`<!doctype html>
-<html lang="vi">
-<head>
-<meta charset="utf-8" />
-<title>Cream Store Dashboard</title>
-<style>
-body{font-family:Arial,sans-serif;background:#0f172a;color:#e5e7eb;padding:24px}
-h1{margin-bottom:8px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:24px 0}
-.card{background:#111827;border:1px solid #334155;border-radius:16px;padding:16px}
-.small{opacity:.8;font-size:14px}
-table{width:100%;border-collapse:collapse;margin-top:12px}
-td,th{border-bottom:1px solid #334155;padding:8px;text-align:left}
-</style>
-</head>
-<body>
-<h1>Cream Store Dashboard</h1>
-<p class="small">Generated at: ${data.generatedAt}</p>
-
-<div class="grid">
-  <div class="card"><h3>Tổng đơn</h3><div>${data.totalOrders}</div></div>
-  <div class="card"><h3>Đang xử lý</h3><div>${data.processing}</div></div>
-  <div class="card"><h3>Đã hoàn thành</h3><div>${data.completed}</div></div>
-  <div class="card"><h3>Doanh thu</h3><div>${Number(data.revenue).toLocaleString('vi-VN')} VND</div></div>
-  <div class="card"><h3>Sắp hết hạn</h3><div>${data.expiringSoon}</div></div>
-</div>
-
-<div class="card">
-  <h3>Top khách hàng</h3>
-  <table>
-    <thead><tr><th>Customer ID</th><th>Đơn</th><th>Tổng chi</th></tr></thead>
-    <tbody>
-      ${data.topCustomers.map((row) => `<tr><td>${row.customer_id}</td><td>${row.total_orders}</td><td>${Number(row.total_spent).toLocaleString('vi-VN')} VND</td></tr>`).join('')}
-    </tbody>
-  </table>
-</div>
-
-<div class="card" style="margin-top:16px">
-  <h3>KPI Staff</h3>
-  <table>
-    <thead><tr><th>Actor ID</th><th>Complete</th><th>Deliver</th><th>Total actions</th></tr></thead>
-    <tbody>
-      ${data.staffKpi.map((row) => `<tr><td>${row.actor_id ?? '-'}</td><td>${row.completed_count ?? 0}</td><td>${row.delivered_count ?? 0}</td><td>${row.total_actions ?? 0}</td></tr>`).join('')}
-    </tbody>
-  </table>
-</div>
-</body>
-</html>`);
+    res.redirect('/web');
   });
 
   // --- Web Dashboard (Mới) ---
