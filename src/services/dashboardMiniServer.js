@@ -2,6 +2,7 @@ import { db } from '../database/db.js';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -560,5 +561,149 @@ td,th{border-bottom:1px solid #334155;padding:8px;text-align:left}
       res.status(500).json({ ok: false, error: e.message });
     }
   });
+  // ═══════ Revenue Chart API ═══════
 
+  app.get('/dashboard/api/revenue-chart', (req, res) => {
+    try {
+      // Daily revenue for last 14 days
+      const daily = safeAll(`
+        SELECT date(created_at) AS day, COALESCE(SUM(total_amount), 0) AS total
+        FROM orders
+        WHERE payment_status = 'PAID'
+          AND created_at >= datetime('now', '-14 days')
+        GROUP BY date(created_at)
+        ORDER BY day ASC
+      `);
+
+      // Monthly revenue for last 6 months
+      const monthly = safeAll(`
+        SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(total_amount), 0) AS total
+        FROM orders
+        WHERE payment_status = 'PAID'
+          AND created_at >= datetime('now', '-6 months')
+        GROUP BY strftime('%Y-%m', created_at)
+        ORDER BY month ASC
+      `);
+
+      // Fill missing days with 0
+      const filledDaily = [];
+      const now = new Date();
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const match = daily.find(r => r.day === key);
+        filledDaily.push({
+          label: `${d.getDate()}/${d.getMonth() + 1}`,
+          date: key,
+          total: match ? Number(match.total) : 0,
+        });
+      }
+
+      res.json({
+        ok: true,
+        daily: filledDaily,
+        monthly: monthly.map(m => ({
+          label: m.month,
+          total: Number(m.total),
+        })),
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+}
+
+// ═══════ WebSocket Broadcast ═══════
+
+const wsClients = new Set();
+
+export function registerWebSocketUpgrade(server) {
+  if (!server) return;
+
+  server.on('upgrade', (request, socket, head) => {
+    if (request.url !== '/ws/dashboard') {
+      socket.destroy();
+      return;
+    }
+
+    // Simple WebSocket handshake
+    const key = request.headers['sec-websocket-key'];
+    if (!key) { socket.destroy(); return; }
+
+    const accept = crypto
+      .createHash('sha1')
+      .update(key + '258EAFA5-E914-47DA-95CA-5AB5DC76B45B')
+      .digest('base64');
+
+    socket.write(
+      'HTTP/1.1 101 Switching Protocols\r\n' +
+      'Upgrade: websocket\r\n' +
+      'Connection: Upgrade\r\n' +
+      `Sec-WebSocket-Accept: ${accept}\r\n\r\n`
+    );
+
+    // Wrap socket for WS frames
+    const client = { socket, alive: true };
+    wsClients.add(client);
+
+    socket.on('data', () => { client.alive = true; });
+    socket.on('close', () => { wsClients.delete(client); });
+    socket.on('error', () => { wsClients.delete(client); });
+  });
+
+  // Ping interval to keep connections alive
+  setInterval(() => {
+    for (const client of wsClients) {
+      if (!client.alive) {
+        client.socket.destroy();
+        wsClients.delete(client);
+        continue;
+      }
+      client.alive = false;
+      try {
+        // Send ping frame
+        const pingFrame = Buffer.alloc(2);
+        pingFrame[0] = 0x89; // ping opcode
+        pingFrame[1] = 0x00; // no payload
+        client.socket.write(pingFrame);
+      } catch { wsClients.delete(client); }
+    }
+  }, 30000);
+
+  console.log('[WS] WebSocket upgrade handler registered for /ws/dashboard');
+}
+
+/**
+ * Broadcast a message to all connected WebSocket clients
+ */
+export function broadcastDashboardEvent(type, message = '') {
+  const payload = JSON.stringify({ type, message, timestamp: Date.now() });
+  const buf = Buffer.from(payload, 'utf-8');
+  
+  // Create WS text frame
+  let frame;
+  if (buf.length < 126) {
+    frame = Buffer.alloc(2 + buf.length);
+    frame[0] = 0x81; // FIN + text opcode
+    frame[1] = buf.length;
+    buf.copy(frame, 2);
+  } else if (buf.length < 65536) {
+    frame = Buffer.alloc(4 + buf.length);
+    frame[0] = 0x81;
+    frame[1] = 126;
+    frame.writeUInt16BE(buf.length, 2);
+    buf.copy(frame, 4);
+  } else {
+    frame = Buffer.alloc(10 + buf.length);
+    frame[0] = 0x81;
+    frame[1] = 127;
+    frame.writeBigUInt64BE(BigInt(buf.length), 2);
+    buf.copy(frame, 10);
+  }
+
+  for (const client of wsClients) {
+    try { client.socket.write(frame); } catch { wsClients.delete(client); }
+  }
 }

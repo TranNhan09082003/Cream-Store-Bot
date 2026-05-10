@@ -1,0 +1,17 @@
+{
+  "name": "Cream Store Dashboard",
+  "short_name": "Cream Store",
+  "description": "Hệ thống quản lý tài khoản dịch vụ số - Premium Dashboard V3",
+  "start_url": "/web/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

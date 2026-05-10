@@ -60,12 +60,20 @@ let totalCustomerPages = 1;
 let customerSearchQuery = '';
 
 // ===== SERVICE CONFIG =====
+const SVC_SVG = {
+    netflix: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.398 0v24l6.735-2.737V0H5.398zm6.868 0v21.263L18.87 24V0h-6.604zM5.398 0l6.868 24H18.87L12.133 0H5.398z"/></svg>`,
+    spotify: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>`,
+    youtube: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+    discord: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286z"/></svg>`,
+    other: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>`
+};
+
 const SERVICE_META = {
-    netflix:  { label: 'Netflix',          emoji: '🎬', color: 'red-n'   },
-    spotify:  { label: 'Spotify',          emoji: '🎵', color: 'green'  },
-    youtube:  { label: 'YouTube Premium',  emoji: '▶️', color: 'red'    },
-    discord:  { label: 'Discord Nitro',    emoji: '💙', color: 'purple' },
-    other:    { label: 'Khác',             emoji: '📦', color: 'blue'   }
+    netflix:  { label: 'Netflix',          emoji: '🎬', color: 'red-n',  svg: SVC_SVG.netflix, iconClass: 'svc-icon-netflix'  },
+    spotify:  { label: 'Spotify',          emoji: '🎵', color: 'green',  svg: SVC_SVG.spotify, iconClass: 'svc-icon-spotify'  },
+    youtube:  { label: 'YouTube Premium',  emoji: '▶️', color: 'red',    svg: SVC_SVG.youtube, iconClass: 'svc-icon-youtube'  },
+    discord:  { label: 'Discord Nitro',    emoji: '💙', color: 'purple', svg: SVC_SVG.discord, iconClass: 'svc-icon-discord'  },
+    other:    { label: 'Khác',             emoji: '📦', color: 'blue',   svg: SVC_SVG.other,   iconClass: 'svc-icon-other'    }
 };
 
 // ===== DATA =====
@@ -181,15 +189,69 @@ function getProgressPercent(acc) {
 function renderAll() {
     updateStats();
     renderCards();
-    renderChart();
+    renderCharts();
 }
 
-let dashboardChart = null;
-function renderChart() {
+// ===== THEME =====
+function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('cream_theme', next);
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('cream_theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+}
+initTheme();
+
+// ===== ANIMATED COUNTER =====
+function animateCountUp(el, target, duration = 800) {
+    if (!el) return;
+    const num = parseInt(target) || 0;
+    if (num === 0) { el.textContent = '0'; return; }
+    const start = parseInt(el.textContent) || 0;
+    if (start === num) return;
+    const startTime = performance.now();
+    function tick(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        el.textContent = Math.round(start + (num - start) * eased);
+        if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+
+// ===== DUAL CHARTS =====
+let doughnutChart = null;
+let revenueChart = null;
+
+function switchChart(type) {
+    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    const dc = document.getElementById('doughnutChart');
+    const rc = document.getElementById('revenueChart');
+    if (type === 'doughnut') {
+        if (dc) dc.style.display = 'block';
+        if (rc) rc.style.display = 'none';
+    } else {
+        if (dc) dc.style.display = 'none';
+        if (rc) rc.style.display = 'block';
+        loadRevenueChart();
+    }
+}
+
+function renderCharts() {
     if (typeof Chart === 'undefined') return;
-    const ctx = document.getElementById('revenueChart');
+    renderDoughnutChart();
+}
+
+function renderDoughnutChart() {
+    const ctx = document.getElementById('doughnutChart');
     if (!ctx) return;
-    
     const count = { netflix: 0, spotify: 0, youtube: 0, discord: 0, other: 0 };
     accounts.forEach(a => {
         const t = a.service || 'netflix';
@@ -197,49 +259,142 @@ function renderChart() {
         else count.other++;
     });
 
-    const canvas = ctx;
-    const gradient = canvas.getContext('2d').createLinearGradient(0, 0, 0, 250);
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
-
     const data = {
         labels: ['Netflix', 'Spotify', 'YouTube', 'Discord', 'Khác'],
         datasets: [{
-            label: 'Số Lượng Tài Khoản',
             data: [count.netflix, count.spotify, count.youtube, count.discord, count.other],
-            backgroundColor: gradient,
-            borderColor: '#6366f1',
+            backgroundColor: [
+                'rgba(229, 9, 20, 0.8)',
+                'rgba(29, 185, 84, 0.8)',
+                'rgba(255, 0, 0, 0.7)',
+                'rgba(88, 101, 242, 0.8)',
+                'rgba(99, 102, 241, 0.5)'
+            ],
+            borderColor: [
+                '#E50914', '#1DB954', '#FF0000', '#5865F2', '#6366f1'
+            ],
             borderWidth: 2,
-            tension: 0.4,
-            fill: true,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: '#6366f1',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 6
+            hoverOffset: 10
         }]
     };
 
-    if (dashboardChart) {
-        dashboardChart.data = data;
-        dashboardChart.update();
+    if (doughnutChart) {
+        doughnutChart.data = data;
+        doughnutChart.update();
     } else {
-        dashboardChart = new Chart(ctx, {
-            type: 'line',
-            data: data,
+        doughnutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '65%',
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { mode: 'index', intersect: false }
-                },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
-                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#94a3b8',
+                            font: { size: 12, weight: 600 },
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyleWidth: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                        titleColor: '#fff',
+                        bodyColor: '#e2e8f0',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8
+                    }
                 }
             }
         });
+    }
+}
+
+async function loadRevenueChart() {
+    const ctx = document.getElementById('revenueChart');
+    if (!ctx || typeof Chart === 'undefined') return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/api/revenue-chart`, {
+            headers: { 'x-dashboard-token': API_TOKEN }
+        });
+        const json = await res.json();
+        if (!json.ok) return;
+
+        const { daily, monthly } = json;
+        const labels = daily.map(d => d.label);
+        const values = daily.map(d => d.total);
+
+        const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 250);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.35)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+        const data = {
+            labels,
+            datasets: [{
+                label: 'Doanh thu (VNĐ)',
+                data: values,
+                backgroundColor: gradient,
+                borderColor: '#6366f1',
+                borderWidth: 2.5,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#6366f1',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 7
+            }]
+        };
+
+        if (revenueChart) {
+            revenueChart.data = data;
+            revenueChart.update();
+        } else {
+            revenueChart = new Chart(ctx, {
+                type: 'line',
+                data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#e2e8f0',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: ctx => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(ctx.parsed.y)
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                            ticks: {
+                                color: '#64748b',
+                                callback: v => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(v)
+                            }
+                        },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', maxRotation: 0 } }
+                    }
+                }
+            });
+        }
+    } catch (e) {
+        console.error('Revenue chart error:', e);
     }
 }
 
@@ -251,10 +406,10 @@ function updateStats() {
         else if (s.status === 'warning') warning++;
         else expired++;
     });
-    document.getElementById('stat-total-num').textContent = total;
-    document.getElementById('stat-active-num').textContent = active;
-    document.getElementById('stat-warning-num').textContent = warning;
-    document.getElementById('stat-expired-num').textContent = expired;
+    animateCountUp(document.getElementById('stat-total-num'), total);
+    animateCountUp(document.getElementById('stat-active-num'), active);
+    animateCountUp(document.getElementById('stat-warning-num'), warning);
+    animateCountUp(document.getElementById('stat-expired-num'), expired);
 
     // Update tab counts
     document.getElementById('tab-count-all').textContent = total;
@@ -347,7 +502,7 @@ function renderCards() {
         <div class="acc-card">
             <div class="acc-card-left">
                 <div class="acc-service-badge">
-                    <div class="acc-icon">${svc.emoji}</div>
+                    <div class="svc-icon ${svc.iconClass}">${svc.svg}</div>
                     <div class="acc-service-meta">
                         ${pName ? `<div class="acc-title">${escHtml(pName)}</div>` : ''}
                         ${acc.email || acc.password ? `
@@ -1109,7 +1264,7 @@ function renderCustomers() {
             grid.innerHTML += `
                 <div class="customer-card">
                     <div class="customer-card-header">
-                         <img src="${c.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="customer-avatar" alt="Avatar">
+                         <div class="avatar-ring"><img src="${c.avatar || 'https://cdn.discordapp.com/embed/avatars/' + (parseInt(c.id || '0') % 5) + '.png'}" class="customer-avatar" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'"></div>
                          <div class="customer-info" style="flex:1; min-width:0;">
                              <div class="title" title="${c.username}">${c.username}</div>
                              <div class="sub" title="${c.tag} • ${c.id}">${c.tag} • ${c.id}</div>
@@ -1309,3 +1464,73 @@ function renderSubscriptions() {
         </tr>`;
     }).join('');
 }
+
+// ═══════════════ WEBSOCKET REALTIME ═══════════════
+
+let ws = null;
+let wsReconnectTimer = null;
+
+function connectWebSocket() {
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${location.host}/ws/dashboard`;
+
+    try {
+        ws = new WebSocket(wsUrl);
+    } catch (e) {
+        console.warn('WebSocket not available:', e);
+        return;
+    }
+
+    ws.onopen = () => {
+        console.log('[WS] Connected');
+        const indicator = document.getElementById('live-indicator');
+        if (indicator) {
+            indicator.classList.add('connected');
+            indicator.querySelector('.live-text').textContent = 'Live';
+        }
+        // Clear reconnect timer
+        if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
+        }
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            console.log('[WS] Event:', msg.type);
+            if (['order_update', 'account_update', 'subscription_update', 'data_refresh'].includes(msg.type)) {
+                // Auto-refresh data
+                loadData().then(() => renderAll());
+                showToast(`⚡ ${msg.message || 'Dữ liệu đã được cập nhật realtime!'}`, 'info');
+            }
+        } catch (e) {
+            console.warn('[WS] Parse error:', e);
+        }
+    };
+
+    ws.onclose = () => {
+        console.log('[WS] Disconnected, reconnecting in 5s...');
+        const indicator = document.getElementById('live-indicator');
+        if (indicator) {
+            indicator.classList.remove('connected');
+            indicator.querySelector('.live-text').textContent = 'Offline';
+        }
+        // Auto reconnect
+        wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+    };
+
+    ws.onerror = (err) => {
+        console.warn('[WS] Error:', err);
+        ws.close();
+    };
+}
+
+// Connect WebSocket after auth
+const origInitPasswordGate = initPasswordGate;
+// Override: connect WS after successful login
+const origDOMContentLoaded = null;
+document.addEventListener('DOMContentLoaded', () => {
+    // Start WS after a short delay
+    setTimeout(connectWebSocket, 2000);
+});

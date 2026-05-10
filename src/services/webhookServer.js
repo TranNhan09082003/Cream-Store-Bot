@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'node:path';
-import { registerDashboardRoutes } from './dashboardMiniServer.js';
+import { registerDashboardRoutes, registerWebSocketUpgrade } from './dashboardMiniServer.js';
 import { handlePayOSWebhook } from './paymentService.js';
 import { handleSepayWebhook } from './sepayService.js';
 
@@ -148,6 +148,9 @@ export async function startWebhookServer(client = null) {
   console.log(`[WEBHOOK] HTTP server listening on port ${port}`);
   console.log(`[WEBHOOK] PayOS path: ${getWebhookPath()}`);
   console.log(`[WEBHOOK] SePay path: ${getSepayWebhookPath()}`);
+
+  // Register WebSocket upgrade handler
+  registerWebSocketUpgrade(httpServer);
 
   const baseUrl = getBaseUrl();
   if (baseUrl) {
