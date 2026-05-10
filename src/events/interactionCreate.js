@@ -1132,15 +1132,41 @@ async function handleSubscriptionAddModal(interaction) {
       if (profileName) note = profileName;
     }
 
-    // Parse customer ID vs name
+    // Parse customer ID vs name vs order code
     let customerId = null;
+    let relatedOrderCode = null;
+
     if (customerField) {
-      if (/^\d{17,20}$/.test(customerField)) {
+      if (/^(CR_)?\d{3,10}$/i.test(customerField)) {
+        const codeToFind = customerField.toUpperCase().startsWith('CR_') ? customerField.toUpperCase() : `CR_${customerField}`;
+        const order = getOrderByCode(codeToFind);
+        if (order) {
+          relatedOrderCode = order.order_code;
+          customerId = order.customer_id;
+          purchaseDate = order.created_at; // Override purchase date từ đơn hàng
+          
+          if (type !== 'spotify') {
+            duration = order.duration_months || duration;
+            if (type === 'nitro') {
+               renewalMode = duration <= 2 ? 'one_time' : 'auto_cycle';
+               renewalCycle = 2;
+            } else if (type === 'netflix') {
+               renewalMode = duration <= 2 ? 'one_time' : 'auto_cycle';
+               renewalCycle = duration <= 2 ? 0 : 1;
+            }
+          }
+        }
+      }
+
+      if (!customerId && /^\d{17,20}$/.test(customerField)) {
         customerId = customerField;
-        const user = await interaction.client.users.fetch(customerId).catch(() => null);
-        customerName = user?.tag || user?.username || customerField;
-      } else {
+      } else if (!customerId && !relatedOrderCode) {
         customerName = customerField;
+      }
+
+      if (customerId && !customerName) {
+        const user = await interaction.client.users.fetch(customerId).catch(() => null);
+        customerName = user?.tag || user?.username || customerId;
       }
     }
 
@@ -1152,6 +1178,7 @@ async function handleSubscriptionAddModal(interaction) {
       gmailPassword: password,
       customerId,
       customerDiscordName: customerName,
+      relatedOrderCode,
       purchaseDate,
       totalDurationMonths: duration,
       renewalCycleMonths: renewalCycle,

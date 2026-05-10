@@ -51,7 +51,7 @@ function buildNitroModal() {
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Gmail').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu Gmail').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Discord khách (ID hoặc tên)').setPlaceholder('123456789 hoặc CreamUser#1234').setStyle(TextInputStyle.Short).setRequired(false)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Mã đơn (CR_...) hoặc Discord Khách').setPlaceholder('CR_123456 hoặc 123456789').setStyle(TextInputStyle.Short).setRequired(false)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('duration').setLabel('Thời hạn tháng (2=lẻ, 4/6/8/12=dài hạn)').setPlaceholder('2').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('purchase_date').setLabel('Ngày mua (DD/MM/YYYY, bỏ trống = nay)').setPlaceholder('06/05/2026').setStyle(TextInputStyle.Short).setRequired(false)),
   );
@@ -65,7 +65,7 @@ function buildSpotifyModal() {
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('family_name').setLabel('Tên Family (VD: Family 1)').setPlaceholder('Family 1').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('slots').setLabel('Số slot đang dùng (1-5)').setPlaceholder('5').setStyle(TextInputStyle.Short).setRequired(false)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('purchase_date').setLabel('Ngày mua (DD/MM/YYYY, bỏ trống = nay)').setPlaceholder('06/05/2026').setStyle(TextInputStyle.Short).setRequired(false)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Mã đơn (CR_...) hoặc Discord Khách').setPlaceholder('CR_123456 hoặc 123456789').setStyle(TextInputStyle.Short).setRequired(false)),
   );
   return modal;
 }
@@ -75,7 +75,7 @@ function buildYoutubeModal() {
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Gmail').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu Gmail').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Discord khách (ID hoặc tên)').setPlaceholder('123456789').setStyle(TextInputStyle.Short).setRequired(false)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Mã đơn (CR_...) hoặc Discord Khách').setPlaceholder('CR_123456 hoặc 123456789').setStyle(TextInputStyle.Short).setRequired(false)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('type').setLabel('Loại: "thang" (tháng) hoặc "full" (1 lần)').setPlaceholder('thang').setStyle(TextInputStyle.Short).setRequired(true).setValue('thang')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('duration').setLabel('Thời hạn tổng (tháng)').setPlaceholder('12').setStyle(TextInputStyle.Short).setRequired(true)),
   );
@@ -87,7 +87,7 @@ function buildNetflixModal() {
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Email Netflix').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Discord khách (ID hoặc tên)').setPlaceholder('123456789 hoặc CreamUser#1234').setStyle(TextInputStyle.Short).setRequired(false)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('customer').setLabel('Mã đơn (CR_...) hoặc Discord Khách').setPlaceholder('CR_123456 hoặc 123456789').setStyle(TextInputStyle.Short).setRequired(false)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('profile').setLabel('Tên Profile (VD: Profile 2)').setPlaceholder('Profile 2').setStyle(TextInputStyle.Short).setRequired(false)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('duration').setLabel('Thời hạn tháng (1=lẻ, 3/6/12=dài hạn)').setPlaceholder('1').setStyle(TextInputStyle.Short).setRequired(true)),
   );
