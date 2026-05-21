@@ -32,7 +32,8 @@ function getDashboardSnapshotRaw() {
   const completed = safeCount("SELECT COUNT(*) AS total FROM orders WHERE status = 'COMPLETED'");
   const revenue = (() => {
     try {
-      const row = db.prepare("SELECT COALESCE(SUM(total_amount), 0) AS total FROM orders WHERE payment_status = 'PAID'").get();
+      // Chỉ tính đơn đã PAID và KHÔNG bị hủy
+      const row = db.prepare("SELECT COALESCE(SUM(amount_paid), 0) AS total FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'").get();
       return Number(row?.total ?? 0);
     } catch {
       return 0;
@@ -47,8 +48,11 @@ function getDashboardSnapshotRaw() {
   `);
 
   const topCustomers = safeAll(`
-    SELECT customer_id, COUNT(*) AS total_orders, COALESCE(SUM(total_amount),0) AS total_spent
+    SELECT customer_id,
+           COUNT(*) AS total_orders,
+           COALESCE(SUM(CASE WHEN status != 'CANCELLED' THEN amount_paid ELSE 0 END), 0) AS total_spent
     FROM orders
+    WHERE payment_status = 'PAID' AND status != 'CANCELLED'
     GROUP BY customer_id
     ORDER BY total_spent DESC, total_orders DESC
     LIMIT 10
@@ -512,11 +516,12 @@ export function registerDashboardRoutes(app) {
 
   app.get('/dashboard/api/revenue-chart', (req, res) => {
     try {
-      // Daily revenue for last 14 days
+      // Daily revenue for last 14 days — chỉ tính PAID + không cancelled
       const daily = safeAll(`
-        SELECT date(created_at) AS day, COALESCE(SUM(total_amount), 0) AS total
+        SELECT date(created_at) AS day, COALESCE(SUM(amount_paid), 0) AS total
         FROM orders
         WHERE payment_status = 'PAID'
+          AND status != 'CANCELLED'
           AND created_at >= datetime('now', '-14 days')
         GROUP BY date(created_at)
         ORDER BY day ASC
@@ -524,9 +529,10 @@ export function registerDashboardRoutes(app) {
 
       // Monthly revenue for last 6 months
       const monthly = safeAll(`
-        SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(total_amount), 0) AS total
+        SELECT strftime('%Y-%m', created_at) AS month, COALESCE(SUM(amount_paid), 0) AS total
         FROM orders
         WHERE payment_status = 'PAID'
+          AND status != 'CANCELLED'
           AND created_at >= datetime('now', '-6 months')
         GROUP BY strftime('%Y-%m', created_at)
         ORDER BY month ASC

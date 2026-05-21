@@ -10,8 +10,10 @@ function summaryStmt() {
       SUM(CASE WHEN status = 'PENDING_PAYMENT' THEN 1 ELSE 0 END) AS pending_payment,
       SUM(CASE WHEN status = 'PROCESSING' THEN 1 ELSE 0 END) AS processing,
       SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled,
       SUM(CASE WHEN status = 'WARRANTY_OPEN' THEN 1 ELSE 0 END) AS warranty_open,
-      COALESCE(SUM(CASE WHEN payment_status = 'PAID' THEN amount_paid ELSE 0 END), 0) AS revenue_paid,
+      -- Doanh thu: chỉ tính đơn đã PAID + KHÔNG bị hủy
+      COALESCE(SUM(CASE WHEN payment_status = 'PAID' AND status != 'CANCELLED' THEN amount_paid ELSE 0 END), 0) AS revenue_paid,
       COUNT(DISTINCT customer_id) AS customers
     FROM orders
     WHERE guild_id = ?
@@ -23,6 +25,7 @@ function topProductsStmt() {
     SELECT product_name, COUNT(*) AS total_orders
     FROM orders
     WHERE guild_id = ?
+      AND status != 'CANCELLED'
     GROUP BY product_name
     ORDER BY total_orders DESC, product_name ASC
     LIMIT ?

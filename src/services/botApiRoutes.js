@@ -80,7 +80,9 @@ export function registerBotApiRoutes(app) {
                 total_orders: db.prepare("SELECT COUNT(*) as c FROM orders").get()?.c ?? 0,
                 completed_orders: db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'COMPLETED'").get()?.c ?? 0,
                 pending_orders: db.prepare("SELECT COUNT(*) as c FROM orders WHERE status IN ('PENDING_PAYMENT', 'PROCESSING')").get()?.c ?? 0,
-                total_revenue: db.prepare("SELECT COALESCE(SUM(amount_paid), 0) as s FROM orders WHERE payment_status = 'PAID'").get()?.s ?? 0,
+                cancelled_orders: db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'CANCELLED'").get()?.c ?? 0,
+                // Doanh thu: chỉ tính đơn đã PAID + không bị hủy
+                total_revenue: db.prepare("SELECT COALESCE(SUM(amount_paid), 0) as s FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'").get()?.s ?? 0,
                 total_customers: db.prepare("SELECT COUNT(DISTINCT customer_id) as c FROM customer_profiles").get()?.c ?? 0,
                 total_feedbacks: db.prepare("SELECT COUNT(*) as c FROM feedbacks").get()?.c ?? 0,
                 avg_rating: db.prepare("SELECT ROUND(AVG(stars), 2) as r FROM feedbacks").get()?.r ?? null,
@@ -91,6 +93,7 @@ export function registerBotApiRoutes(app) {
                 today_revenue: db.prepare(`
                     SELECT COALESCE(SUM(amount_paid), 0) as s FROM orders
                     WHERE payment_status = 'PAID'
+                      AND status != 'CANCELLED'
                       AND date(paid_at) = date('now', 'localtime')
                 `).get()?.s ?? 0,
             };
@@ -178,8 +181,10 @@ export function registerBotApiRoutes(app) {
             const stats = db.prepare(`
                 SELECT
                     COUNT(*) as total_orders,
-                    COALESCE(SUM(amount_paid), 0) as total_spent,
                     SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelled,
+                    -- Tổng đã chi: chỉ đơn không bị hủy + đã thanh toán
+                    COALESCE(SUM(CASE WHEN payment_status = 'PAID' AND status != 'CANCELLED' THEN amount_paid ELSE 0 END), 0) as total_spent,
                     MAX(created_at) as last_order_at
                 FROM orders WHERE customer_id = ?
             `).get(discordId);
@@ -234,6 +239,7 @@ export function registerBotApiRoutes(app) {
                        MAX(created_at) as last_order_at
                 FROM orders
                 WHERE payment_status = 'PAID'
+                  AND status != 'CANCELLED'
                 GROUP BY customer_id
                 ORDER BY total_spent DESC
                 LIMIT ?
@@ -253,6 +259,7 @@ export function registerBotApiRoutes(app) {
                        COALESCE(SUM(amount_paid), 0) as total_revenue
                 FROM orders
                 WHERE payment_status = 'PAID'
+                  AND status != 'CANCELLED'
                 GROUP BY product_name
                 ORDER BY total_orders DESC
                 LIMIT ?

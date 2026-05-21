@@ -99,7 +99,8 @@ export function getDashboardSnapshotRaw() {
   const totalOrders = db.prepare('SELECT COUNT(*) AS c FROM orders').get()?.c ?? 0;
   const processing = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status IN ('PENDING_PAYMENT','PROCESSING')").get()?.c ?? 0;
   const completed = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE status = 'COMPLETED'").get()?.c ?? 0;
-  const revenue = db.prepare("SELECT COALESCE(SUM(total_amount), 0) AS s FROM orders WHERE payment_status = 'PAID'").get()?.s ?? 0;
+  // Doanh thu: chỉ tính đơn PAID + KHÔNG bị hủy
+  const revenue = db.prepare("SELECT COALESCE(SUM(amount_paid), 0) AS s FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'").get()?.s ?? 0;
   const expiringSoon = db.prepare(`
     SELECT COUNT(*) AS c
     FROM orders
@@ -109,8 +110,11 @@ export function getDashboardSnapshotRaw() {
   `).get()?.c ?? 0;
 
   const topCustomers = db.prepare(`
-    SELECT customer_id, COUNT(*) AS total_orders, COALESCE(SUM(total_amount),0) AS total_spent
+    SELECT customer_id,
+           COUNT(*) AS total_orders,
+           COALESCE(SUM(CASE WHEN status != 'CANCELLED' THEN amount_paid ELSE 0 END), 0) AS total_spent
     FROM orders
+    WHERE payment_status = 'PAID' AND status != 'CANCELLED'
     GROUP BY customer_id
     ORDER BY total_spent DESC, total_orders DESC
     LIMIT 10
