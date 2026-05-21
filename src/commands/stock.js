@@ -15,18 +15,8 @@ import {
 import { getActiveProducts } from '../services/productCatalogService.js';
 import { config } from '../config.js';
 import { formatCurrency } from '../utils/formatters.js';
-
-// 🛒 Thay đổi các icon/emoji dưới đây bằng custom emoji của server bạn
-// Ví dụ custom emoji: '<:ten_emoji:1234567890>'
-const ICONS = {
-  header: '🛍️',
-  price: '💰',
-  duration: '⏱️',
-  footer: '📌',
-  defaultProduct: '📦',
-  cart: '🛒',
-  edit: '✏️',
-};
+import { getEmojiMap } from '../services/emojiService.js';
+import { fmt, h2, subtext } from '../utils/embedHelpers.js';
 
 export const data = new SlashCommandBuilder()
   .setName('stock')
@@ -37,14 +27,19 @@ export function buildStockPanelComponents(guildId) {
   const products = getActiveProducts(guildId);
   if (!products.length) return null;
 
-  // ─── Container (fixed: 6 components inside, never grows) ───
+  const em = getEmojiMap(guildId);
+  const E = (slot, fallback) => em[slot] || fallback;
+
+  // ─── Container ───
   const container = new ContainerBuilder()
     .setAccentColor(config.accentColorPrimary);
 
+  // Header với heading h1 (lớn nhất Discord cho phép)
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# ${ICONS.header}  Cream Store — Bảng Giá Sản Phẩm\n` +
-      `> Chọn sản phẩm bên dưới để mua hàng ngay!`
+      `# ${E('stock_header', '🛍️')}  Cream Store — Bảng Giá\n` +
+      `> ${E('icon_sparkle', '✨')} ${fmt.b('Sản phẩm chính chủ — Giao tự động 24/7')}\n` +
+      subtext('Chọn sản phẩm bên dưới để đặt hàng ngay!')
     )
   );
 
@@ -52,32 +47,34 @@ export function buildStockPanelComponents(guildId) {
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
-  // Tất cả sản phẩm gom vào 1 TextDisplay duy nhất
-  const lines = products.map(p => {
-    const priceText = p.price > 0 ? formatCurrency(p.price) : '🎁 Miễn phí';
+  // Mỗi sản phẩm 1 dòng đẹp, dùng quote + bold
+  const productLines = products.map(p => {
+    const priceText = p.price > 0 ? fmt.b(formatCurrency(p.price)) : `${E('icon_gift', '🎁')} ${fmt.b('Miễn phí')}`;
     const dur = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
-    const desc = p.description ? ` — _${p.description}_` : '';
-    return `${p.emoji || ICONS.defaultProduct} **${p.name}** | ${ICONS.price} ${priceText} | ${ICONS.duration} ${dur}${desc}`;
+    const desc = p.description ? `\n  ${subtext(p.description)}` : '';
+    const emoji = p.emoji || E('order_product', '📦');
+    return `${emoji} ${fmt.b(p.name)} ${fmt.b('·')} ${priceText} ${fmt.b('·')} ${E('icon_duration', '⏱️')} ${dur}${desc}`;
   }).join('\n');
 
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(lines)
+    new TextDisplayBuilder().setContent(productLines)
   );
 
   container.addSeparatorComponents(
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
+  // Footer với subtext
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# ${ICONS.footer} Chọn sản phẩm từ dropdown bên dưới để đặt hàng | Cream Store`
+      subtext(`💜 Chọn sản phẩm từ dropdown bên dưới để đặt hàng · Cream Store`)
     )
   );
 
-  // ─── Select menu (2 components) ───
+  // ─── Select menu ───
   const selectOptions = products.slice(0, 25).map(p => ({
     label: `${p.name}`.slice(0, 100),
-    description: (p.description || `${p.duration_months} tháng`).slice(0, 100),
+    description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
     emoji: p.emoji || '📦',
   }));
@@ -85,11 +82,10 @@ export function buildStockPanelComponents(guildId) {
   const selectRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('product:select')
-      .setPlaceholder(`${ICONS.cart} Chọn sản phẩm muốn mua...`)
+      .setPlaceholder(`${E('order_product', '🛒')} Chọn sản phẩm muốn mua...`)
       .addOptions(selectOptions)
   );
 
-  // Tổng: 1 Container (6 bên trong) + 1 ActionRow (1 menu) = 8 components cố định
   return [container, selectRow];
 }
 

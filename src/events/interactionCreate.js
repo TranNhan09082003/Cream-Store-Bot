@@ -277,7 +277,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
 
   await channel.setName(buildTicketChannelName(ticket.ticket_code)).catch(() => null);
   const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
-    ticket.ticket_code, interaction.user.id, normalizedType
+    ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
   );
   await channel.send({
     components: [welcomeV2, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
@@ -435,7 +435,8 @@ async function handleProductPurchaseFlow(interaction, productId) {
       interaction.user.id,
       normalizedType,
       order.order_code,
-      product.name
+      product.name,
+      interaction.guildId
     );
     await channel.send({
       components: [welcomeContainer, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
