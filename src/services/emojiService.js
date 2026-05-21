@@ -25,21 +25,63 @@ export const EMOJI_SLOTS = {
   order_created:      { label: '✅ Đơn hàng tạo',       default: '✅' },
   order_queue:        { label: '📌 Hàng chờ',           default: '📌' },
   order_cancel:       { label: '❌ Hủy đơn',            default: '❌' },
+  order_complete:     { label: '🎉 Đơn hoàn thành',     default: '🎉' },
+  order_processing:   { label: '⚙️ Đơn đang xử lý',     default: '⚙️' },
+  order_pending:      { label: '⏳ Đơn chờ thanh toán', default: '⏳' },
+  order_id:           { label: '🆔 Mã đơn',             default: '🆔' },
+  order_product:      { label: '📦 Sản phẩm',           default: '📦' },
 
   // Payment
   payment_payos:      { label: '💳 PayOS',              default: '💳' },
   payment_vietqr:     { label: '🏦 VietQR/Ngân hàng',  default: '🏦' },
   payment_success:    { label: '✅ Thanh toán thành công', default: '✅' },
+  payment_qr:         { label: '📱 Mã QR',              default: '📱' },
+  payment_money:      { label: '💰 Số tiền',            default: '💰' },
+  payment_refund:     { label: '↩️ Hoàn tiền',          default: '↩️' },
 
   // Ticket
   ticket_close:       { label: '🔒 Đóng ticket',        default: '🔒' },
   ticket_claim:       { label: '🛡️ Claim đơn (Staff)', default: '🛡️' },
   ticket_open:        { label: '🎫 Mở ticket mới',      default: '🎫' },
+  ticket_user:        { label: '👤 Khách hàng',         default: '👤' },
+  ticket_staff:       { label: '🧑‍💼 Nhân viên',        default: '🧑‍💼' },
+
+  // Time
+  icon_clock:         { label: '⏰ Đồng hồ',            default: '⏰' },
+  icon_calendar:      { label: '📅 Lịch',               default: '📅' },
+  icon_expire:        { label: '⏱️ Hết hạn',            default: '⏱️' },
+  icon_history:       { label: '📜 Lịch sử',            default: '📜' },
+
+  // Status
+  status_check:       { label: '✅ Tích xanh',          default: '✅' },
+  status_cross:       { label: '❌ Dấu X',              default: '❌' },
+  status_warn:        { label: '⚠️ Cảnh báo',           default: '⚠️' },
+  status_info:        { label: 'ℹ️ Thông tin',          default: 'ℹ️' },
+  status_loading:     { label: '⏳ Đang tải',           default: '⏳' },
+
+  // Brand
+  brand_netflix:      { label: '🎬 Netflix',            default: '🎬' },
+  brand_spotify:      { label: '🎵 Spotify',            default: '🎵' },
+  brand_youtube:      { label: '📺 YouTube',            default: '📺' },
+  brand_chatgpt:      { label: '🤖 ChatGPT',            default: '🤖' },
+  brand_discord:      { label: '💬 Discord',            default: '💬' },
 
   // Misc
   icon_price:         { label: '💰 Biểu tượng giá',     default: '💰' },
   icon_duration:      { label: '⏱️ Biểu tượng thời hạn', default: '⏱️' },
   icon_store:         { label: '🏪 Biểu tượng cửa hàng', default: '🏪' },
+  icon_star:          { label: '⭐ Sao',                default: '⭐' },
+  icon_fire:          { label: '🔥 Lửa',                default: '🔥' },
+  icon_gem:           { label: '💎 Kim cương',          default: '💎' },
+  icon_gift:          { label: '🎁 Quà',                default: '🎁' },
+  icon_sparkle:       { label: '✨ Sparkle',            default: '✨' },
+  icon_crown:         { label: '👑 Vương miện',         default: '👑' },
+  icon_chart:         { label: '📊 Biểu đồ',            default: '📊' },
+  icon_id:            { label: '🆔 ID',                 default: '🆔' },
+  icon_location:      { label: '📍 Địa điểm',           default: '📍' },
+  icon_settings:      { label: '⚙️ Cài đặt',            default: '⚙️' },
+  icon_key:           { label: '🔑 Chìa khóa',          default: '🔑' },
+  icon_link:          { label: '🔗 Link',               default: '🔗' },
 };
 
 // ═══════════════════════════════════════════════
