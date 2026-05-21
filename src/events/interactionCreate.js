@@ -1483,7 +1483,7 @@ export function registerInteractionHandler(client, commands) {
 
               // Gửi panel mới
               const { buildTicketPanelV2 } = await import('../utils/embeds.js');
-              const { container, rows, flags } = buildTicketPanelV2(updated);
+              const { container, rows, flags } = buildTicketPanelV2({ ...updated, guild_id: interaction.guildId });
               const newMsg = await panelChannel.send({ components: [container, ...rows], flags });
 
               // Lưu message ID mới vào DB

@@ -19,6 +19,7 @@ import {
   searchGuildEmojis,
   parseDiscordEmoji,
 } from '../services/emojiService.js';
+import { refreshAllPanels } from '../services/panelRefreshService.js';
 
 export const data = new SlashCommandBuilder()
   .setName('emoji-setup')
@@ -123,12 +124,14 @@ export async function execute(interaction) {
         return interaction.editReply(`❌ Slot \`${slot}\` không tồn tại.`);
       }
       setEmoji(guildId, slot, null);
+      const refreshNote = await tryRefreshPanels(interaction.guild);
       return interaction.editReply(
-        `✅ Slot **${EMOJI_SLOTS[slot].label}** đã reset về mặc định: ${EMOJI_SLOTS[slot].default}`
+        `✅ Slot **${EMOJI_SLOTS[slot].label}** đã reset về mặc định: ${EMOJI_SLOTS[slot].default}\n${refreshNote}`
       );
     } else {
       resetAllEmojis(guildId);
-      return interaction.editReply('✅ Đã reset **tất cả** emoji về mặc định!');
+      const refreshNote = await tryRefreshPanels(interaction.guild);
+      return interaction.editReply(`✅ Đã reset **tất cả** emoji về mặc định!\n${refreshNote}`);
     }
   }
 
@@ -167,6 +170,7 @@ export async function execute(interaction) {
     setEmoji(guildId, slot, emojiStr.trim());
 
     const meta = EMOJI_SLOTS[slot];
+    const refreshNote = await tryRefreshPanels(interaction.guild);
     const embed = new EmbedBuilder()
       .setColor(0x22c55e)
       .setTitle('✅ Đã Cập Nhật Emoji!')
@@ -175,8 +179,29 @@ export async function execute(interaction) {
         { name: 'Tên UI', value: meta.label, inline: true },
         { name: 'Emoji mới', value: emojiStr.trim(), inline: true },
       )
+      .setDescription(refreshNote)
       .setFooter({ text: 'Áp dụng ngay cho tất cả giao diện bot!' });
 
     return interaction.editReply({ embeds: [embed] });
+  }
+}
+
+// ─── Helper: refresh panels và trả về note ngắn ────────────────────────────
+async function tryRefreshPanels(guild) {
+  try {
+    const results = await refreshAllPanels(guild);
+    const success = results.filter(r => r.result.ok);
+    const failed = results.filter(r => !r.result.ok);
+    const lines = [];
+    if (success.length) {
+      lines.push(`🔄 Đã refresh: ${success.map(s => `\`${s.panel}\``).join(', ')}`);
+    }
+    if (failed.length) {
+      const failNotes = failed.map(f => `\`${f.panel}\` (${f.result.error})`).join(', ');
+      lines.push(`⚠️ Bỏ qua: ${failNotes}`);
+    }
+    return lines.join('\n') || '_Không có panel nào để refresh._';
+  } catch (e) {
+    return `⚠️ Lỗi khi refresh panel: ${e.message}`;
   }
 }

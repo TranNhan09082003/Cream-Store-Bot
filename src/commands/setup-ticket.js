@@ -46,7 +46,7 @@ export async function execute(interaction) {
     const staffLogChannel = interaction.options.getChannel('staff_log_channel');
     const reminderChannel = interaction.options.getChannel('reminder_channel');
 
-    const { container: panelContainer, rows: panelRows, flags: panelFlags } = buildTicketPanelV2();
+    const { container: panelContainer, rows: panelRows, flags: panelFlags } = buildTicketPanelV2({ guild_id: interaction.guildId });
     const panelMessage = await panelChannel.send({
       components: [panelContainer, ...panelRows],
       flags: panelFlags,
