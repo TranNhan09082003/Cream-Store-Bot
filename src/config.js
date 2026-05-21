@@ -134,7 +134,7 @@ export const config = {
   payosReturnPath: pathWithLeadingSlash('PAYOS_RETURN_PATH', '/payments/payos/return'),
   payosCancelPath: pathWithLeadingSlash('PAYOS_CANCEL_PATH', '/payments/payos/cancel'),
   payosAutoConfirmWebhook: getBooleanEnv('PAYOS_AUTO_CONFIRM_WEBHOOK', false),
-  payosExpireMinutes: Number.parseInt(getEnv('PAYOS_EXPIRE_MINUTES', '30'), 10),
+  payosExpireMinutes: Number.parseInt(getEnv('PAYOS_EXPIRE_MINUTES', '60'), 10),
   // SePay
   sepayApiKey: getEnv('SEPAY_API_KEY', ''),
   sepayWebhookPath: pathWithLeadingSlash('SEPAY_WEBHOOK_PATH', '/webhooks/sepay'),
