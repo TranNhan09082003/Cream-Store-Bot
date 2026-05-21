@@ -141,7 +141,24 @@ export function getQueuePosition(order) {
 export function claimOrder(orderCode, actorId) { claimOrderStmt().run(actorId, nowIso(), nowIso(), orderCode); return getOrderByCode(orderCode); }
 export function releaseOrderClaim(orderCode) { clearClaimStmt().run(nowIso(), orderCode); return getOrderByCode(orderCode); }
 
-export function markOrderPaid(orderCode,{amountPaid,transactionId,transactionContent}){const order=getOrderByCode(orderCode); if(!order) return null; const amount=Math.max(ensureAmountValue(amountPaid), ensureAmountValue(order.total_amount)); const paidAt=nowIso(); markOrderPaidStmt().run(amount,paidAt,transactionId ?? null,transactionContent ?? null, paidAt, paidAt, orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); broadcastDashboardEvent('order_update'); return updated;}
+export function markOrderPaid(orderCode,{amountPaid,transactionId,transactionContent}){
+  const order=getOrderByCode(orderCode);
+  if(!order) return null;
+
+  // Nếu đơn đã bị CANCELLED, vẫn ghi nhận thanh toán nhưng GIỮ status='CANCELLED'
+  // (admin sẽ phải refund thủ công hoặc xóa giao dịch)
+  if (order.status === 'CANCELLED') {
+    console.warn(`[ORDER] markOrderPaid: đơn ${orderCode} đã bị CANCELLED nhưng nhận tiền — giữ status, cần refund.`);
+  }
+
+  const amount=Math.max(ensureAmountValue(amountPaid), ensureAmountValue(order.total_amount));
+  const paidAt=nowIso();
+  markOrderPaidStmt().run(amount,paidAt,transactionId ?? null,transactionContent ?? null, paidAt, paidAt, orderCode);
+  const updated=getOrderByCode(orderCode);
+  syncCustomerStats(updated.guild_id, updated.customer_id);
+  broadcastDashboardEvent('order_update');
+  return updated;
+}
 export function setOrderStatus(orderCode,status){const order=getOrderByCode(orderCode); if(!order) return null; setOrderStatusStmt().run(status, nowIso(), nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); broadcastDashboardEvent('order_update'); return updated;}
 export function updateOrderEditableFields(orderCode,{productName,quantity,totalAmount,priorityRank}){const order=getOrderByCode(orderCode); if(!order) return null; const nextName=productName ?? order.product_name; const nextQty=quantity ?? order.quantity; const nextAmount=totalAmount === undefined ? order.total_amount : ensureAmountValue(totalAmount); const nextPriority=priorityRank === undefined ? Number(order.priority_rank ?? 0) : Number(priorityRank); updateOrderFieldsStmt().run(nextName, nextQty, nextAmount, normalizeQueueGroup(nextName) || 'mac-dinh', nextPriority, nowIso(), orderCode); return getOrderByCode(orderCode);}
 

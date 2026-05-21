@@ -636,6 +636,19 @@ async function handleOrderCancel(interaction, orderCode) {
   const cancelled = cancelOrder(orderCode, `Cancelled by ${interaction.user.tag}`);
   await updateOrderLogMessage(interaction.guild, cancelled);
   await interaction.message.edit({ components: [] }).catch(() => null);
+
+  // Nếu staff hủy đơn của khách khác → DM khách
+  if (!isOwner && cancelled.customer_id !== interaction.user.id) {
+    try {
+      const customer = await interaction.client.users.fetch(cancelled.customer_id);
+      const wasPaid = cancelled.payment_status === 'PAID';
+      const dmMsg = wasPaid
+        ? `🚫 **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy bởi staff. Tiền sẽ được hoàn lại sớm nhất, liên hệ shop nếu chưa nhận được.`
+        : `🚫 **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy. Bạn có thể đặt đơn mới bất kỳ lúc nào.`;
+      await customer.send(dmMsg).catch(() => null);
+    } catch (e) {}
+  }
+
   await safeReply(interaction, {
     content: `❌ Đơn \`${cancelled.order_code}\` đã được hủy.`,
     ephemeral: true,
@@ -1389,20 +1402,19 @@ export function registerInteractionHandler(client, commands) {
         const orderCode = parts[3];
         await interaction.deferReply({ flags: 64 });
         try {
-          import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr, sendVietQRPayment }) => {
-            try {
-              if (method === 'payos') {
-                await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode });
-              } else {
-                await sendVietQRPayment({ guild: interaction.guild, orderCode });
-              }
-              await interaction.editReply('✅ Đã tạo mã QR thanh toán! Kiểm tra trong ticket nhé.');
-            } catch (err) {
-              await interaction.editReply(`⚠️ Không tạo được QR: ${err.message}`);
-            }
-          });
-        } catch (e) {
-          await interaction.editReply(`⚠️ Lỗi: ${e.message}`);
+          // Disable button ngay để chống spam click
+          await interaction.message.edit({ components: [] }).catch(() => null);
+
+          const { sendOrRefreshPaymentQr, sendVietQRPayment } = await import('../services/paymentService.js');
+          if (method === 'payos') {
+            await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode });
+          } else {
+            await sendVietQRPayment({ guild: interaction.guild, orderCode });
+          }
+          await interaction.editReply('✅ Đã tạo mã QR thanh toán! Kiểm tra trong ticket nhé.');
+        } catch (err) {
+          console.error('[PAYMENT METHOD]', err);
+          await interaction.editReply(`⚠️ Không tạo được QR: ${err.message}`).catch(() => null);
         }
         return;
       }

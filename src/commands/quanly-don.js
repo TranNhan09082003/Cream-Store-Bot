@@ -48,7 +48,18 @@ export async function execute(interaction) {
       const order = cancelOrder(orderCode, 'Hủy thủ công qua lệnh quản lý');
       await updateOrderLogMessage(interaction.guild, order);
       await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'ORDER_EDITED', detail: 'Hủy đơn', relatedOrderCode: order.order_code });
-      await interaction.editReply(`✅ Đã hủy đơn \`${orderCode}\` thành công!`);
+
+      // Thông báo cho khách qua DM
+      try {
+        const customer = await interaction.client.users.fetch(order.customer_id);
+        const wasPaid = order.payment_status === 'PAID';
+        const dmMsg = wasPaid
+          ? `🚫 **Cream Store** — Đơn hàng \`${orderCode}\` của bạn đã được hủy bởi staff. Số tiền sẽ được hoàn lại trong thời gian sớm nhất. Liên hệ shop để được hỗ trợ.`
+          : `🚫 **Cream Store** — Đơn hàng \`${orderCode}\` của bạn đã được hủy. Bạn có thể tạo đơn mới bất kỳ lúc nào.`;
+        await customer.send(dmMsg).catch(() => null);
+      } catch (e) {}
+
+      await interaction.editReply(`✅ Đã hủy đơn \`${orderCode}\` thành công! Đã DM thông báo cho khách.`);
       return;
     }
 
