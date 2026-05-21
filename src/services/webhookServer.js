@@ -3,6 +3,7 @@ import path from 'node:path';
 import { registerDashboardRoutes, registerWebSocketUpgrade } from './dashboardMiniServer.js';
 import { handlePayOSWebhook } from './paymentService.js';
 import { handleSepayWebhook } from './sepayService.js';
+import { registerBotApiRoutes } from './botApiRoutes.js';
 
 let httpServer = null;
 let appInstance = null;
@@ -137,6 +138,7 @@ export async function startWebhookServer(client = null) {
 
   registerPaymentRoutes(app);
   registerDashboardRoutes(app);
+  registerBotApiRoutes(app);
 
   const port = Number(process.env.HTTP_PORT ?? 3000);
 
