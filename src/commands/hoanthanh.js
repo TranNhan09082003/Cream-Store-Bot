@@ -6,6 +6,7 @@ import { sendCompletedFlow, updateOrderLogMessage } from '../services/notificati
 import { emitStaffLog } from '../services/staffLogService.js';
 import { buildDoneConfirmationText } from '../utils/embeds.js';
 import { assertStaffCapability } from '../utils/permissions.js';
+import { getCenarHub } from '../services/cenarHub.js';
 
 export const data = new SlashCommandBuilder()
   .setName('hoanthanh')
@@ -42,6 +43,10 @@ export async function execute(interaction) {
   let order = markOrderCompleted(orderCode, interaction.user.id, config.feedbackTimeoutHours);
   order = ensureOrderExpiry(order.order_code, new Date(order.completed_at ?? Date.now())) ?? order;
   await updateOrderLogMessage(interaction.guild, order);
+  
+  const hub = getCenarHub();
+  if (hub) hub.completeOrder(orderCode).catch(e => console.error('[HUB] Lỗi completeOrder:', e.message));
+  
   const result = await sendCompletedFlow({ guild: interaction.guild, order, actorId: interaction.user.id, supportId: interaction.user.id });
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'ORDER_COMPLETE_MANUAL', detail: 'Lệnh /hoanthanh', relatedOrderCode: order.order_code });
   await interaction.editReply({ content: buildDoneConfirmationText(order, result.dmSent), ephemeral: true });

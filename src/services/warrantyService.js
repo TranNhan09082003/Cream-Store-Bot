@@ -6,6 +6,7 @@ import { updateOrderLogMessage } from './notificationService.js';
 import { buildTicketControlComponents, buildTicketWelcomeEmbed, buildWarrantyOpenedEmbed } from '../utils/embeds.js';
 import { buildWarrantyChannelName } from '../utils/formatters.js';
 import { TICKET_MEMBER_PERMISSIONS } from '../utils/permissions.js';
+import { getCenarHub } from './cenarHub.js';
 
 export async function openWarrantyTicket({ guild, customerId, actorId, orderCode, reason = null }) {
   const guildConfig = getGuildConfig(guild.id);
@@ -91,9 +92,17 @@ export async function openWarrantyTicket({ guild, customerId, actorId, orderCode
   if (updatedOrder) {
     await updateOrderLogMessage(guild, updatedOrder).catch(() => null);
   }
+  
+  const hub = getCenarHub();
+  if (hub) {
+    hub.openWarranty(orderCode).catch(e => console.error('[HUB] Lỗi đồng bộ bảo hành:', e.message));
+  }
+  
   await channel.send({
     embeds: [buildWarrantyOpenedEmbed(updatedOrder ?? order, reason, channel)],
   }).catch(() => null);
+
+  await channel.send(`⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`).catch(() => null);
 
   return { ticket, channel, order: updatedOrder ?? order, reused: false };
 }

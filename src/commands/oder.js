@@ -11,6 +11,7 @@ import {
 } from '../utils/embeds.js';
 import { buildOrderLogContent, parseMoneyInput } from '../utils/formatters.js';
 import { config } from '../config.js';
+import { getCenarHub } from '../services/cenarHub.js';
 
 export const data = new SlashCommandBuilder()
   .setName('oder')
@@ -81,6 +82,22 @@ export async function execute(interaction) {
     }
     const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
     saveOrderLogMessage(order.order_code, logMessage.id);
+
+    const hub = getCenarHub();
+    if (hub) {
+      hub.createOrder({
+        order_code: order.order_code,
+        discord_customer_id: customer.id,
+        guild_id: interaction.guildId,
+        product_name: productName,
+        quantity: quantity,
+        total_amount: amount,
+        ticket_channel_id: ticketChannel.id,
+        service_type: 'other',
+        duration_months: durationMonths,
+        payment_provider: amount > 0 ? 'PAYOS' : 'FREE',
+      }).catch(e => console.error('[HUB] Lỗi tạo đơn trên web:', e.message));
+    }
 
     // Gửi Order Created V2 + Queue V2 trong cùng 1 message
     const { container: orderContainer, actionRow: orderActionRow, flags: orderFlags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);

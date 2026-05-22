@@ -62,6 +62,7 @@ import { TICKET_MEMBER_PERMISSIONS, isStaffMember, isManager, assertStaffCapabil
 import { ensureRateLimit } from '../services/abuseService.js';
 import { keepTicketOpen, scheduleTicketAutoClose } from '../services/ticketService.js';
 import { getActiveProducts, getProductById, updateProduct } from '../services/productCatalogService.js';
+import { getCenarHub } from '../services/cenarHub.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -275,6 +276,15 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
     ticketType: normalizedType,
   });
 
+  const hub = getCenarHub();
+  if (hub) {
+    hub.upsertUser({
+      discord_id: interaction.user.id,
+      discord_username: interaction.user.username,
+      display_name: interaction.member?.displayName,
+    }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+  }
+
   await channel.setName(buildTicketChannelName(ticket.ticket_code)).catch(() => null);
   const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
     ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
@@ -411,6 +421,15 @@ async function handleProductPurchaseFlow(interaction, productId) {
       openedById: interaction.user.id,
       ticketType: normalizedType,
     });
+
+    const hub = getCenarHub();
+    if (hub) {
+      hub.upsertUser({
+        discord_id: interaction.user.id,
+        discord_username: interaction.user.username,
+        display_name: interaction.member?.displayName,
+      }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+    }
 
     const prefix = product.service_type.toLowerCase();
     await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);

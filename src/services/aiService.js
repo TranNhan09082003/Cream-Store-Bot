@@ -55,6 +55,11 @@ export async function generateSystemPrompt(guild, isStaff) {
 7. Nếu không chắc chắn thông tin, hãy nói "Em không rõ lắm, để em hỏi lại Admin" thay vì bịa.
 8. Khi tạo đơn, phải dùng ĐÚNG tên sản phẩm và giá từ danh sách catalog, KHÔNG ĐƯỢC tự ý đổi.
 9. Nếu ticket đã có đơn hàng đang xử lý, KHÔNG tạo thêm đơn mới, hãy hướng dẫn khách check đơn cũ.
+
+--- QUY TRÌNH BẢO HÀNH ---
+- Khi khách hàng yêu cầu BẢO HÀNH (ví dụ: tài khoản lỗi, sai pass, mất premium), nếu họ cung cấp MÃ ĐƠN (ví dụ: CR_123456), hãy gọi tool \`open_warranty_ticket\`.
+- Nếu khách CHƯA cung cấp mã đơn, hãy hỏi họ: "Bạn vui lòng cho mình xin mã đơn hàng, hoặc nếu không nhớ mã, hãy cho mình biết bạn đã mua sản phẩm gì và vào ngày tháng nào để mình tạo phiếu bảo hành nhé!".
+- Nếu khách KHÔNG CÓ MÃ ĐƠN nhưng đã nói tên sản phẩm và ngày mua (ví dụ: "Mua Netflix hôm 12/5"), hãy gọi tool \`create_manual_warranty_order\` để tự động tạo đơn bù và mở bảo hành.
 `;
 
   if (isStaff) {
@@ -80,6 +85,39 @@ const createOrderToolDeclaration = {
         durationMonths: { type: "integer", description: "Số tháng gia hạn/sử dụng. Mặc định là 1 nếu không rõ." }
       },
       required: ["productName", "quantity", "amount"]
+    }
+  }
+};
+
+const openWarrantyToolDeclaration = {
+  type: "function",
+  function: {
+    name: "open_warranty_ticket",
+    description: "Sử dụng chức năng này để tạo phiếu bảo hành khi khách hàng báo lỗi và ĐÃ CUNG CẤP MÃ ĐƠN HÀNG.",
+    parameters: {
+      type: "object",
+      properties: {
+        orderCode: { type: "string", description: "Mã đơn hàng khách cần bảo hành (ví dụ: CR_123456)" },
+        reason: { type: "string", description: "Mô tả ngắn gọn lỗi khách gặp phải" }
+      },
+      required: ["orderCode", "reason"]
+    }
+  }
+};
+
+const createManualWarrantyToolDeclaration = {
+  type: "function",
+  function: {
+    name: "create_manual_warranty_order",
+    description: "Sử dụng chức năng này để tạo phiếu bảo hành khi khách hàng KHÔNG CÓ MÃ ĐƠN HÀNG nhưng đã cung cấp thông tin sản phẩm và ngày mua.",
+    parameters: {
+      type: "object",
+      properties: {
+        productName: { type: "string", description: "Tên sản phẩm khách đã mua" },
+        purchaseDate: { type: "string", description: "Ngày tháng khách đã mua (để ghi chú lại)" },
+        reason: { type: "string", description: "Lý do bảo hành" }
+      },
+      required: ["productName", "purchaseDate", "reason"]
     }
   }
 };
@@ -113,6 +151,7 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     if (isTicket) {
       // Tạm thời vô hiệu hóa AI tự động tạo đơn theo yêu cầu
       // body.tools = [createOrderToolDeclaration];
+      body.tools = [openWarrantyToolDeclaration, createManualWarrantyToolDeclaration];
     }
 
 
@@ -140,6 +179,16 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
       if (toolCall.function.name === 'create_order') {
         const args = JSON.parse(toolCall.function.arguments);
         await handleAutoCreateOrder(message, args);
+        return true;
+      }
+      if (toolCall.function.name === 'open_warranty_ticket') {
+        const args = JSON.parse(toolCall.function.arguments);
+        await handleAutoOpenWarranty(message, args);
+        return true;
+      }
+      if (toolCall.function.name === 'create_manual_warranty_order') {
+        const args = JSON.parse(toolCall.function.arguments);
+        await handleAutoCreateManualWarrantyOrder(message, args);
         return true;
       }
     }
@@ -233,5 +282,69 @@ async function handleAutoCreateOrder(message, args) {
   } catch (error) {
     console.error('[AI ORDER] Error:', error);
     await message.channel.send(`❌ Có lỗi khi AI tự tạo đơn hàng: ${error.message}`);
+  }
+}
+
+async function handleAutoOpenWarranty(message, args) {
+  const { orderCode, reason } = args;
+  const { openWarrantyTicket } = await import('./warrantyService.js');
+  try {
+    const result = await openWarrantyTicket({
+      guild: message.guild,
+      customerId: message.author.id,
+      actorId: message.client.user.id,
+      orderCode: orderCode.toUpperCase(),
+      reason: reason || "AI tự động tạo",
+    });
+
+    if (result.reused) {
+      await message.channel.send(`ℹ️ Đơn \`${orderCode}\` đã có phiếu bảo hành đang mở tại <#${result.channel.id}> rồi nhé ạ.`);
+    } else {
+      await message.channel.send(`✅ Phiếu bảo hành cho đơn \`${orderCode}\` đã được tạo thành công tại <#${result.channel.id}>.\n\n⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
+    }
+  } catch (error) {
+    await message.channel.send(`❌ Có lỗi khi tạo bảo hành: ${error.message}`);
+  }
+}
+
+async function handleAutoCreateManualWarrantyOrder(message, args) {
+  const { productName, purchaseDate, reason } = args;
+  const ticket = getTicketByChannelId(message.channel.id);
+  const guildConfig = getGuildConfig(message.guildId);
+
+  if (!ticket) {
+    await message.channel.send('⚠️ Lỗi: Không thể lên đơn vì không tìm thấy thông tin Ticket này.');
+    return;
+  }
+
+  try {
+    const order = createOrder({
+      guildId: message.guildId,
+      ticketId: ticket.id,
+      ticketChannelId: ticket.channel_id,
+      customerId: ticket.customer_id,
+      productName: productName,
+      quantity: 1,
+      note: `AI Tự Động Lên Đơn bù bảo hành. Ngày mua cũ: ${purchaseDate}`,
+      totalAmount: 0,
+      durationMonths: 1,
+      orderLogChannelId: guildConfig.order_log_channel_id,
+      createdById: message.client.user.id,
+    });
+
+    const { openWarrantyTicket } = await import('./warrantyService.js');
+    const result = await openWarrantyTicket({
+      guild: message.guild,
+      customerId: message.author.id,
+      actorId: message.client.user.id,
+      orderCode: order.order_code,
+      reason: reason || `AI tự động tạo bảo hành cho sản phẩm ${productName} (mua ngày ${purchaseDate})`,
+    });
+
+    await message.channel.send(`✅ Đã ghi nhận thông tin mua hàng cũ và tạo phiếu bảo hành thành công tại <#${result.channel.id}>.\n\n⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
+
+  } catch (error) {
+    console.error('[AI WARRANTY] Error:', error);
+    await message.channel.send(`❌ Có lỗi khi AI tự tạo bảo hành: ${error.message}`);
   }
 }

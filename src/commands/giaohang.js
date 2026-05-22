@@ -14,6 +14,7 @@ import {
   buildDeliveryLoginComponents,
   buildDeliveryNoticeEmbed,
 } from '../utils/embeds.js';
+import { getCenarHub } from '../services/cenarHub.js';
 
 export const data = new SlashCommandBuilder()
   .setName('giaohang')
@@ -102,6 +103,15 @@ export async function execute(interaction) {
     if (!shouldShowClaimButton && credentialEmail && credentialPassword) {
       await dmChannel.send({ embeds: buildCredentialEmbeds({ ...storedOrder, credential_email: credentialEmail, credential_password: credentialPassword, claim_notes: claimNotes }) }).catch(() => null);
     }
+  }
+  
+  const hub = getCenarHub();
+  if (hub) {
+    hub.deliverOrder(order.order_code, {
+      credential_email: credentialEmail,
+      credential_password: credentialPassword,
+      staff_id: interaction.user.id
+    }).catch(e => console.error('[HUB] Lỗi deliver:', e.message));
   }
 
   const ticketChannel = await interaction.guild.channels.fetch(order.ticket_channel_id).catch(() => null);
