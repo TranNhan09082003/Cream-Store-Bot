@@ -1,15 +1,15 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import Database from 'better-sqlite3';
 import { config } from '../config.js';
-import { STAFF_COMMAND_PERMISSIONS } from '../utils/permissions.js';
+import { STAFF_DEFAULT_PERMISSIONS } from '../utils/permissions.js';
 
 export const data = new SlashCommandBuilder()
   .setName('dsbaohanh')
   .setDescription('Liệt kê danh sách các đơn hàng đang chờ bảo hành')
-  .setDefaultMemberPermissions(STAFF_COMMAND_PERMISSIONS);
+  .setDefaultMemberPermissions(STAFF_DEFAULT_PERMISSIONS);
 
 export async function execute(interaction) {
-  if (!interaction.member.permissions.has(STAFF_COMMAND_PERMISSIONS)) {
+  if (!interaction.member.permissions.has(STAFF_DEFAULT_PERMISSIONS)) {
     return interaction.reply({ content: 'Bạn không có quyền sử dụng lệnh này.', ephemeral: true });
   }
 
