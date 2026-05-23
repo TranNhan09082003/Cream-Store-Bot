@@ -936,7 +936,7 @@ async function handleProductEditModal(interaction, productId) {
   const rawPrice = interaction.fields.getTextInputValue('price');
   const rawDuration = interaction.fields.getTextInputValue('duration');
   const emoji = interaction.fields.getTextInputValue('emoji');
-  const desc = interaction.fields.getTextInputValue('description');
+  const category = interaction.fields.getTextInputValue('category')?.trim() || null;
 
   const price = parseMoneyInput(rawPrice);
   if (price === null) {
@@ -955,7 +955,8 @@ async function handleProductEditModal(interaction, productId) {
     price,
     durationMonths,
     emoji: emoji || '📦',
-    description: desc || null,
+    description: null,
+    serviceType: category || undefined,
   });
 
   import('../commands/stock.js').then(({ refreshStockPanel }) => {
@@ -975,7 +976,7 @@ async function handleProductAddModal(interaction) {
   const rawPrice = interaction.fields.getTextInputValue('price');
   const rawDuration = interaction.fields.getTextInputValue('duration');
   const emoji = interaction.fields.getTextInputValue('emoji');
-  const desc = interaction.fields.getTextInputValue('description');
+  const category = interaction.fields.getTextInputValue('category')?.trim() || 'other';
 
   const price = parseMoneyInput(rawPrice);
   if (price === null || price <= 0) {
@@ -998,10 +999,10 @@ async function handleProductAddModal(interaction) {
   const product = addProduct({
     guildId: interaction.guildId,
     name,
-    description: desc || null,
+    description: null,
     price,
     durationMonths,
-    serviceType: 'other',
+    serviceType: category,
     emoji: emoji || '📦',
   });
 
@@ -1530,6 +1531,115 @@ export function registerInteractionHandler(client, commands) {
         }
 
         await interaction.editReply('✅ Panel đã được làm mới thành công! Nội dung cũ đã bị xóa.');
+        return;
+      }
+
+      // ═══════ Shop Panel Edit Button ═══════
+      if (interaction.isButton() && interaction.customId === 'shop:panel:edit') {
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        if (!member || !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+          await interaction.reply({ content: '⛔ Chỉ **Admin** mới được chỉnh sửa Panel Shop.', ephemeral: true });
+          return;
+        }
+
+        const { getShopPanelByMessageId } = await import('../services/shopPanelService.js');
+        const panel = getShopPanelByMessageId(interaction.message.id);
+
+        const modal = new ModalBuilder()
+          .setCustomId(`shop:panel:edit:modal:${interaction.message.id}`)
+          .setTitle('✏️ Chỉnh Sửa Panel Shop');
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('title')
+              .setLabel('Tiêu đề')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setPlaceholder('VD: Discord Nitro')
+              .setValue(panel?.title || '')
+              .setMaxLength(100)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('image_url')
+              .setLabel('Link ảnh Banner')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setPlaceholder('https://i.imgur.com/...')
+              .setValue(panel?.image_url || '')
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('features')
+              .setLabel('Tính năng (mỗi dòng 1 mục)')
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+              .setPlaceholder('ESP + AIM\nChỉ AIM\nSupport HVCI ON')
+              .setValue(panel?.features || '')
+              .setMaxLength(1000)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('category')
+              .setLabel('Danh mục sản phẩm (lọc dropdown)')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setPlaceholder('VD: Nitro')
+              .setValue(panel?.category || '')
+              .setMaxLength(50)
+          ),
+        );
+        await interaction.showModal(modal);
+        return;
+      }
+
+      // ═══════ Shop Panel Edit Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('shop:panel:edit:modal:')) {
+        await interaction.deferReply({ ephemeral: true });
+        const messageId = interaction.customId.split(':').slice(4).join(':');
+        const title = interaction.fields.getTextInputValue('title')?.trim() || null;
+        const imageUrl = interaction.fields.getTextInputValue('image_url')?.trim() || null;
+        const features = interaction.fields.getTextInputValue('features')?.trim() || null;
+        const category = interaction.fields.getTextInputValue('category')?.trim();
+
+        if (!category) {
+          await interaction.editReply('❌ Danh mục không được để trống.');
+          return;
+        }
+
+        const { getShopPanelByMessageId, updateShopPanel, buildShopPanelV2 } = await import('../services/shopPanelService.js');
+        const panel = getShopPanelByMessageId(messageId);
+
+        // Rebuild panel V2
+        const { components, flags } = buildShopPanelV2({
+          guildId: interaction.guildId,
+          category,
+          title: title || category,
+          imageUrl,
+          features,
+        });
+
+        try {
+          // Tìm và edit message gốc
+          const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
+          if (channel) {
+            const msg = await channel.messages.fetch(messageId).catch(() => null);
+            if (msg) {
+              await msg.edit({ components, flags });
+            }
+          }
+
+          // Cập nhật DB
+          if (panel) {
+            updateShopPanel(panel.id, { title: title || category, imageUrl, features, category });
+          }
+
+          await interaction.editReply('✅ Panel Shop đã được cập nhật thành công!');
+        } catch (err) {
+          console.error('[SHOP PANEL EDIT]', err);
+          await interaction.editReply(`❌ Lỗi cập nhật: ${err.message}`);
+        }
         return;
       }
 

@@ -99,12 +99,12 @@ export async function execute(interaction) {
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
-              .setCustomId('description')
-              .setLabel('Mô tả (tùy chọn)')
-              .setPlaceholder('Mô tả ngắn hiển thị trên panel')
-              .setStyle(TextInputStyle.Paragraph)
+              .setCustomId('category')
+              .setLabel('Danh mục (dùng cho Panel Shop)')
+              .setPlaceholder('VD: Nitro, Netflix, Spotify, ValEZ')
+              .setStyle(TextInputStyle.Short)
               .setRequired(false)
-              .setMaxLength(200)
+              .setMaxLength(50)
           )
         );
         interaction.showModal(modal).catch(console.error);
@@ -159,11 +159,12 @@ export async function execute(interaction) {
           ),
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
-              .setCustomId('description')
-              .setLabel('Mô tả')
-              .setValue(product.description || '')
-              .setStyle(TextInputStyle.Paragraph)
+              .setCustomId('category')
+              .setLabel('Danh mục (dùng cho Panel Shop)')
+              .setValue(product.service_type || 'other')
+              .setStyle(TextInputStyle.Short)
               .setRequired(false)
+              .setMaxLength(50)
           )
         );
         interaction.showModal(modal).catch(console.error);

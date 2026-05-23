@@ -279,6 +279,21 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_guild_status ON subscription_accounts (guild_id, status, service_type);
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_renewal ON subscription_accounts (next_renewal_at, status);
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_expiry ON subscription_accounts (expiry_at, status);
+
+    CREATE TABLE IF NOT EXISTS shop_panels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      category TEXT NOT NULL,
+      title TEXT,
+      image_url TEXT,
+      features TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_shop_panels_guild ON shop_panels (guild_id);
+    CREATE INDEX IF NOT EXISTS idx_shop_panels_message ON shop_panels (message_id);
   `);
 
   ensureColumn('guild_settings', 'warranty_category_id', 'TEXT');
