@@ -163,3 +163,34 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
 
   return { components, flags: MessageFlags.IsComponentsV2 };
 }
+
+// ═══════════════════════════════════════════════
+// Auto-refresh all shop panels for a guild
+// ═══════════════════════════════════════════════
+
+export async function refreshAllShopPanels(client, guildId) {
+  const panels = getShopPanelsByGuild(guildId);
+  if (!panels.length) return;
+
+  for (const panel of panels) {
+    try {
+      const channel = await client.channels.fetch(panel.channel_id).catch(() => null);
+      if (!channel?.isTextBased()) continue;
+
+      const msg = await channel.messages.fetch(panel.message_id).catch(() => null);
+      if (!msg) continue;
+
+      const { components, flags } = buildShopPanelV2({
+        guildId,
+        category: panel.category,
+        title: panel.title || panel.category,
+        imageUrl: panel.image_url,
+        features: panel.features,
+      });
+
+      await msg.edit({ components, flags }).catch(() => null);
+    } catch (e) {
+      // Panel bị xóa hoặc lỗi → bỏ qua
+    }
+  }
+}

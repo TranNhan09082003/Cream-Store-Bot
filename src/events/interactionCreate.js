@@ -962,6 +962,9 @@ async function handleProductEditModal(interaction, productId) {
   import('../commands/stock.js').then(({ refreshStockPanel }) => {
     refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
   });
+  import('../services/shopPanelService.js').then(({ refreshAllShopPanels }) => {
+    refreshAllShopPanels(interaction.client, interaction.guildId).catch(() => null);
+  });
 
   await safeReply(interaction, {
     content: `✅ Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
@@ -1008,6 +1011,9 @@ async function handleProductAddModal(interaction) {
 
   import('../commands/stock.js').then(({ refreshStockPanel }) => {
     refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
+  });
+  import('../services/shopPanelService.js').then(({ refreshAllShopPanels }) => {
+    refreshAllShopPanels(interaction.client, interaction.guildId).catch(() => null);
   });
 
   await safeReply(interaction, {
@@ -1089,6 +1095,9 @@ async function handleProductSaleModal(interaction) {
   if (successCount > 0) {
     import('../commands/stock.js').then(({ refreshStockPanel }) => {
       refreshStockPanel(interaction.client, interaction.guildId).catch(() => null);
+    });
+    import('../services/shopPanelService.js').then(({ refreshAllShopPanels }) => {
+      refreshAllShopPanels(interaction.client, interaction.guildId).catch(() => null);
     });
   }
 
