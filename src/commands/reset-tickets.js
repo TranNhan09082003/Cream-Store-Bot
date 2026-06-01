@@ -69,7 +69,7 @@ export async function execute(interaction) {
     });
 
     // ─── Import database ───
-    const { default: db } = await import('../database/db.js');
+    const { db } = await import('../database/db.js');
     const guild = interaction.guild;
 
     // ─── Get all tickets from database ───
