@@ -5,7 +5,7 @@ import { config } from '../config.js';
 
 export const data = new SlashCommandBuilder()
   .setName('setup-ticket')
-  .setDescription('Cấu hình hệ thống ticket và bán hàng của Cream Store')
+  .setDescription('Cấu hình hệ thống ticket và bán hàng của Cenar Store')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   // Bắt buộc
   .addChannelOption(opt => opt.setName('panel_channel').setDescription('Kênh sẽ gửi panel ticket').addChannelTypes(ChannelType.GuildText).setRequired(true))
@@ -74,7 +74,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle('✅  Cream Store — Setup Thành Công')
+      .setTitle('✅  Cenar Store — Setup Thành Công')
       .setDescription('> Hệ thống ticket và bán hàng đã được cấu hình. Panel đã gửi vào kênh tương ứng.')
       .addFields(
         { name: '📋 Panel Ticket', value: `${panelChannel}`, inline: true },

@@ -9,7 +9,7 @@ export const data = new SlashCommandBuilder()
   .setName('quanly-don')
   .setDescription('Công cụ quản lý đơn nâng cao (Hủy đơn, Đã thanh toán, Hoàn thành) ở mọi nơi.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-  .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CR_123456').setRequired(true))
+  .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CN_123456').setRequired(true))
   .addStringOption((option) =>
     option.setName('hanh_dong')
       .setDescription('Hành động muốn thực hiện')
@@ -75,7 +75,7 @@ export async function execute(interaction) {
       // Thông báo cho khách hàng
       try {
         const customer = await interaction.client.users.fetch(order.customer_id);
-        await customer.send(`💸 **Cream Store** - Đơn hàng \`${orderCode}\` của bạn đã được xác nhận thanh toán thủ công! Đơn đang chờ xử lý.`).catch(() => null);
+        await customer.send(`💸 **Cenar Store** - Đơn hàng \`${orderCode}\` của bạn đã được xác nhận thanh toán thủ công! Đơn đang chờ xử lý.`).catch(() => null);
       } catch (e) {}
       
       await interaction.editReply(`✅ Đã cập nhật trạng thái **Đã thanh toán** cho đơn \`${orderCode}\`!`);

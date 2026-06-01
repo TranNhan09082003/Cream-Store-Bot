@@ -97,7 +97,7 @@ function buildPayOSRequestPayload(order) {
     description,
     items: [
       {
-        name: truncateText(order.product_name, 25) || 'Don hang Cream Store',
+        name: truncateText(order.product_name, 25) || 'Don hang Cenar Store',
         quantity: 1,
         price: amount,
       },

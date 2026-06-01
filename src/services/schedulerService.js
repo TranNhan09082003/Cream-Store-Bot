@@ -134,6 +134,7 @@ export function startScheduler(client) {
   }, 12 * 60 * 60 * 1000);
 
   console.log(`[V11.5] Scheduler đang chạy mỗi ${Math.max(1, intervalMinutes)} phút. Chế độ Auto-backup Bật (lưu 7 ngày).`);
+  console.log(`[V11.5] Cenar Store Bot — Scheduler & Backup Service started.`);
 }
 
 export function stopScheduler() {

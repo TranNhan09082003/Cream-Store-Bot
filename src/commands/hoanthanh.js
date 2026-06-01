@@ -12,7 +12,7 @@ export const data = new SlashCommandBuilder()
   .setName('hoanthanh')
   .setDescription('Chuyển trạng thái đơn sang đã hoàn thành, sửa log, nhắc feedback và gửi DM riêng.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-  .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CR_123456').setRequired(true));
+  .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CN_123456').setRequired(true));
 
 export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });

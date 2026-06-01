@@ -106,7 +106,7 @@ export function buildTicketChannelName(ticketCode, prefix = 'ticket') {
 
 export function buildWarrantyChannelName(orderCode) {
   const shortId = String(orderCode ?? '')
-    .replace(/^CR_/, '')
+    .replace(/^CN_/, '')
     .toLowerCase();
   return `bao-hanh-${shortId}`;
 }

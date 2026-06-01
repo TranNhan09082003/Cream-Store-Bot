@@ -1,4 +1,4 @@
-# Cream Store Bot v7 (PayOS)
+# Cenar Store Bot v7 (PayOS)
 
 Bản v7 chuyển hệ thống thanh toán từ SePay/VietQR sang **PayOS** nhưng vẫn giữ nguyên flow bán hàng của shop:
 - ticket + order + log + giao hàng + feedback + bảo hành
@@ -7,7 +7,7 @@ Bản v7 chuyển hệ thống thanh toán từ SePay/VietQR sang **PayOS** như
 - webhook PayOS tự xác nhận thanh toán
 - trang `returnUrl` / `cancelUrl` để khách xem kết quả thanh toán
 - DM thanh toán thành công, DM hoàn thành đơn, DM giao tài khoản
-- mã đơn random dạng `CR_123456`
+- mã đơn random dạng `CN_123456`
 - ticket dạng `ticket-123456`
 - `/congno`, `/khachhang`, transcript, scheduler non-legit
 

@@ -14,8 +14,8 @@ function block(text) {
   return `\`${safeText(text)}\``;
 }
 
-export function buildCreamStorePaymentQrView({
-  storeName = 'Cream Store',
+export function buildCenarStorePaymentQrView({
+  storeName = 'Cenar Store',
   orderCode,
   paymentCode,
   productName,

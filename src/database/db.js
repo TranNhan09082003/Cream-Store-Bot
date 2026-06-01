@@ -14,6 +14,17 @@ fs.mkdirSync(path.dirname(resolvedDatabasePath), { recursive: true });
 export const db = new Database(resolvedDatabasePath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('synchronous = NORMAL');     // Cân bằng tốc độ và an toàn
+db.pragma('cache_size = -8000');       // 8MB cache
+db.pragma('temp_store = MEMORY');      // Temp tables in memory
+db.pragma('mmap_size = 268435456');    // 256MB memory-mapped I/O
+
+// WAL checkpoint định kỳ mỗi 30 phút (tránh WAL file quá lớn)
+setInterval(() => {
+  try {
+    db.pragma('wal_checkpoint(PASSIVE)');
+  } catch { /* ignore */ }
+}, 30 * 60 * 1000);
 
 function ensureColumn(tableName, columnName, definitionSql) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();

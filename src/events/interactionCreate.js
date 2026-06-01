@@ -92,6 +92,12 @@ export async function loadCommands() {
 }
 
 async function safeReply(interaction, payload) {
+  // Timeout guard: nếu interaction quá 14 giây thì không reply được nữa
+  if (Date.now() - interaction.createdTimestamp > 14000 && !interaction.deferred && !interaction.replied) {
+    console.warn(`[INTERACTION] Interaction ${interaction.id} đã hết hạn (>14s), bỏ qua reply.`);
+    return null;
+  }
+
   if (interaction.replied || interaction.deferred) {
     return interaction.followUp(payload).catch(() => null);
   }

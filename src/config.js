@@ -115,11 +115,11 @@ export const config = {
   defaultWarrantyDurationDays: Number.parseInt(getEnv('DEFAULT_WARRANTY_DURATION_DAYS', '30'), 10),
   defaultLoginUrl: getEnv('DEFAULT_LOGIN_URL', 'https://www.netflix.com/login'),
   sendTranscriptToCustomer: getBooleanEnv('SEND_TRANSCRIPT_TO_CUSTOMER', true),
-  storeName: getEnv('STORE_NAME', 'Cream Store'),
-  storeFooter: getEnv('STORE_FOOTER', 'Cream Store'),
+  storeName: getEnv('STORE_NAME', 'Cenar Store'),
+  storeFooter: getEnv('STORE_FOOTER', 'Cenar Store'),
   storeIconUrl: getEnv('STORE_ICON_URL', ''),
-  shipperName: getEnv('SHIPPER_NAME', 'Cream Shipper'),
-  shipperFooter: getEnv('SHIPPER_FOOTER', 'Cream Store'),
+  shipperName: getEnv('SHIPPER_NAME', 'Cenar Shipper'),
+  shipperFooter: getEnv('SHIPPER_FOOTER', 'Cenar Store'),
   shipperIconUrl: getEnv('SHIPPER_ICON_URL', ''),
   paymentImageUrl: getEnv('PAYMENT_IMAGE_URL', ''),
   paymentThumbnailUrl: getEnv('PAYMENT_THUMBNAIL_URL', ''),
@@ -149,7 +149,7 @@ export const config = {
   processingReminderMinutes: Number.parseInt(getEnv('PROCESSING_REMINDER_MINUTES', '60'), 10),
   groqApiKey: getEnv('GROQ_API_KEY', getEnv('OPENROUTER_API_KEY', '')), // Dùng chung biến để tiện cho user nếu họ nhác sửa
   aiModel: getEnv('AI_MODEL', 'llama-3.3-70b-versatile'),
-  aiSystemPrompt: getMultilineEnv('AI_SYSTEM_PROMPT', 'Bạn là trợ lý AI thân thiện của Cream Store. Hãy tư vấn nhiệt tình và ngắn gọn.'),
+  aiSystemPrompt: getMultilineEnv('AI_SYSTEM_PROMPT', 'Bạn là trợ lý AI thân thiện của Cenar Store. Hãy tư vấn nhiệt tình và ngắn gọn.'),
 
 
   ticketOpenCooldownSeconds: Number.parseInt(getEnv('TICKET_OPEN_COOLDOWN_SECONDS', '120'), 10),

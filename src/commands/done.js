@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Alias nhanh của /hoanthanh.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addStringOption((option) =>
-    option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CR_123456').setRequired(true),
+    option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CN_123456').setRequired(true),
   );
 
 export async function execute(interaction) {

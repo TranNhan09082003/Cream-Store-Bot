@@ -72,10 +72,10 @@ export async function applyCustomerRoles(guild, customerId) {
       try {
           const { EmbedBuilder } = await import('discord.js');
           const embed = new EmbedBuilder()
-            .setTitle('🎉 Chúc Mừng Thăng Hạng Level Tại Cream Store!')
-            .setDescription(`Xin chào **${member.user.username}**! Thật tuyệt vời, hệ thống ghi nhận bạn đã nâng hạng và được cấp Role mới: **${highestTier.name}**!\n\nCảm ơn bạn đã đồng hành và luôn tin tưởng sử dụng dịch vụ của Cream Store 💖`)
+            .setTitle('🎉 Chúc Mừng Thăng Hạng Level Tại Cenar Store!')
+            .setDescription(`Xin chào **${member.user.username}**! Thật tuyệt vời, hệ thống ghi nhận bạn đã nâng hạng và được cấp Role mới: **${highestTier.name}**!\n\nCảm ơn bạn đã đồng hành và luôn tin tưởng sử dụng dịch vụ của Cenar Store 💖`)
             .setColor('#a855f7')
-            .setFooter({ text: 'Cream Store Auto-Assign System', iconURL: guild.iconURL() })
+            .setFooter({ text: 'Cenar Store Auto-Assign System', iconURL: guild.iconURL() })
             .setTimestamp();
           
           await member.send({ embeds: [embed] }).catch(() => null);

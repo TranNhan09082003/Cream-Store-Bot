@@ -55,8 +55,9 @@ function exactCandidates(code) {
 
 function legacySwapCandidates(code) {
   const list = [];
+  if (code.startsWith('CN_')) list.push(code.replace(/^CN_/, 'VB_'));
   if (code.startsWith('CR_')) list.push(code.replace(/^CR_/, 'VB_'));
-  if (code.startsWith('VB_')) list.push(code.replace(/^VB_/, 'CR_'));
+  if (code.startsWith('VB_')) { list.push(code.replace(/^VB_/, 'CN_')); list.push(code.replace(/^VB_/, 'CR_')); }
   return list;
 }
 

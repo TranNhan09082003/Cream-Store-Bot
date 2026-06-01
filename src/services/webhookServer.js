@@ -52,7 +52,7 @@ function renderPage(title, lines = []) {
 
 export function registerPaymentRoutes(app) {
   app.get('/health', (req, res) => {
-    res.json({ ok: true, service: 'cream-store-http-server' });
+    res.json({ ok: true, service: 'cenar-store-http-server' });
   });
 
   app.get(getReturnPath(), (req, res) => {

@@ -259,8 +259,8 @@ export function createRenewalOrderRaw({
   );
 
   const id = Number(result.lastInsertRowid);
-  const orderCode = `CR_${String(100000 + id).slice(-6)}`;
-  const payosOrderCode = Number(String(orderCode).replace(/^CR_/, ''));
+  const orderCode = `CN_${String(100000 + id).slice(-6)}`;
+  const payosOrderCode = Number(String(orderCode).replace(/^CN_/, ''));
   const paymentCode = safeAmount > 0 ? orderCode : null;
 
   db.prepare(`

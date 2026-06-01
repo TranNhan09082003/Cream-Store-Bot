@@ -10,7 +10,7 @@ export const data = new SlashCommandBuilder()
   .setDescription('Mở ticket bảo hành cho một đơn đã mua.')
   .setDMPermission(false)
   .addStringOption((option) =>
-    option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CR_123456').setRequired(true),
+    option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CN_123456').setRequired(true),
   )
   .addStringOption((option) =>
     option.setName('ly_do').setDescription('Mô tả lỗi / yêu cầu bảo hành').setRequired(false).setMaxLength(500),

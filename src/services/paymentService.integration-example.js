@@ -2,12 +2,12 @@
  * Ví dụ tích hợp nhanh cho paymentService.js
  *
  * 1) Import:
- *    import { buildCreamStorePaymentQrView } from '../utils/paymentQrUi.js';
+ *    import { buildCenarStorePaymentQrView } from '../utils/paymentQrUi.js';
  *
  * 2) Ở chỗ bot đang gửi QR thanh toán, thay embed cũ bằng:
  *
- *    const payload = buildCreamStorePaymentQrView({
- *      storeName: 'Cream Store',
+ *    const payload = buildCenarStorePaymentQrView({
+ *      storeName: 'Cenar Store',
  *      orderCode: order.order_code,
  *      paymentCode: paymentCode ?? order.order_code,
  *      productName: `${order.quantity ?? 1} ${order.product_name}`.trim(),

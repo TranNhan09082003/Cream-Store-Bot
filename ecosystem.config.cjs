@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'discord-sales-bot',
+      name: 'cenar-store-bot',
       script: './src/index.js',
       instances: 1,
       autorestart: true,

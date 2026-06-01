@@ -1,7 +1,7 @@
 {
-  "name": "cream-store-bot-v13",
-  "version": "2.0.0",
-  "description": "Bot ho tro ban hang Discord.js cho Cream Store - Components V2, SePay, AI nang cap, Product Catalog.",
+  "name": "cenar-store-bot",
+  "version": "1.10.4",
+  "description": "Bot ho tro ban hang Discord.js cho Cenar Store voi PayOS, ticket phan loai, dashboard, blacklist, role tu dong va backup/export.",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

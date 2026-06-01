@@ -20,7 +20,7 @@ function block(text) {
 }
 
 export function buildOrderPaymentCreatedView({
-  storeName = 'Cream Store',
+  storeName = 'Cenar Store',
   orderCode,
   paymentCode,
   productName,

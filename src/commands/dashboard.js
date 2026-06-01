@@ -4,7 +4,7 @@ import { buildDashboardEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('dashboard')
-  .setDescription('Xem dashboard thống kê nhanh của Cream Store.')
+  .setDescription('Xem dashboard thống kê nhanh của Cenar Store.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
