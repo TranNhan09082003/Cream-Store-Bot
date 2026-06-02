@@ -333,7 +333,7 @@ export function registerBotApiRoutes(app) {
                     return res.status(400).json({ ok: false, error: 'Số dư ví không đủ.' });
                 }
                 // Trừ tiền ngay
-                addWalletBalance(guildId, customerId, -totalAmount, 'PAYMENT', \`Thanh toán đơn \${orderCode}\`, orderCode);
+                addWalletBalance(guildId, customerId, -totalAmount, 'PAYMENT', `Thanh toán đơn ${orderCode}`, orderCode);
             }
 
             const orderPayload = {
