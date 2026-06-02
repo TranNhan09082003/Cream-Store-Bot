@@ -268,5 +268,66 @@ export function registerBotApiRoutes(app) {
         res.json(result);
     });
 
+    // ── WEB ORDERS — nhận đơn hàng từ website ──────────────
+    app.post('/api/bot/web-orders', async (req, res) => {
+        try {
+            const { items, contact, note, discord_id, source } = req.body;
+            if (!items || items.length === 0) return res.status(400).json({ ok: false, error: 'Giỏ hàng trống' });
+            
+            // Lấy db helpers và orderService
+            const { generateOrderCode, insertOrder, notifyNewOrder } = await import('./orderService.js');
+            const { generateVietQR } = await import('../utils/paymentQrUi.js');
+            
+            const firstItem = items[0];
+            const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const orderCode = generateOrderCode();
+            
+            // Xử lý duration_months, tránh undefined/null
+            let durationMonths = firstItem.duration_months;
+            if (durationMonths == null || isNaN(durationMonths)) {
+                durationMonths = null;
+            } else {
+                durationMonths = parseInt(durationMonths, 10);
+            }
+            
+            const orderPayload = {
+                orderCode,
+                guildId: process.env.PRIMARY_GUILD_ID || '1264259885827391629', // Default hardcoded for standalone bot
+                customerId: discord_id || 'web_user',
+                productName: firstItem.product_name || firstItem.name || 'Sản phẩm Web',
+                quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+                totalAmount: totalAmount,
+                durationMonths: durationMonths,
+                paymentProvider: 'vietqr'
+            };
+            
+            const order = insertOrder(orderPayload);
+            
+            // Tạo link QR
+            const payment_qr_code = generateVietQR(orderCode, totalAmount);
+            
+            // Trả về JSON cho Web Next.js
+            res.json({
+                ok: true,
+                data: {
+                    order_code: orderCode,
+                    payment_checkout_url: null, // Sẽ dùng QR trực tiếp
+                    payment_qr_code: payment_qr_code,
+                    total_amount: totalAmount,
+                    status: order.status
+                }
+            });
+            
+            // Gửi thông báo về kênh bot log
+            try {
+                notifyNewOrder(null, order, `[Website] ${contact} - ${note || ''}`);
+            } catch (e) { console.error('Lỗi notifyNewOrder:', e); }
+            
+        } catch (e) {
+            console.error('[WEB ORDERS API]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
     console.log('[BOT_API] Registered /api/bot/* routes');
 }
