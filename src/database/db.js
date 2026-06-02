@@ -201,6 +201,32 @@ export function initDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS wallet_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      description TEXT,
+      related_code TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS wallet_topup_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      topup_code TEXT UNIQUE,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      payos_order_code INTEGER UNIQUE,
+      payment_link_id TEXT,
+      payment_checkout_url TEXT,
+      payment_qr_code TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      paid_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS payment_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       order_code TEXT,
@@ -290,6 +316,10 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_guild_status ON subscription_accounts (guild_id, status, service_type);
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_renewal ON subscription_accounts (next_renewal_at, status);
     CREATE INDEX IF NOT EXISTS idx_sub_accounts_expiry ON subscription_accounts (expiry_at, status);
+
+    CREATE INDEX IF NOT EXISTS idx_wallet_trans_customer ON wallet_transactions (guild_id, customer_id);
+    CREATE INDEX IF NOT EXISTS idx_wallet_topups_code ON wallet_topup_orders (topup_code);
+    CREATE INDEX IF NOT EXISTS idx_wallet_topups_payos ON wallet_topup_orders (payos_order_code);
 
     CREATE TABLE IF NOT EXISTS shop_panels (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -385,6 +415,9 @@ export function initDatabase() {
   // Customer flags — mute ticket (ngăn tạo ticket)
   ensureColumn('customer_flags', 'is_ticket_muted', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('customer_flags', 'ticket_mute_reason', 'TEXT');
+
+  // Thêm ví điện tử
+  ensureColumn('customer_profiles', 'wallet_balance', 'INTEGER NOT NULL DEFAULT 0');
 
   // Custom emoji slots cho từng guild
   ensureColumn('guild_settings', 'custom_emojis', 'TEXT');

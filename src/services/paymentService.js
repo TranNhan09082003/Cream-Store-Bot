@@ -14,6 +14,7 @@ import {
   setOrderStatus,
 } from './orderService.js';
 import { findOrderByIncomingPaymentCode, syncPaymentCodeIfPossible } from './paymentOrderMatcher.js';
+import { getTopupByPayOSCode, finalizeTopup } from './walletService.js';
 import { syncCustomerStats } from './customerService.js';
 import { applyCustomerRoles } from './roleService.js';
 import { emitStaffLog } from './staffLogService.js';
@@ -454,6 +455,23 @@ export async function handlePayOSWebhook({ client, body }) {
   }
 
   const payosOrderCode = Number(payload.data.orderCode);
+  
+  // 1. Kiểm tra xem có phải đơn NẠP TIỀN ví không
+  if (Number.isFinite(payosOrderCode)) {
+    const topup = getTopupByPayOSCode(payosOrderCode);
+    if (topup) {
+      const resultCode = String(payload.data.code ?? payload.code ?? '').trim();
+      const isSuccess = payload.success === true || (payload.success === null && resultCode === '00');
+      
+      if (isSuccess && resultCode === '00' && Number(payload.data.amount ?? 0) >= topup.amount) {
+        finalizeTopup(topup.topup_code);
+        return { ok: true, status: 200, body: { ok: true, message: 'Topup confirmed', topup_code: topup.topup_code } };
+      }
+      return { ok: true, status: 200, body: { ok: true, message: 'Ignored non-success topup' } };
+    }
+  }
+
+  // 2. Tìm đơn hàng thông thường
   let order = Number.isFinite(payosOrderCode) ? getOrderByPayOSCode(payosOrderCode) : null;
   const matched = findOrderByIncomingPaymentCode({
     orderCode: payload.data.orderCode,

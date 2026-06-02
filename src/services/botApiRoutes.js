@@ -268,6 +268,37 @@ export function registerBotApiRoutes(app) {
         res.json(result);
     });
 
+    // ── WALLET API — Ví điện tử ───────────────
+    app.get('/api/bot/wallet/:customerId', async (req, res) => {
+        const customerId = req.params.customerId;
+        const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+        try {
+            const { getWalletBalance, getWalletTransactions } = await import('./walletService.js');
+            const balance = getWalletBalance(guildId, customerId);
+            const transactions = getWalletTransactions(guildId, customerId, 20);
+            res.json({ ok: true, data: { balance, transactions } });
+        } catch (e) {
+            console.error('[WALLET GET]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    app.post('/api/bot/wallet/topup', async (req, res) => {
+        const { customerId, amount } = req.body;
+        if (!customerId || !amount || amount < 10000) {
+            return res.status(400).json({ ok: false, error: 'Số tiền tối thiểu 10,000đ' });
+        }
+        const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+        try {
+            const { createTopupCheckout } = await import('./walletService.js');
+            const data = await createTopupCheckout(guildId, customerId, amount);
+            res.json({ ok: true, data });
+        } catch (e) {
+            console.error('[WALLET TOPUP]', e);
+            res.status(500).json({ ok: false, error: 'Lỗi tạo đơn nạp tiền PayOS' });
+        }
+    });
+
     // ── WEB ORDERS — nhận đơn hàng từ website ──────────────
     app.post('/api/bot/web-orders', async (req, res) => {
         try {
@@ -290,37 +321,64 @@ export function registerBotApiRoutes(app) {
                 durationMonths = parseInt(durationMonths, 10);
             }
             
+            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const customerId = discord_id || 'web_user';
+            const paymentProvider = req.body.paymentProvider || 'vietqr'; // Lấy từ request nếu có, vd: 'WALLET'
+
+            // Nếu thanh toán bằng ví, kiểm tra số dư và trừ tiền
+            if (paymentProvider === 'WALLET') {
+                const { getWalletBalance, addWalletBalance } = await import('./walletService.js');
+                const balance = getWalletBalance(guildId, customerId);
+                if (balance < totalAmount) {
+                    return res.status(400).json({ ok: false, error: 'Số dư ví không đủ.' });
+                }
+                // Trừ tiền ngay
+                addWalletBalance(guildId, customerId, -totalAmount, 'PAYMENT', \`Thanh toán đơn \${orderCode}\`, orderCode);
+            }
+
             const orderPayload = {
                 orderCode,
-                guildId: process.env.PRIMARY_GUILD_ID || '1264259885827391629', // Default hardcoded for standalone bot
-                customerId: discord_id || 'web_user',
+                guildId,
+                customerId,
                 productName: firstItem.product_name || firstItem.name || 'Sản phẩm Web',
                 quantity: items.reduce((sum, item) => sum + item.quantity, 0),
                 totalAmount: totalAmount,
                 durationMonths: durationMonths,
-                paymentProvider: 'vietqr'
+                paymentProvider: paymentProvider
             };
             
             const order = insertOrder(orderPayload);
-            
-            // Tạo link QR
-            const payment_qr_code = generateVietQR(orderCode, totalAmount);
+            let payment_qr_code = null;
+            let finalStatus = order.status;
+
+            if (paymentProvider === 'WALLET') {
+                // Đánh dấu đã thanh toán
+                const { markOrderPaid } = await import('./orderService.js');
+                markOrderPaid(orderCode, {
+                    amountPaid: totalAmount,
+                    transactionId: `WALLET_${Date.now()}`,
+                    transactionContent: 'Thanh toán bằng số dư Ví',
+                });
+                finalStatus = 'PROCESSING';
+            } else {
+                payment_qr_code = generateVietQR(orderCode, totalAmount);
+            }
             
             // Trả về JSON cho Web Next.js
             res.json({
                 ok: true,
                 data: {
                     order_code: orderCode,
-                    payment_checkout_url: null, // Sẽ dùng QR trực tiếp
+                    payment_checkout_url: null,
                     payment_qr_code: payment_qr_code,
                     total_amount: totalAmount,
-                    status: order.status
+                    status: finalStatus
                 }
             });
             
             // Gửi thông báo về kênh bot log
             try {
-                notifyNewOrder(null, order, `[Website] ${contact} - ${note || ''}`);
+                notifyNewOrder(null, order, \`[Website - \${paymentProvider}] \${contact} - \${note || ''}\`);
             } catch (e) { console.error('Lỗi notifyNewOrder:', e); }
             
         } catch (e) {
