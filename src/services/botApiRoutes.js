@@ -378,7 +378,7 @@ export function registerBotApiRoutes(app) {
             
             // Gửi thông báo về kênh bot log
             try {
-                notifyNewOrder(null, order, \`[Website - \${paymentProvider}] \${contact} - \${note || ''}\`);
+                notifyNewOrder(null, order, `[Website - ${paymentProvider}] ${contact} - ${note || ''}`);
             } catch (e) { console.error('Lỗi notifyNewOrder:', e); }
             
         } catch (e) {
