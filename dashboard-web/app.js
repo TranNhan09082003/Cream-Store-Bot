@@ -772,38 +772,35 @@ function openRenewModal(id) {
     openModal('modal-renew');
 }
 
-function handleRenewSubmit(e) {
+async function handleRenewSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('renew-account-id').value;
     const months = parseInt(document.getElementById('renew-months').value) || 0;
     if (months <= 0) { showToast('Vui lòng nhập số tháng hợp lệ!', 'error'); return; }
     
-    const idx = accounts.findIndex(a => a.id === id);
-    if (idx === -1) return;
-    
-    const acc = accounts[idx];
-    const now = new Date();
-    const currentExpiry = new Date(acc.expiryDate);
-    const newStart = currentExpiry > now ? currentExpiry : now;
-    const newExpiry = new Date(newStart);
-    newExpiry.setMonth(newExpiry.getMonth() + months);
-
-    acc.startDate = newStart.toISOString();
-    acc.expiryDate = newExpiry.toISOString();
-    acc.monthsPurchased = months;
-
-    if (!acc.history) acc.history = [];
-    acc.history.push({
-        id: genId(), type: 'renewal', date: now.toISOString(),
-        months, startDate: newStart.toISOString(), expiryDate: newExpiry.toISOString(),
-        accountEmail: acc.email
-    });
-
-    apiSaveAccount(acc, false);
-    saveData();
-    renderAll();
-    closeModal('modal-renew');
-    showToast(`Đã gia hạn ${months} tháng cho ${acc.customerName}!`, 'success');
+    showLoader("Đang xử lý gia hạn...");
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/api/accounts/${id}/renew`, {
+            method: 'POST',
+            headers: { 
+                'x-dashboard-token': API_TOKEN,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ months })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showToast('✅ Đã gia hạn dịch vụ thành công!', 'success');
+            await loadData();
+            renderAll();
+            closeModal('modal-renew');
+        } else {
+            showToast('❌ Lỗi gia hạn: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (e) {
+        showToast('❌ Lỗi mạng khi gia hạn.', 'error');
+    }
+    hideLoader();
 }
 
 // ===== HISTORY =====
@@ -1167,15 +1164,23 @@ function switchView(viewName) {
     document.getElementById('nav-accounts').classList.toggle('active', viewName === 'accounts');
     document.getElementById('nav-customers').classList.toggle('active', viewName === 'customers');
     document.getElementById('nav-subscriptions').classList.toggle('active', viewName === 'subscriptions');
+    document.getElementById('nav-system-health').classList.toggle('active', viewName === 'system-health');
+    document.getElementById('nav-audit-log').classList.toggle('active', viewName === 'audit-log');
     
     document.getElementById('view-accounts').style.display = viewName === 'accounts' ? 'block' : 'none';
     document.getElementById('view-customers').style.display = viewName === 'customers' ? 'block' : 'none';
     document.getElementById('view-subscriptions').style.display = viewName === 'subscriptions' ? 'block' : 'none';
+    document.getElementById('view-system-health').style.display = viewName === 'system-health' ? 'block' : 'none';
+    document.getElementById('view-audit-log').style.display = viewName === 'audit-log' ? 'block' : 'none';
 
     if (viewName === 'customers') {
         loadCustomers();
     } else if (viewName === 'subscriptions') {
         loadSubscriptions();
+    } else if (viewName === 'system-health') {
+        loadSystemHealth();
+    } else if (viewName === 'audit-log') {
+        loadAuditLog();
     } else {
         renderAll();
     }
@@ -1534,3 +1539,120 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start WS after a short delay
     setTimeout(connectWebSocket, 2000);
 });
+
+// ═══════════════ SYSTEM HEALTH & AUDIT LOGS ═══════════════
+
+async function loadSystemHealth() {
+    showLoader('Đang tải trạng thái hệ thống...');
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/api/system-health`, {
+            headers: { 'x-dashboard-token': API_TOKEN }
+        });
+        const json = await res.json();
+        if (json.ok) {
+            const data = json.data;
+            
+            // Format uptime
+            const uptimeSecs = Math.floor(data.uptime);
+            const hrs = Math.floor(uptimeSecs / 3600);
+            const mins = Math.floor((uptimeSecs % 3600) / 60);
+            const secs = uptimeSecs % 60;
+            const uptimeStr = `${hrs} giờ ${mins} phút ${secs} giây`;
+
+            document.getElementById('health-bot-status-pill').textContent = data.botStatus;
+            document.getElementById('health-bot-status-pill').className = `status-pill pill-${data.botStatus === 'READY' ? 'active' : 'warning'}`;
+            document.getElementById('health-bot-uptime').textContent = uptimeStr;
+            document.getElementById('health-bot-ping').textContent = `${data.botPing} ms`;
+            document.getElementById('health-bot-platform').textContent = data.platform;
+
+            document.getElementById('health-node-version').textContent = data.node;
+            document.getElementById('health-mem-rss').textContent = `${data.memory.rss} MB`;
+            document.getElementById('health-mem-heap').textContent = `${data.memory.heapUsed} MB / ${data.memory.heapTotal} MB`;
+
+            document.getElementById('health-db-size').textContent = `${data.database.sizeMB} MB`;
+        } else {
+            showToast('Lỗi tải trạng thái: ' + json.error, 'error');
+        }
+    } catch (e) {
+        showToast('Lỗi mạng khi tải trạng thái hệ thống', 'error');
+    }
+    hideLoader();
+}
+
+let auditLogData = [];
+let currentAuditPage = 1;
+let totalAuditPages = 1;
+
+async function loadAuditLog(page = 1) {
+    showLoader('Đang tải nhật ký hoạt động...');
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/api/audit-log?page=${page}&limit=20`, {
+            headers: { 'x-dashboard-token': API_TOKEN }
+        });
+        const json = await res.json();
+        if (json.ok) {
+            auditLogData = json.data;
+            currentAuditPage = json.pagination.page;
+            totalAuditPages = json.pagination.totalPages;
+            renderAuditLog();
+            renderAuditPagination();
+        } else {
+            showToast('Lỗi tải nhật ký: ' + json.error, 'error');
+        }
+    } catch (e) {
+        showToast('Lỗi mạng khi tải nhật ký hoạt động', 'error');
+    }
+    hideLoader();
+}
+
+function renderAuditLog() {
+    const tbody = document.getElementById('audit-tbody');
+    const emptyEl = document.getElementById('audit-empty');
+    if (!tbody) return;
+
+    if (!auditLogData || auditLogData.length === 0) {
+        tbody.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    tbody.innerHTML = auditLogData.map(log => {
+        return `<tr>
+            <td><strong>${formatDateTime(log.created_at)}</strong></td>
+            <td><span class="sub-type-badge" style="--svc-color: #a855f7; font-family: monospace;">${escHtml(log.actor_id || 'System')}</span></td>
+            <td><span class="status-pill pill-active" style="font-size: 11px; font-weight: bold; background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2);">${escHtml(log.action)}</span></td>
+            <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escHtml(log.detail || '')}">${escHtml(log.detail || '—')}</td>
+            <td><span style="font-family: monospace; color: var(--text-secondary);">${escHtml(log.related_order_code || '—')}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function renderAuditPagination() {
+    const container = document.getElementById('audit-pagination');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (totalAuditPages <= 1) return;
+    
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'page-btn';
+    prevBtn.innerHTML = '❮';
+    prevBtn.disabled = currentAuditPage === 1;
+    prevBtn.onclick = () => loadAuditLog(currentAuditPage - 1);
+    
+    const info = document.createElement('div');
+    info.className = 'page-info';
+    info.innerHTML = `<span>${currentAuditPage}</span> / ${totalAuditPages}`;
+    
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'page-btn';
+    nextBtn.innerHTML = '❯';
+    nextBtn.disabled = currentAuditPage === totalAuditPages;
+    nextBtn.onclick = () => loadAuditLog(currentAuditPage + 1);
+    
+    container.appendChild(prevBtn);
+    container.appendChild(info);
+    container.appendChild(nextBtn);
+}
+

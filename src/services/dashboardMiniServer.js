@@ -566,6 +566,148 @@ export function registerDashboardRoutes(app) {
     }
   });
 
+  // ═══════ Advanced API Endpoints for Premium Redesign ═══════
+
+  app.get('/dashboard/api/system-health', (req, res) => {
+    try {
+      const memUsage = process.memoryUsage();
+      let dbSize = 0;
+      try {
+        const dbSizeRow = db.prepare("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()").get();
+        dbSize = dbSizeRow?.size || 0;
+      } catch {}
+      const client = req.app.locals.discordClient;
+      res.json({
+        ok: true,
+        data: {
+          uptime: process.uptime(),
+          memory: {
+            rss: Math.round(memUsage.rss / 1024 / 1024),
+            heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+            heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+          },
+          database: {
+            sizeMB: Math.round(dbSize / 1024 / 1024 * 100) / 100,
+          },
+          node: process.version,
+          platform: process.platform,
+          botPing: client?.ws?.ping || 0,
+          botStatus: client?.ws?.status === 0 ? 'READY' : 'CONNECTING',
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/dashboard/api/audit-log', (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+      const offset = (page - 1) * limit;
+
+      const totalRow = db.prepare('SELECT COUNT(*) as total FROM staff_logs').get();
+      const total = totalRow?.total || 0;
+
+      const logs = db.prepare('SELECT * FROM staff_logs ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset);
+      res.json({
+        ok: true,
+        data: logs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/dashboard/api/analytics', (req, res) => {
+    try {
+      const totalRevenueRow = db.prepare("SELECT COALESCE(SUM(amount_paid), 0) AS total FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'").get();
+      const totalRevenue = totalRevenueRow?.total || 0;
+
+      const serviceStats = db.prepare(`
+        SELECT service_type, COUNT(*) as count, COALESCE(SUM(amount_paid), 0) as revenue
+        FROM orders
+        WHERE payment_status = 'PAID' AND status != 'CANCELLED'
+        GROUP BY service_type
+      `).all();
+
+      const topSpenders = db.prepare(`
+        SELECT customer_id, COUNT(*) as count, COALESCE(SUM(amount_paid), 0) as total_spent
+        FROM orders
+        WHERE payment_status = 'PAID' AND status != 'CANCELLED'
+        GROUP BY customer_id
+        ORDER BY total_spent DESC
+        LIMIT 5
+      `).all();
+
+      res.json({
+        ok: true,
+        data: {
+          totalRevenue,
+          serviceStats,
+          topSpenders
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/dashboard/api/accounts/:id/renew', (req, res) => {
+    try {
+      const orderCode = req.params.id;
+      const { months } = req.body;
+      const monthsNum = parseInt(months) || 1;
+
+      const order = db.prepare("SELECT * FROM orders WHERE order_code = ?").get(orderCode);
+      if (!order) {
+        return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
+      }
+
+      const now = new Date();
+      let currentExpiry = order.expiry_at ? new Date(order.expiry_at) : new Date();
+      let newStart = currentExpiry > now ? currentExpiry : now;
+      let newExpiry = new Date(newStart);
+      newExpiry.setMonth(newExpiry.getMonth() + monthsNum);
+
+      const hist = order.history_json ? JSON.parse(order.history_json) : [];
+      hist.push({
+        id: 'CR_W_' + Math.floor(Math.random()*1000000),
+        type: 'renewal',
+        date: now.toISOString(),
+        months: monthsNum,
+        startDate: newStart.toISOString(),
+        expiryDate: newExpiry.toISOString(),
+        accountEmail: order.credential_email || ''
+      });
+
+      db.prepare(`
+        UPDATE orders 
+        SET expiry_at = ?, duration_months = ?, updated_at = ?, history_json = ? 
+        WHERE order_code = ?
+      `).run(newExpiry.toISOString(), monthsNum, now.toISOString(), JSON.stringify(hist), orderCode);
+
+      // Staff Log
+      const cl = req.app.locals.discordClient;
+      const guilds = cl?.guilds?.cache;
+      if (guilds) {
+        const firstGuild = guilds.first();
+        if (firstGuild) sendStaffLog(cl, firstGuild.id, `🔄 **Web Admin** vừa **GIA HẠN** đơn \`${orderCode}\` thêm **${monthsNum} tháng**`);
+      }
+
+      res.json({ ok: true, expiryDate: newExpiry.toISOString() });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+
 }
 
 // ═══════ WebSocket Broadcast ═══════

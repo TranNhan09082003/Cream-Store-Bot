@@ -6,6 +6,7 @@ import { handleSepayWebhook } from './sepayService.js';
 import { registerBotApiRoutes } from './botApiRoutes.js';
 import { registerAuthRoutes } from './authApiRoutes.js';
 import { registerAdminRoutes } from './adminApiRoutes.js';
+import { securityHeaders, generalLimiter, webhookLimiter } from './rateLimitMiddleware.js';
 
 let httpServer = null;
 let appInstance = null;
@@ -132,8 +133,24 @@ export async function startWebhookServer(client = null) {
   appInstance = app;
   app.locals.discordClient = client;
 
+  // Global CORS Middleware
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-Bot-Api-Key, x-bot-api-key, x-dashboard-token');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    next();
+  });
+
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true }));
+
+  // Security headers (helmet-lite — no external dependency)
+  app.use(securityHeaders);
+
+  // Global rate limiting
+  app.use('/api/', generalLimiter);
+  app.use('/webhooks/', webhookLimiter);
   
   // Serve static transcripts
   app.use('/transcripts', express.static(path.join(process.cwd(), 'data', 'transcripts')));

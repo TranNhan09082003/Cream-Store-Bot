@@ -1,5 +1,10 @@
 import { db } from '../database/db.js';
 import crypto from 'node:crypto';
+import {
+  sanitizeString, sanitizePositiveInt, sanitizePagination,
+  isValidRole, isValidOrderStatus, isValidServiceType,
+  errorResponse, successResponse, validateRequired,
+} from '../utils/inputValidator.js';
 
 export function registerAdminRoutes(app) {
   function requireAdminRole(req, res, next) {
@@ -122,15 +127,67 @@ export function registerAdminRoutes(app) {
   app.put('/api/bot/admin/users/:id/role', requireAdminRole, (req, res) => {
     try {
       if (req.adminRole !== 'admin') {
-        return res.status(403).json({ ok: false, error: 'Chỉ Admin mới có quyền đổi role.' });
+        return errorResponse(res, 403, 'Chỉ Admin mới có quyền đổi role.');
       }
       const { role } = req.body;
-      if (!['admin', 'staff', 'member'].includes(role)) return res.status(400).json({ ok: false, error: 'Invalid role' });
+      if (!isValidRole(role)) return errorResponse(res, 400, 'Invalid role. Must be: admin, staff, or member');
 
-      db.prepare('UPDATE web_users SET role = ? WHERE id = ?').run(role, req.params.id);
-      res.json({ ok: true });
+      const userId = sanitizeString(req.params.id, 100);
+      db.prepare('UPDATE web_users SET role = ? WHERE id = ?').run(role, userId);
+      
+      // Audit log
+      try {
+        db.prepare(`INSERT INTO staff_logs (guild_id, actor_id, action, detail, created_at) VALUES ('WEB', ?, 'ADMIN_ROLE_CHANGE', ?, CURRENT_TIMESTAMP)`)
+          .run(req.header('x-user-id'), `Changed role of ${userId} to ${role}`);
+      } catch { /* ignore audit failures */ }
+
+      return successResponse(res, null, `Đã đổi role thành ${role}`);
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      return errorResponse(res, 500, e.message);
+    }
+  });
+
+  // ==== 5. AUDIT LOG ====
+  app.get('/api/bot/admin/audit-log', requireAdminRole, (req, res) => {
+    try {
+      const { page, limit } = sanitizePagination(req.query.page, req.query.limit, 50);
+      const offset = (page - 1) * limit;
+      
+      const totalRow = db.prepare('SELECT COUNT(*) as total FROM staff_logs').get();
+      const logs = db.prepare('SELECT * FROM staff_logs ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset);
+      
+      return successResponse(res, {
+        logs,
+        pagination: { page, limit, total: totalRow.total, totalPages: Math.ceil(totalRow.total / limit) }
+      });
+    } catch (e) {
+      return errorResponse(res, 500, e.message);
+    }
+  });
+
+  // ==== 6. SYSTEM HEALTH ====
+  app.get('/api/bot/admin/system-health', requireAdminRole, (req, res) => {
+    try {
+      const memUsage = process.memoryUsage();
+      const dbSizeRow = db.prepare("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()").get();
+      
+      return successResponse(res, {
+        uptime: process.uptime(),
+        memory: {
+          rss: Math.round(memUsage.rss / 1024 / 1024),
+          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+        },
+        database: {
+          sizeMB: Math.round((dbSizeRow?.size || 0) / 1024 / 1024 * 100) / 100,
+        },
+        node: process.version,
+        platform: process.platform,
+        botPing: req.app.locals.discordClient?.ws?.ping || 0,
+        botStatus: req.app.locals.discordClient?.ws?.status === 0 ? 'READY' : 'CONNECTING',
+      });
+    } catch (e) {
+      return errorResponse(res, 500, e.message);
     }
   });
 }

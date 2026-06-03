@@ -86,6 +86,14 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                 Quản Lý Subscriptions
             </button>
+            <button class="nav-btn" id="nav-system-health" onclick="switchView('system-health')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+                Trạng Thái Hệ Thống
+            </button>
+            <button class="nav-btn" id="nav-audit-log" onclick="switchView('audit-log')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Nhật Ký Hoạt Động
+            </button>
             
             <div class="nav-spacer"></div>
             
@@ -346,6 +354,105 @@
                     </div>
                 </div>
             </div> <!-- /view-subscriptions -->
+
+            <!-- GÓC NHÌN: TRẠNG THÁI HỆ THỐNG -->
+            <div id="view-system-health" class="view-section" style="display: none;">
+                <div class="table-container">
+                    <div class="customer-header-inner" style="padding: 20px;">
+                        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; margin-bottom: 8px;">Trạng Thái Hệ Thống</h2>
+                        <p style="color: #a1a1aa; font-size: 14px;">Thông số phần cứng, cơ sở dữ liệu và tình trạng kết nối Discord Bot.</p>
+                    </div>
+                </div>
+
+                <div class="system-health-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                    <!-- Bot Connection Card -->
+                    <div class="health-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(10px);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                            <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; margin: 0;">🤖 Discord Bot Connection</h3>
+                            <span id="health-bot-status-pill" class="status-pill" style="padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">Checking...</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Uptime</span>
+                            <span id="health-bot-uptime" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Bot Ping</span>
+                            <span id="health-bot-ping" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; font-size: 14px;">
+                            <span style="color: #94a3b8;">Platform</span>
+                            <span id="health-bot-platform" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Hardware Stats Card -->
+                    <div class="health-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(10px);">
+                        <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; margin: 0 0 20px 0;">💻 Host Hardware Usage</h3>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Node.js Version</span>
+                            <span id="health-node-version" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Memory RSS</span>
+                            <span id="health-mem-rss" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; font-size: 14px;">
+                            <span style="color: #94a3b8;">Memory Heap Used</span>
+                            <span id="health-mem-heap" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Database Stats Card -->
+                    <div class="health-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(10px);">
+                        <h3 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; margin: 0 0 20px 0;">🗄️ Database Stats</h3>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 8px;">
+                            <span style="color: #94a3b8;">Engine</span>
+                            <span style="font-weight: 600; color: #10b981;">SQLite 3 (WAL)</span>
+                        </div>
+                        <div class="health-detail-row" style="display: flex; justify-content: space-between; font-size: 14px;">
+                            <span style="color: #94a3b8;">Database File Size</span>
+                            <span id="health-db-size" style="font-weight: 600; color: #fff;">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- /view-system-health -->
+
+            <!-- GÓC NHÌN: NHẬT KÝ HOẠT ĐỘNG -->
+            <div id="view-audit-log" class="view-section" style="display: none;">
+                <div class="table-container">
+                    <div class="customer-header-inner" style="display: flex; justify-content: space-between; align-items: center; padding: 20px;">
+                        <div>
+                            <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; margin-bottom: 8px;">Nhật Ký Hoạt Động (Audit Log)</h2>
+                            <p style="color: #a1a1aa; font-size: 14px;">Lịch sử thao tác của các quản trị viên và nhân viên trên hệ thống.</p>
+                        </div>
+                        <div class="pagination-controls" id="audit-pagination">
+                            <!-- Pagination JS -->
+                        </div>
+                    </div>
+                    
+                    <div class="sub-table-wrapper" style="margin-top: 15px;">
+                        <table class="sub-table" id="audit-table">
+                            <thead>
+                                <tr>
+                                    <th>Thời Gian</th>
+                                    <th>Nhân Viên</th>
+                                    <th>Hành Động</th>
+                                    <th>Chi Tiết</th>
+                                    <th>Mã Đơn</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-tbody">
+                                <!-- Data injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="empty-state" id="audit-empty" style="display: none;">
+                        <div class="empty-icon">📂</div>
+                        <h3>Chưa có bản ghi nhật ký nào</h3>
+                    </div>
+                </div>
+            </div> <!-- /view-audit-log -->
 
         </div> <!-- /main-scroll -->
     </main>

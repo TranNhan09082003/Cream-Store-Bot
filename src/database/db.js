@@ -451,6 +451,113 @@ export function initDatabase() {
 
   // Custom emoji slots cho từng guild
   ensureColumn('guild_settings', 'custom_emojis', 'TEXT');
+
+  // ═══════════════════════════════════════════════
+  // Phase 8: VIP Tiers (DB-driven)
+  // ═══════════════════════════════════════════════
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vip_tiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      role_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      emoji TEXT DEFAULT '⭐',
+      min_spent INTEGER NOT NULL DEFAULT 0,
+      min_orders INTEGER NOT NULL DEFAULT 0,
+      require_first_order INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_vip_tiers_guild ON vip_tiers (guild_id, sort_order);
+
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'percent',
+      value INTEGER NOT NULL DEFAULT 0,
+      min_order INTEGER NOT NULL DEFAULT 0,
+      max_uses INTEGER NOT NULL DEFAULT 0,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      max_per_user INTEGER NOT NULL DEFAULT 1,
+      product_filter TEXT,
+      expires_at TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(guild_id, code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_coupons_guild ON coupons (guild_id, code, is_active);
+
+    CREATE TABLE IF NOT EXISTS coupon_usages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      coupon_id INTEGER NOT NULL,
+      customer_id TEXT NOT NULL,
+      order_code TEXT,
+      discount_amount INTEGER NOT NULL DEFAULT 0,
+      used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (coupon_id) REFERENCES coupons(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_coupon_usages ON coupon_usages (coupon_id, customer_id);
+
+    CREATE TABLE IF NOT EXISTS referral_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL UNIQUE,
+      code TEXT NOT NULL UNIQUE,
+      total_referrals INTEGER NOT NULL DEFAULT 0,
+      total_earned INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_referral_codes ON referral_codes (guild_id, code);
+
+    CREATE TABLE IF NOT EXISTS referral_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      referrer_id TEXT NOT NULL,
+      referred_id TEXT NOT NULL,
+      order_code TEXT,
+      reward_amount INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_referral_events ON referral_events (referrer_id);
+
+    CREATE TABLE IF NOT EXISTS loyalty_points (
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      points INTEGER NOT NULL DEFAULT 0,
+      lifetime_points INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (guild_id, customer_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS loyalty_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      points INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      description TEXT,
+      related_code TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_loyalty_tx ON loyalty_transactions (guild_id, customer_id);
+
+    CREATE TABLE IF NOT EXISTS ai_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id TEXT NOT NULL,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT,
+      messages_json TEXT NOT NULL DEFAULT '[]',
+      message_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(channel_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_conv ON ai_conversations (channel_id);
+  `);
 }
 
 export function nowIso() {

@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from '../database/db.js';
+import { authLimiter, checkLoginLock, recordLoginFailure, clearLoginAttempts } from './rateLimitMiddleware.js';
+import { sanitizeString, isValidEmail, errorResponse, successResponse } from '../utils/inputValidator.js';
 
 // Utils hash password
 function hashPassword(password) {
@@ -33,50 +35,65 @@ export function registerAuthRoutes(app) {
   app.post('/api/bot/auth/register', requireApiKey, (req, res) => {
     try {
       const { email, password, displayName } = req.body;
-      if (!email || !password) return res.status(400).json({ ok: false, error: 'Thiếu email/password' });
+      if (!email || !password) return errorResponse(res, 400, 'Thiếu email/password');
 
-      const emailLower = email.toLowerCase();
+      const emailLower = sanitizeString(email, 200).toLowerCase();
+      if (!isValidEmail(emailLower)) return errorResponse(res, 400, 'Email không hợp lệ');
       
       // Check exist
       const exist = db.prepare('SELECT id FROM web_users WHERE email = ?').get(emailLower);
-      if (exist) return res.status(400).json({ ok: false, error: 'Email đã được đăng ký' });
+      if (exist) return errorResponse(res, 400, 'Email đã được đăng ký');
 
       const id = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
       const hash = hashPassword(password);
+      const safeName = sanitizeString(displayName || emailLower.split('@')[0], 100);
       
       db.prepare(`
         INSERT INTO web_users (id, email, password_hash, display_name, auth_provider, role)
         VALUES (?, ?, ?, ?, 'email', 'member')
-      `).run(id, emailLower, hash, displayName || emailLower.split('@')[0]);
+      `).run(id, emailLower, hash, safeName);
 
-      res.json({ ok: true, data: { id, email: emailLower, display_name: displayName, role: 'member' } });
+      return successResponse(res, { id, email: emailLower, display_name: safeName, role: 'member' });
     } catch (e) {
       console.error('[AUTH API] Lỗi register:', e);
-      res.status(500).json({ ok: false, error: 'Lỗi server' });
+      return errorResponse(res, 500, 'Lỗi server');
     }
   });
 
-  app.post('/api/bot/auth/login', requireApiKey, (req, res) => {
+  app.post('/api/bot/auth/login', requireApiKey, authLimiter, (req, res) => {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) return res.status(400).json({ ok: false, error: 'Thiếu email/password' });
+      const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+      
+      // Check if IP is locked
+      const lockStatus = checkLoginLock(clientIp);
+      if (lockStatus.locked) {
+        return errorResponse(res, 429, `Tài khoản bị khóa tạm thời. Thử lại sau ${lockStatus.remainMin} phút.`);
+      }
 
-      const emailLower = email.toLowerCase();
+      const { email, password } = req.body;
+      if (!email || !password) return errorResponse(res, 400, 'Thiếu email/password');
+
+      const emailLower = sanitizeString(email, 200).toLowerCase();
       const user = db.prepare('SELECT * FROM web_users WHERE email = ?').get(emailLower);
       
       if (!user || !user.password_hash) {
-        return res.status(401).json({ ok: false, error: 'Sai tài khoản hoặc mật khẩu' });
+        recordLoginFailure(clientIp);
+        return errorResponse(res, 401, 'Sai tài khoản hoặc mật khẩu');
       }
 
       if (!verifyPassword(password, user.password_hash)) {
-        return res.status(401).json({ ok: false, error: 'Sai tài khoản hoặc mật khẩu' });
+        recordLoginFailure(clientIp);
+        return errorResponse(res, 401, 'Sai tài khoản hoặc mật khẩu');
       }
 
+      // Success → clear login attempts
+      clearLoginAttempts(clientIp);
+
       const { password_hash, ...safeUser } = user;
-      res.json({ ok: true, data: safeUser });
+      return successResponse(res, safeUser);
     } catch (e) {
       console.error('[AUTH API] Lỗi login:', e);
-      res.status(500).json({ ok: false, error: 'Lỗi server' });
+      return errorResponse(res, 500, 'Lỗi server');
     }
   });
 
