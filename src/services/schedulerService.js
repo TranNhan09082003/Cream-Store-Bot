@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runDeepNotifications, runSubscriptionNotifications } from './deepNotificationService.js';
-import { getDatabasePath } from '../database/db.js';
+import { backupDatabase } from './backupService.js';
 import { getDueAutoCloseTickets, closeTicket } from './ticketService.js';
 import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
@@ -13,41 +13,7 @@ let backupHandle = null;
 let bootstrapped = false;
 
 function autoBackupDatabase() {
-  try {
-    const dbPath = getDatabasePath();
-    if (!fs.existsSync(dbPath)) return;
-
-    const dataDir = path.dirname(dbPath);
-    const backupDir = path.join(dataDir, 'backups');
-    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const backupName = `shopbot_${dateStr}.sqlite`;
-    const backupPath = path.join(backupDir, backupName);
-
-    // Không backup quá 1 lần 1 ngày
-    if (!fs.existsSync(backupPath)) {
-      fs.copyFileSync(dbPath, backupPath);
-      console.log(`[BACKUP] Đã sao lưu database thành công: ${backupName}`);
-    }
-
-    // Xóa các file backup cũ hơn 7 ngày
-    const limitDate = new Date();
-    limitDate.setDate(limitDate.getDate() - 7);
-    
-    const files = fs.readdirSync(backupDir);
-    files.forEach(file => {
-      const filePath = path.join(backupDir, file);
-      const stat = fs.statSync(filePath);
-      if (stat.mtime < limitDate) {
-        fs.unlinkSync(filePath);
-        console.log(`[BACKUP] Đã xóa backup cũ: ${file}`);
-      }
-    });
-  } catch (error) {
-    console.error('[BACKUP] Lỗi hệ thống sao lưu tự động:', error);
-  }
+  backupDatabase().catch(e => console.error('[BACKUP] Lỗi hệ thống sao lưu tự động:', e));
 }
 
 export function startScheduler(client) {

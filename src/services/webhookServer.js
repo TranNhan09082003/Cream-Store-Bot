@@ -4,6 +4,8 @@ import { registerDashboardRoutes, registerWebSocketUpgrade } from './dashboardMi
 import { handlePayOSWebhook } from './paymentService.js';
 import { handleSepayWebhook } from './sepayService.js';
 import { registerBotApiRoutes } from './botApiRoutes.js';
+import { registerAuthRoutes } from './authApiRoutes.js';
+import { registerAdminRoutes } from './adminApiRoutes.js';
 
 let httpServer = null;
 let appInstance = null;
@@ -139,6 +141,8 @@ export async function startWebhookServer(client = null) {
   registerPaymentRoutes(app);
   registerDashboardRoutes(app);
   registerBotApiRoutes(app);
+  registerAuthRoutes(app);
+  registerAdminRoutes(app);
 
   const port = Number(process.env.HTTP_PORT ?? 3000);
 
