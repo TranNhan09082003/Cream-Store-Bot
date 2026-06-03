@@ -57,7 +57,7 @@ function updateOrderFieldsStmt(){return db.prepare(`UPDATE orders SET product_na
 function getStaffKpiStmt(){return db.prepare(`SELECT actor_id, COUNT(*) total_actions, SUM(CASE WHEN action IN ('ORDER_COMPLETE_MANUAL','ORDER_COMPLETE_AUTO','ORDER_COMPLETED') THEN 1 ELSE 0 END) completed_orders, SUM(CASE WHEN action IN ('DELIVERY_SENT','ORDER_DELIVERED') THEN 1 ELSE 0 END) deliveries, SUM(CASE WHEN action IN ('ORDER_CLAIM','ORDER_CLAIMED') THEN 1 ELSE 0 END) claims FROM staff_logs WHERE guild_id=? AND actor_id IS NOT NULL GROUP BY actor_id ORDER BY completed_orders DESC, deliveries DESC, total_actions DESC LIMIT ?`);}
 function averageCompletionTimeStmt(){return db.prepare(`SELECT AVG((julianday(completed_at)-julianday(created_at))*86400.0) avg_seconds FROM orders WHERE guild_id=? AND completed_by_id=? AND completed_at IS NOT NULL`);}
 
-function generateUniqueOrderCode(){while(true){const c=`CN_${randomDigits(6)}`; if(!orderCodeExistsStmt().get(c)) return c;}}
+export function generateUniqueOrderCode(){while(true){const c=`CN_${randomDigits(6)}`; if(!orderCodeExistsStmt().get(c)) return c;}}
 function ensureAmountValue(v){const a=Number(v ?? 0); return Number.isFinite(a)&&a>0?Math.trunc(a):0;}
 function computePriority(guildId, customerId, productName){const profile=getCustomerProfile(guildId, customerId); const completed=Number(profile?.total_completed_orders ?? 0); let rank=0; if (completed >= config.vipRoleThreshold) rank += 100; if ((productName||'').toLowerCase().includes('vip')) rank += 20; return rank;}
 
@@ -71,12 +71,12 @@ function detectServiceType(name) {
   return 'other';
 }
 
-export function createOrder({ guildId, ticketId, ticketChannelId, customerId, productName, quantity, note, totalAmount = 0, durationMonths = config.defaultOrderDurationMonths, orderLogChannelId, createdById }) {
+export function createOrder({ guildId, ticketId, ticketChannelId, customerId, productName, quantity, note, totalAmount = 0, durationMonths = config.defaultOrderDurationMonths, orderLogChannelId, createdById, orderCode }) {
   const timestamp = nowIso();
   const safeAmount = ensureAmountValue(totalAmount);
-  const orderCode = generateUniqueOrderCode();
-  const payosOrderCode = Number(orderCode.replace('CN_', ''));
-  const paymentCode = safeAmount > 0 ? orderCode : null;
+  const finalOrderCode = orderCode || generateUniqueOrderCode();
+  const payosOrderCode = Number(finalOrderCode.replace('CN_', ''));
+  const paymentCode = safeAmount > 0 ? finalOrderCode : null;
   const paymentStatus = safeAmount > 0 ? 'UNPAID' : 'FREE';
   const status = safeAmount > 0 ? 'PENDING_PAYMENT' : 'PROCESSING';
   const queueGroup = normalizeQueueGroup(productName) || 'mac-dinh';
@@ -84,9 +84,9 @@ export function createOrder({ guildId, ticketId, ticketChannelId, customerId, pr
   const safeDurationMonths = Math.max(1, Number.parseInt(String(durationMonths ?? config.defaultOrderDurationMonths), 10) || config.defaultOrderDurationMonths);
   const serviceType = detectServiceType(productName);
 
-  const result = createOrderStmt().run(orderCode,guildId,ticketId,ticketChannelId,customerId,productName,quantity,note ?? null,safeAmount,safeAmount > 0 ? 0 : safeAmount,config.paymentProvider,paymentCode,payosOrderCode,paymentStatus,status,timestamp,queueGroup,priorityRank,safeDurationMonths,orderLogChannelId,createdById,timestamp,timestamp,serviceType);
+  const result = createOrderStmt().run(finalOrderCode,guildId,ticketId,ticketChannelId,customerId,productName,quantity,note ?? null,safeAmount,safeAmount > 0 ? 0 : safeAmount,config.paymentProvider,paymentCode,payosOrderCode,paymentStatus,status,timestamp,queueGroup,priorityRank,safeDurationMonths,orderLogChannelId,createdById,timestamp,timestamp,serviceType);
   syncCustomerStats(guildId, customerId);
-  broadcastDashboardEvent('order_update', `Đơn hàng mới: ${orderCode}`);
+  broadcastDashboardEvent('order_update', `Đơn hàng mới: ${finalOrderCode}`);
   return getOrderById(Number(result.lastInsertRowid));
 }
 

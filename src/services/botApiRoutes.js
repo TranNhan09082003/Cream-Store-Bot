@@ -306,12 +306,12 @@ export function registerBotApiRoutes(app) {
             if (!items || items.length === 0) return res.status(400).json({ ok: false, error: 'Giỏ hàng trống' });
             
             // Lấy db helpers và orderService
-            const { generateOrderCode, insertOrder, notifyNewOrder } = await import('./orderService.js');
+            const { generateUniqueOrderCode, createOrder, saveOrderLogMessage } = await import('./orderService.js');
             const { generateVietQR } = await import('../utils/paymentQrUi.js');
             
             const firstItem = items[0];
             const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const orderCode = generateOrderCode();
+            const orderCode = generateUniqueOrderCode();
             
             // Xử lý duration_months, tránh undefined/null
             let durationMonths = firstItem.duration_months;
@@ -344,10 +344,11 @@ export function registerBotApiRoutes(app) {
                 quantity: items.reduce((sum, item) => sum + item.quantity, 0),
                 totalAmount: totalAmount,
                 durationMonths: durationMonths,
-                paymentProvider: paymentProvider
+                note: note || '',
+                createdById: customerId
             };
             
-            const order = insertOrder(orderPayload);
+            const order = createOrder(orderPayload);
             let payment_qr_code = null;
             let finalStatus = order.status;
 
@@ -369,7 +370,7 @@ export function registerBotApiRoutes(app) {
                 ok: true,
                 data: {
                     order_code: orderCode,
-                    payment_checkout_url: null,
+                    payment_checkout_url: null, // Sẽ dùng QR trực tiếp
                     payment_qr_code: payment_qr_code,
                     total_amount: totalAmount,
                     status: finalStatus
@@ -378,8 +379,34 @@ export function registerBotApiRoutes(app) {
             
             // Gửi thông báo về kênh bot log
             try {
-                notifyNewOrder(null, order, `[Website - ${paymentProvider}] ${contact} - ${note || ''}`);
-            } catch (e) { console.error('Lỗi notifyNewOrder:', e); }
+                const client = req.app.locals.discordClient;
+                if (client) {
+                    const guild = await client.guilds.fetch(guildId).catch(() => null);
+                    if (guild) {
+                        const { getGuildConfig } = await import('./guildConfigService.js');
+                        const guildConfig = getGuildConfig(guildId);
+                        if (guildConfig && guildConfig.order_log_channel_id) {
+                            const orderLogChannel = await guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null);
+                            if (orderLogChannel && orderLogChannel.isTextBased()) {
+                                const { buildOrderCreatedV2 } = await import('../utils/embeds.js');
+                                const { container, actionRow } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
+                                
+                                container.addFields([
+                                    { name: 'Khách hàng Web', value: `👤 Contact: ${contact || 'Không có'}\n🆔 Discord: <@${customerId}>`, inline: true },
+                                    { name: 'Ghi chú đơn', value: `📝 ${note || 'Không có Ghi chú'}`, inline: true }
+                                ]);
+                                
+                                const orderLogMsg = await orderLogChannel.send({ embeds: [container], components: [actionRow] }).catch(() => null);
+                                if (orderLogMsg) {
+                                    saveOrderLogMessage(orderCode, orderLogMsg.id);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Lỗi gửi embed log Discord:', e);
+            }
             
         } catch (e) {
             console.error('[WEB ORDERS API]', e);
