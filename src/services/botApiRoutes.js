@@ -325,6 +325,79 @@ export function registerBotApiRoutes(app) {
             const customerId = discord_id || 'web_user';
             const paymentProvider = req.body.paymentProvider || 'vietqr'; // Lấy từ request nếu có, vd: 'WALLET'
 
+            // Let's create the ticket channel first
+            let channelId = `web-${orderCode.toLowerCase().replace('_', '-')}`;
+            let ticketId = 0;
+            let discordChannel = null;
+
+            try {
+                const client = req.app.locals.discordClient;
+                if (client) {
+                    const guild = await client.guilds.fetch(guildId).catch(() => null);
+                    if (guild) {
+                        const { getGuildConfig } = await import('./guildConfigService.js');
+                        const guildConfig = getGuildConfig(guildId);
+                        if (guildConfig) {
+                            const { ChannelType, PermissionFlagsBits } = await import('discord.js');
+                            const { TICKET_MEMBER_PERMISSIONS } = await import('../utils/permissions.js');
+                            
+                            const overwrites = [
+                                {
+                                    id: guild.roles.everyone.id,
+                                    deny: [PermissionFlagsBits.ViewChannel],
+                                },
+                                {
+                                    id: client.user.id,
+                                    allow: [
+                                        PermissionFlagsBits.ViewChannel,
+                                        PermissionFlagsBits.SendMessages,
+                                        PermissionFlagsBits.ReadMessageHistory,
+                                        PermissionFlagsBits.ManageChannels
+                                    ],
+                                },
+                            ];
+                            
+                            if (guildConfig.support_role_id) {
+                                overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+                            }
+                            if (customerId && customerId !== 'web_user') {
+                                const member = await guild.members.fetch(customerId).catch(() => null);
+                                if (member) {
+                                    overwrites.push({ id: customerId, allow: TICKET_MEMBER_PERMISSIONS });
+                                }
+                            }
+                            
+                            const categoryId = guildConfig.ticket_category_id;
+                            const channel = await guild.channels.create({
+                                name: `web-${orderCode.toLowerCase().replace('_', '-')}`,
+                                type: ChannelType.GuildText,
+                                parent: categoryId,
+                                permissionOverwrites: overwrites,
+                            }).catch(() => null);
+                            
+                            if (channel) {
+                                discordChannel = channel;
+                                channelId = channel.id;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[WEB ORDER] Lỗi tạo kênh Discord:', err);
+            }
+
+            // Tạo ticket trong DB
+            const { createTicket } = await import('./ticketService.js');
+            const ticket = createTicket({
+                guildId,
+                channelId,
+                customerId,
+                openedById: customerId,
+                ticketType: 'ORDER',
+                relatedOrderCode: orderCode
+            });
+            ticketId = ticket.id;
+
             // Nếu thanh toán bằng ví, kiểm tra số dư và trừ tiền
             if (paymentProvider === 'WALLET') {
                 const { getWalletBalance, addWalletBalance } = await import('./walletService.js');
@@ -339,6 +412,8 @@ export function registerBotApiRoutes(app) {
             const orderPayload = {
                 orderCode,
                 guildId,
+                ticketId,
+                ticketChannelId: channelId,
                 customerId,
                 productName: firstItem.product_name || firstItem.name || 'Sản phẩm Web',
                 quantity: items.reduce((sum, item) => sum + item.quantity, 0),
@@ -376,6 +451,28 @@ export function registerBotApiRoutes(app) {
                     status: finalStatus
                 }
             });
+
+            // Gửi welcome embed và components vào kênh Discord mới
+            if (discordChannel) {
+                try {
+                    const { buildTicketWelcomeV2, buildTicketControlComponents } = await import('../utils/embeds.js');
+                    const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+                        orderCode, customerId, 'ORDER', null, null, guildId
+                    );
+                    await discordChannel.send({
+                        components: [welcomeV2, ...buildTicketControlComponents(ticketId, customerId)],
+                        flags: welcomeV2Flags,
+                    }).catch(() => null);
+                    
+                    if (customerId && customerId !== 'web_user') {
+                        await discordChannel.send({ content: `<@${customerId}> — Đơn hàng từ Web của bạn đã tạo ticket này!` }).catch(() => null);
+                    } else {
+                        await discordChannel.send({ content: `🔔 Có đơn hàng mới từ Web! Đơn hàng: **${orderCode}**.` }).catch(() => null);
+                    }
+                } catch (welcomeErr) {
+                    console.error('[WEB ORDER] Lỗi gửi welcome embed vào kênh Discord:', welcomeErr);
+                }
+            }
             
             // Gửi thông báo về kênh bot log
             try {
@@ -410,6 +507,438 @@ export function registerBotApiRoutes(app) {
             
         } catch (e) {
             console.error('[WEB ORDERS API]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ── ORDER CHAT — đồng bộ tin nhắn 2 chiều ──────────────────
+    app.get('/api/bot/orders/:code/chat', async (req, res) => {
+        try {
+            const code = String(req.params.code || '').toUpperCase();
+            const order = db.prepare(`SELECT * FROM orders WHERE order_code = ?`).get(code);
+            if (!order) {
+                return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
+            }
+
+            const channelId = order.ticket_channel_id;
+            if (!channelId || channelId === 'web' || channelId.startsWith('web-')) {
+                return res.json({ ok: true, messages: [] });
+            }
+
+            const client = req.app.locals.discordClient;
+            if (!client) {
+                return res.json({ ok: true, messages: [] });
+            }
+
+            const guildId = order.guild_id || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guild = await client.guilds.fetch(guildId).catch(() => null);
+            if (!guild) {
+                return res.json({ ok: true, messages: [] });
+            }
+
+            const channel = await guild.channels.fetch(channelId).catch(() => null);
+            if (!channel || !channel.isTextBased()) {
+                return res.json({ ok: true, messages: [] });
+            }
+
+            const messages = await channel.messages.fetch({ limit: 50 }).catch(() => []);
+            if (!messages || messages.size === 0) {
+                return res.json({ ok: true, messages: [] });
+            }
+
+            const formatted = Array.from(messages.values()).map(m => {
+                let authorType = 'staff';
+                let content = m.content || '';
+                let authorName = m.author?.username || 'Hệ thống';
+                let authorAvatar = m.author ? m.author.displayAvatarURL() : null;
+
+                if (m.author?.bot) {
+                    if (content.startsWith('**[Khách từ Web]**:')) {
+                        authorType = 'customer';
+                        content = content.replace('**[Khách từ Web]**:', '').trim();
+                    } else if (content.startsWith('**[Khách hàng từ Web]**:')) {
+                        authorType = 'customer';
+                        content = content.replace('**[Khách hàng từ Web]**:', '').trim();
+                    } else {
+                        authorType = 'system';
+                    }
+                } else {
+                    authorType = 'staff';
+                    authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                }
+
+                if (!content && m.embeds && m.embeds.length > 0) {
+                    const embed = m.embeds[0];
+                    content = embed.description || embed.title || '';
+                    authorType = 'system';
+                }
+
+                return {
+                    id: m.id,
+                    authorType,
+                    authorName,
+                    authorAvatar,
+                    content,
+                    timestamp: m.createdAt.toISOString()
+                };
+            }).reverse().filter(msg => msg.content || msg.authorType === 'system');
+
+            res.json({ ok: true, messages: formatted });
+        } catch (e) {
+            console.error('[CHAT GET API ERROR]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    app.post('/api/bot/orders/:code/chat', async (req, res) => {
+        try {
+            const code = String(req.params.code || '').toUpperCase();
+            const { content } = req.body;
+            if (!content) return res.status(400).json({ ok: false, error: 'Tin nhắn không được để trống' });
+
+            const order = db.prepare(`SELECT * FROM orders WHERE order_code = ?`).get(code);
+            if (!order) {
+                return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
+            }
+
+            let channelId = order.ticket_channel_id;
+            const client = req.app.locals.discordClient;
+            let channel = null;
+
+            if (client) {
+                const guild = await client.guilds.fetch(order.guild_id).catch(() => null);
+                if (guild) {
+                    if (!channelId || channelId === 'web' || channelId.startsWith('web-')) {
+                        // Self-healing
+                        const { getGuildConfig } = await import('./guildConfigService.js');
+                        const guildConfig = getGuildConfig(order.guild_id);
+                        if (guildConfig) {
+                            const { ChannelType, PermissionFlagsBits } = await import('discord.js');
+                            const { TICKET_MEMBER_PERMISSIONS } = await import('../utils/permissions.js');
+                            
+                            const overwrites = [
+                                { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+                                {
+                                    id: client.user.id,
+                                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels]
+                                }
+                            ];
+                            if (guildConfig.support_role_id) {
+                                overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+                            }
+                            if (order.customer_id && order.customer_id !== 'web_user') {
+                                const member = await guild.members.fetch(order.customer_id).catch(() => null);
+                                if (member) {
+                                    overwrites.push({ id: order.customer_id, allow: TICKET_MEMBER_PERMISSIONS });
+                                }
+                            }
+                            
+                            const categoryId = guildConfig.ticket_category_id;
+                            const newChannel = await guild.channels.create({
+                                name: `web-${order.order_code.toLowerCase().replace('_', '-')}`,
+                                type: ChannelType.GuildText,
+                                parent: categoryId,
+                                permissionOverwrites: overwrites,
+                            }).catch(() => null);
+
+                            if (newChannel) {
+                                channel = newChannel;
+                                channelId = newChannel.id;
+                                db.prepare(`UPDATE orders SET ticket_channel_id = ?, updated_at = ? WHERE order_code = ?`).run(channelId, nowIso(), order.order_code);
+                                
+                                const { buildTicketWelcomeV2, buildTicketControlComponents } = await import('../utils/embeds.js');
+                                const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+                                    order.order_code, order.customer_id, 'ORDER', null, null, order.guild_id
+                                );
+                                await channel.send({
+                                    components: [welcomeV2, ...buildTicketControlComponents(order.ticket_id, order.customer_id)],
+                                    flags: welcomeV2Flags,
+                                }).catch(() => null);
+                            }
+                        }
+                    } else {
+                        channel = await guild.channels.fetch(channelId).catch(() => null);
+                    }
+                }
+            }
+
+            if (channel && channel.isTextBased()) {
+                await channel.send({ content: `**[Khách từ Web]**: ${content}` });
+                return res.json({ ok: true });
+            } else {
+                return res.status(503).json({ ok: false, error: 'Đang không thể kết nối tới hỗ trợ Discord' });
+            }
+        } catch (e) {
+            console.error('[CHAT POST API ERROR]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ── GENERAL TICKETS — tạo ticket hỗ trợ trực tuyến ─────────
+    app.post('/api/bot/tickets/start', async (req, res) => {
+        try {
+            const { contact, discord_id } = req.body;
+            if (!contact) return res.status(400).json({ ok: false, error: 'Thiếu thông tin liên hệ (tên/SĐT)' });
+
+            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const customerId = discord_id || 'web_user';
+            
+            let channelId = `live-${contact.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'guest'}-${Math.random().toString().slice(2, 6)}`;
+            let ticketId = 0;
+            let discordChannel = null;
+
+            const client = req.app.locals.discordClient;
+            if (client) {
+                const guild = await client.guilds.fetch(guildId).catch(() => null);
+                if (guild) {
+                    const { getGuildConfig } = await import('./guildConfigService.js');
+                    const guildConfig = getGuildConfig(guildId);
+                    if (guildConfig) {
+                        const { ChannelType, PermissionFlagsBits } = await import('discord.js');
+                        const { TICKET_MEMBER_PERMISSIONS } = await import('../utils/permissions.js');
+                        
+                        const overwrites = [
+                            {
+                                id: guild.roles.everyone.id,
+                                deny: [PermissionFlagsBits.ViewChannel],
+                            },
+                            {
+                                id: client.user.id,
+                                allow: [
+                                    PermissionFlagsBits.ViewChannel,
+                                    PermissionFlagsBits.SendMessages,
+                                    PermissionFlagsBits.ReadMessageHistory,
+                                    PermissionFlagsBits.ManageChannels
+                                ],
+                            },
+                        ];
+                        
+                        if (guildConfig.support_role_id) {
+                            overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+                        }
+                        if (customerId && customerId !== 'web_user') {
+                            const member = await guild.members.fetch(customerId).catch(() => null);
+                            if (member) {
+                                overwrites.push({ id: customerId, allow: TICKET_MEMBER_PERMISSIONS });
+                            }
+                        }
+                        
+                        const categoryId = guildConfig.support_category_id || guildConfig.ticket_category_id;
+                        const channel = await guild.channels.create({
+                            name: `live-${contact.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'guest'}`,
+                            type: ChannelType.GuildText,
+                            parent: categoryId,
+                            permissionOverwrites: overwrites,
+                        }).catch(() => null);
+                        
+                        if (channel) {
+                            discordChannel = channel;
+                            channelId = channel.id;
+                        }
+                    }
+                }
+            }
+
+            // Tạo ticket trong DB
+            const { createTicket } = await import('./ticketService.js');
+            const ticket = createTicket({
+                guildId,
+                channelId,
+                customerId,
+                openedById: customerId,
+                ticketType: 'SUPPORT'
+            });
+
+            if (discordChannel) {
+                try {
+                    const { buildTicketWelcomeV2, buildTicketControlComponents } = await import('../utils/embeds.js');
+                    const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+                        ticket.ticket_code, customerId, 'SUPPORT', null, null, guildId
+                    );
+                    await discordChannel.send({
+                        components: [welcomeV2, ...buildTicketControlComponents(ticket.id, customerId)],
+                        flags: welcomeV2Flags,
+                    }).catch(() => null);
+
+                    await discordChannel.send({
+                        content: `🔔 **YÊU CẦU HỖ TRỢ TRỰC TUYẾN TỪ WEB**\n👤 Liên hệ: **${contact}**\n🆔 Discord: ${customerId === 'web_user' ? 'Khách vãng lai' : `<@${customerId}>`}`
+                    }).catch(() => null);
+                } catch (err) {
+                    console.error('[LIVE CHAT START] Lỗi gửi welcome embed:', err);
+                }
+            }
+
+            res.json({ ok: true, data: { ticket_code: ticket.ticket_code } });
+        } catch (e) {
+            console.error('[LIVE CHAT START API ERROR]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ── GENERAL TICKETS CHAT ──────────────────────────────────
+    app.get('/api/bot/tickets/:code/chat', async (req, res) => {
+        try {
+            const code = String(req.params.code || '').toUpperCase();
+            const ticket = db.prepare(`SELECT * FROM tickets WHERE ticket_code = ?`).get(code);
+            if (!ticket) {
+                return res.status(404).json({ ok: false, error: 'Không tìm thấy ticket' });
+            }
+
+            const ticketStatus = ticket.status; // OPEN, CLOSED, etc.
+            const channelId = ticket.channel_id;
+            if (!channelId || channelId === 'web' || channelId.startsWith('live-')) {
+                return res.json({ ok: true, messages: [], status: ticketStatus });
+            }
+
+            const client = req.app.locals.discordClient;
+            if (!client) {
+                return res.json({ ok: true, messages: [], status: ticketStatus });
+            }
+
+            const guildId = ticket.guild_id || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guild = await client.guilds.fetch(guildId).catch(() => null);
+            if (!guild) {
+                return res.json({ ok: true, messages: [], status: ticketStatus });
+            }
+
+            const channel = await guild.channels.fetch(channelId).catch(() => null);
+            if (!channel || !channel.isTextBased()) {
+                return res.json({ ok: true, messages: [], status: ticketStatus });
+            }
+
+            const messages = await channel.messages.fetch({ limit: 50 }).catch(() => []);
+            if (!messages || messages.size === 0) {
+                return res.json({ ok: true, messages: [], status: ticketStatus });
+            }
+
+            const formatted = Array.from(messages.values()).map(m => {
+                let authorType = 'staff';
+                let content = m.content || '';
+                let authorName = m.author?.username || 'Hệ thống';
+                let authorAvatar = m.author ? m.author.displayAvatarURL() : null;
+
+                if (m.author?.bot) {
+                    if (content.startsWith('**[Khách từ Web]**:')) {
+                        authorType = 'customer';
+                        content = content.replace('**[Khách từ Web]**:', '').trim();
+                    } else if (content.startsWith('**[Khách hàng từ Web]**:')) {
+                        authorType = 'customer';
+                        content = content.replace('**[Khách hàng từ Web]**:', '').trim();
+                    } else {
+                        authorType = 'system';
+                    }
+                } else {
+                    authorType = 'staff';
+                    authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                }
+
+                if (!content && m.embeds && m.embeds.length > 0) {
+                    const embed = m.embeds[0];
+                    content = embed.description || embed.title || '';
+                    authorType = 'system';
+                }
+
+                return {
+                    id: m.id,
+                    authorType,
+                    authorName,
+                    authorAvatar,
+                    content,
+                    timestamp: m.createdAt.toISOString()
+                };
+            }).reverse().filter(msg => msg.content || msg.authorType === 'system');
+
+            res.json({ ok: true, messages: formatted, status: ticketStatus });
+        } catch (e) {
+            console.error('[TICKET CHAT GET API ERROR]', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    app.post('/api/bot/tickets/:code/chat', async (req, res) => {
+        try {
+            const code = String(req.params.code || '').toUpperCase();
+            const { content } = req.body;
+            if (!content) return res.status(400).json({ ok: false, error: 'Tin nhắn không được để trống' });
+
+            const ticket = db.prepare(`SELECT * FROM tickets WHERE ticket_code = ?`).get(code);
+            if (!ticket) {
+                return res.status(404).json({ ok: false, error: 'Không tìm thấy ticket' });
+            }
+
+            if (ticket.status === 'CLOSED') {
+                return res.status(400).json({ ok: false, error: 'Ticket này đã đóng. Không thể gửi thêm tin nhắn.' });
+            }
+
+            let channelId = ticket.channel_id;
+            const client = req.app.locals.discordClient;
+            let channel = null;
+
+            if (client) {
+                const guild = await client.guilds.fetch(ticket.guild_id).catch(() => null);
+                if (guild) {
+                    if (!channelId || channelId.startsWith('live-')) {
+                        // self-healing
+                        const { getGuildConfig } = await import('./guildConfigService.js');
+                        const guildConfig = getGuildConfig(ticket.guild_id);
+                        if (guildConfig) {
+                            const { ChannelType, PermissionFlagsBits } = await import('discord.js');
+                            const { TICKET_MEMBER_PERMISSIONS } = await import('../utils/permissions.js');
+                            
+                            const overwrites = [
+                                { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+                                {
+                                    id: client.user.id,
+                                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels]
+                                }
+                            ];
+                            if (guildConfig.support_role_id) {
+                                overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+                            }
+                            if (ticket.customer_id && ticket.customer_id !== 'web_user') {
+                                const member = await guild.members.fetch(ticket.customer_id).catch(() => null);
+                                if (member) {
+                                    overwrites.push({ id: ticket.customer_id, allow: TICKET_MEMBER_PERMISSIONS });
+                                }
+                            }
+                            
+                            const categoryId = guildConfig.support_category_id || guildConfig.ticket_category_id;
+                            const newChannel = await guild.channels.create({
+                                name: `live-help`,
+                                type: ChannelType.GuildText,
+                                parent: categoryId,
+                                permissionOverwrites: overwrites,
+                            }).catch(() => null);
+
+                            if (newChannel) {
+                                channel = newChannel;
+                                channelId = newChannel.id;
+                                db.prepare(`UPDATE tickets SET channel_id = ? WHERE ticket_code = ?`).run(channelId, ticket.ticket_code);
+                                
+                                const { buildTicketWelcomeV2, buildTicketControlComponents } = await import('../utils/embeds.js');
+                                const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+                                    ticket.ticket_code, ticket.customer_id, 'SUPPORT', null, null, ticket.guild_id
+                                );
+                                await channel.send({
+                                    components: [welcomeV2, ...buildTicketControlComponents(ticket.id, ticket.customer_id)],
+                                    flags: welcomeV2Flags,
+                                }).catch(() => null);
+                            }
+                        }
+                    } else {
+                        channel = await guild.channels.fetch(channelId).catch(() => null);
+                    }
+                }
+            }
+
+            if (channel && channel.isTextBased()) {
+                await channel.send({ content: `**[Khách từ Web]**: ${content}` });
+                return res.json({ ok: true });
+            } else {
+                return res.status(503).json({ ok: false, error: 'Không thể kết nối với hỗ trợ Discord lúc này' });
+            }
+        } catch (e) {
+            console.error('[TICKET CHAT POST API ERROR]', e);
             res.status(500).json({ ok: false, error: e.message });
         }
     });
