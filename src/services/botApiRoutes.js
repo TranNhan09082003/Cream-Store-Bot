@@ -409,6 +409,10 @@ export function registerBotApiRoutes(app) {
                 addWalletBalance(guildId, customerId, -totalAmount, 'PAYMENT', `Thanh toán đơn ${orderCode}`, orderCode);
             }
 
+            const { getGuildConfig } = await import('./guildConfigService.js');
+            const guildConfig = getGuildConfig(guildId);
+            const orderLogChannelId = guildConfig?.order_log_channel_id || channelId || 'default_log';
+
             const orderPayload = {
                 orderCode,
                 guildId,
@@ -420,6 +424,7 @@ export function registerBotApiRoutes(app) {
                 totalAmount: totalAmount,
                 durationMonths: durationMonths,
                 note: note || '',
+                orderLogChannelId,
                 createdById: customerId
             };
             
