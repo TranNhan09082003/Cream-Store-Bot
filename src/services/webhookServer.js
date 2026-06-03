@@ -59,19 +59,13 @@ export function registerPaymentRoutes(app) {
   });
 
   app.get(getReturnPath(), (req, res) => {
-    res.setHeader('content-type', 'text/html; charset=utf-8');
-    res.end(renderPage('Thanh toán PayOS', [
-      'Bot đã nhận return URL.',
-      'Nếu bạn đã thanh toán nhưng đơn chưa cập nhật, vui lòng quay lại Discord vài giây rồi kiểm tra ticket.',
-    ]));
+    const webUrl = process.env.WEBSITE_URL || 'https://cenarstore.xyz';
+    res.redirect(`${webUrl}/payment?status=success`);
   });
 
   app.get(getCancelPath(), (req, res) => {
-    res.setHeader('content-type', 'text/html; charset=utf-8');
-    res.end(renderPage('Thanh toán đã bị hủy', [
-      'Bạn đã hủy thanh toán hoặc phiên checkout đã bị đóng.',
-      'Bạn có thể quay lại Discord để tạo lại QR / link thanh toán mới.',
-    ]));
+    const webUrl = process.env.WEBSITE_URL || 'https://cenarstore.xyz';
+    res.redirect(`${webUrl}/payment?status=cancel`);
   });
 
   app.get(getWebhookPath(), (req, res) => {
