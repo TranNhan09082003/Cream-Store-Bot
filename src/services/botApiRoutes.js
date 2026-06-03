@@ -459,6 +459,13 @@ export function registerBotApiRoutes(app) {
                     const encodedContent = encodeURIComponent(orderCode);
                     const encodedName = encodeURIComponent(accountName);
                     payment_qr_code = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${totalAmount}&addInfo=${encodedContent}&accountName=${encodedName}`;
+                    
+                    // Lưu mã QR vào DB để trang chi tiết đơn hàng tra cứu được
+                    const { savePaymentLinkData } = await import('./orderService.js');
+                    savePaymentLinkData(orderCode, {
+                        qrCode: payment_qr_code,
+                        qrUrl: payment_qr_code
+                    });
                 }
             }
             
