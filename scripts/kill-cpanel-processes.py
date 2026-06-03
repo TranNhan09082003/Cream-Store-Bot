@@ -21,7 +21,7 @@ try:
     print("✅ Connected to SSH successfully!")
     
     # Chạy lệnh giết các tiến trình Node.js của user
-    cmd = "pkill -f node || killall -9 node"
+    cmd = "pkill -f \"[n]ode\" || killall -9 node"
     print(f"Executing: {cmd}")
     stdin, stdout, stderr = client.exec_command(cmd, timeout=30)
     
