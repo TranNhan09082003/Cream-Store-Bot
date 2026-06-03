@@ -307,7 +307,6 @@ export function registerBotApiRoutes(app) {
             
             // Lấy db helpers và orderService
             const { generateUniqueOrderCode, createOrder, saveOrderLogMessage } = await import('./orderService.js');
-            const { generateVietQR } = await import('../utils/paymentQrUi.js');
             
             const firstItem = items[0];
             const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -432,7 +431,7 @@ export function registerBotApiRoutes(app) {
             let payment_qr_code = null;
             let finalStatus = order.status;
 
-            if (paymentProvider === 'WALLET') {
+             if (paymentProvider === 'WALLET') {
                 // Đánh dấu đã thanh toán
                 const { markOrderPaid } = await import('./orderService.js');
                 markOrderPaid(orderCode, {
@@ -442,7 +441,25 @@ export function registerBotApiRoutes(app) {
                 });
                 finalStatus = 'PROCESSING';
             } else {
-                payment_qr_code = generateVietQR(orderCode, totalAmount);
+                let bankBin = '970418';
+                let accountNo = '';
+                let accountName = 'CREAM STORE';
+
+                if (guildConfig && guildConfig.bank_bin && guildConfig.bank_account_no) {
+                    bankBin = guildConfig.bank_bin;
+                    accountNo = guildConfig.bank_account_no;
+                    accountName = guildConfig.bank_account_name || 'CREAM STORE';
+                } else if (process.env.SEPAY_BANK_ACCOUNT) {
+                    bankBin = process.env.VIETQR_BANK_BIN || '970418';
+                    accountNo = process.env.SEPAY_BANK_ACCOUNT;
+                    accountName = process.env.VIETQR_ACCOUNT_NAME || 'CREAM STORE';
+                }
+
+                if (accountNo) {
+                    const encodedContent = encodeURIComponent(orderCode);
+                    const encodedName = encodeURIComponent(accountName);
+                    payment_qr_code = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${totalAmount}&addInfo=${encodedContent}&accountName=${encodedName}`;
+                }
             }
             
             // Trả về JSON cho Web Next.js
