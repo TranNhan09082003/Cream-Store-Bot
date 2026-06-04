@@ -54,6 +54,41 @@ export function registerAdminRoutes(app) {
     }
   });
 
+  // ==== 1.1 REVENUE CHART ====
+  app.get('/api/bot/admin/revenue-chart', requireAdminRole, (req, res) => {
+    try {
+      const daily = db.prepare(`
+        SELECT date(created_at) AS day, COALESCE(SUM(amount_paid), 0) AS total
+        FROM orders
+        WHERE payment_status = 'PAID'
+          AND status != 'CANCELLED'
+          AND created_at >= datetime('now', '-30 days')
+        GROUP BY date(created_at)
+        ORDER BY day ASC
+      `).all();
+
+      const todayHourly = db.prepare(`
+        SELECT strftime('%H', created_at) AS hour, COALESCE(SUM(amount_paid), 0) AS total
+        FROM orders
+        WHERE payment_status = 'PAID'
+          AND status != 'CANCELLED'
+          AND date(created_at) = date('now')
+        GROUP BY strftime('%H', created_at)
+        ORDER BY hour ASC
+      `).all();
+
+      res.json({
+        ok: true,
+        data: {
+          daily,
+          todayHourly
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
   // ==== 2. PRODUCTS ====
   app.get('/api/bot/admin/products', requireAdminRole, (req, res) => {
     try {
