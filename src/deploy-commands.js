@@ -17,6 +17,7 @@ try {
   assertDeployConfig();
   const total = await deployCommands();
   console.log(`[DEPLOY] Đã đăng ký ${total} slash commands vào guild test.`);
+  process.exit(0);
 } catch (error) {
   console.error('[DEPLOY] Lỗi deploy slash commands:', error);
   process.exit(1);
