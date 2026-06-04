@@ -201,14 +201,4 @@ export function registerAuthRoutes(app) {
       res.status(500).json({ ok: false, error: 'Lỗi server' });
     }
   });
-
-  // Temporary debug endpoint - will be removed after diagnosing
-  app.get('/api/bot/auth/debug-users', requireApiKey, (req, res) => {
-    try {
-      const users = db.prepare('SELECT * FROM web_users').all();
-      res.json({ ok: true, data: users });
-    } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
-    }
-  });
 }
