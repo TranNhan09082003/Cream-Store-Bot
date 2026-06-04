@@ -5,6 +5,8 @@ import {
   isValidRole, isValidOrderStatus, isValidServiceType,
   errorResponse, successResponse, validateRequired,
 } from '../utils/inputValidator.js';
+import { setBlacklistStatus } from './blacklistService.js';
+import { addWalletBalance } from './walletService.js';
 
 export function registerAdminRoutes(app) {
   function requireAdminRole(req, res, next) {
@@ -152,7 +154,16 @@ export function registerAdminRoutes(app) {
   // ==== 4. USERS ====
   app.get('/api/bot/admin/users', requireAdminRole, (req, res) => {
     try {
-      const users = db.prepare('SELECT id, email, display_name, auth_provider, role, created_at FROM web_users ORDER BY created_at DESC').all();
+      const users = db.prepare(`
+        SELECT u.id, u.email, u.display_name, u.auth_provider, u.role, u.created_at, u.discord_id, u.discord_username, u.google_email,
+               COALESCE(cp.wallet_balance, 0) AS wallet_balance,
+               COALESCE(cf.is_blacklisted, 0) AS is_blacklisted,
+               cf.blacklist_reason
+        FROM web_users u
+        LEFT JOIN customer_profiles cp ON u.id = cp.customer_id AND cp.guild_id = 'WEB'
+        LEFT JOIN customer_flags cf ON u.id = cf.customer_id AND cf.guild_id = 'WEB'
+        ORDER BY u.created_at DESC
+      `).all();
       res.json({ ok: true, data: users });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
@@ -177,6 +188,53 @@ export function registerAdminRoutes(app) {
       } catch { /* ignore audit failures */ }
 
       return successResponse(res, null, `Đã đổi role thành ${role}`);
+    } catch (e) {
+      return errorResponse(res, 500, e.message);
+    }
+  });
+
+  app.post('/api/bot/admin/users/:id/ban', requireAdminRole, (req, res) => {
+    try {
+      if (req.adminRole !== 'admin') {
+        return errorResponse(res, 403, 'Chỉ Admin mới có quyền khóa tài khoản.');
+      }
+      const { ban, reason } = req.body;
+      const userId = sanitizeString(req.params.id, 100);
+      const actorId = req.header('x-user-id');
+
+      setBlacklistStatus('WEB', userId, ban ? 1 : 0, actorId, reason);
+
+      // Audit log
+      try {
+        db.prepare(`INSERT INTO staff_logs (guild_id, actor_id, action, detail, created_at) VALUES ('WEB', ?, 'ADMIN_USER_BAN', ?, CURRENT_TIMESTAMP)`)
+          .run(actorId, `${ban ? 'Banned' : 'Unbanned'} user ${userId}. Reason: ${reason || 'None'}`);
+      } catch { /* ignore audit failures */ }
+
+      return successResponse(res, null, ban ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản');
+    } catch (e) {
+      return errorResponse(res, 500, e.message);
+    }
+  });
+
+  app.post('/api/bot/admin/users/:id/wallet', requireAdminRole, (req, res) => {
+    try {
+      if (req.adminRole !== 'admin') {
+        return errorResponse(res, 403, 'Chỉ Admin mới có quyền thay đổi số dư ví.');
+      }
+      const { amount, type, reason } = req.body;
+      const userId = sanitizeString(req.params.id, 100);
+      const actorId = req.header('x-user-id');
+      
+      const changeAmount = type === 'add' ? amount : -amount;
+      addWalletBalance('WEB', userId, changeAmount, 'ADMIN_ADJUST', reason);
+
+      // Audit log
+      try {
+        db.prepare(`INSERT INTO staff_logs (guild_id, actor_id, action, detail, created_at) VALUES ('WEB', ?, 'ADMIN_WALLET_ADJUST', ?, CURRENT_TIMESTAMP)`)
+          .run(actorId, `Adjusted wallet of user ${userId} by ${changeAmount}đ. Reason: ${reason || 'None'}`);
+      } catch { /* ignore audit failures */ }
+
+      return successResponse(res, null, 'Cập nhật số dư thành công');
     } catch (e) {
       return errorResponse(res, 500, e.message);
     }
