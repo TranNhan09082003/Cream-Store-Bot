@@ -421,6 +421,9 @@ export function initDatabase() {
   ensureColumn('orders', 'claimed_by_id', 'TEXT');
   ensureColumn('orders', 'claimed_at', 'TEXT');
 
+  ensureColumn('product_catalog', 'require_email', 'INTEGER DEFAULT 0');
+  ensureColumn('product_catalog', 'require_phone', 'INTEGER DEFAULT 0');
+
   // Thêm các cột mới cho form website
   ensureColumn('orders', 'service_type', "TEXT DEFAULT 'netflix'");
   ensureColumn('orders', 'customer_name', 'TEXT');

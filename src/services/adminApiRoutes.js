@@ -103,11 +103,11 @@ export function registerAdminRoutes(app) {
 
   app.post('/api/bot/admin/products', requireAdminRole, (req, res) => {
     try {
-      const { name, description, price, duration_months, service_type, is_active, sort_order } = req.body;
+      const { name, description, price, duration_months, service_type, is_active, sort_order, require_email, require_phone } = req.body;
       const result = db.prepare(`
-        INSERT INTO product_catalog (guild_id, name, description, price, duration_months, service_type, is_active, sort_order)
-        VALUES ('WEB', ?, ?, ?, ?, ?, ?, ?)
-      `).run(name, description, price, duration_months || 1, service_type || 'other', is_active ? 1 : 0, sort_order || 0);
+        INSERT INTO product_catalog (guild_id, name, description, price, duration_months, service_type, is_active, sort_order, require_email, require_phone)
+        VALUES ('WEB', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(name, description, price, duration_months || 1, service_type || 'other', is_active ? 1 : 0, sort_order || 0, require_email ? 1 : 0, require_phone ? 1 : 0);
       
       res.json({ ok: true, id: result.lastInsertRowid });
     } catch (e) {
@@ -117,12 +117,12 @@ export function registerAdminRoutes(app) {
 
   app.put('/api/bot/admin/products/:id', requireAdminRole, (req, res) => {
     try {
-      const { name, description, price, duration_months, service_type, is_active, sort_order } = req.body;
+      const { name, description, price, duration_months, service_type, is_active, sort_order, require_email, require_phone } = req.body;
       db.prepare(`
         UPDATE product_catalog 
-        SET name = ?, description = ?, price = ?, duration_months = ?, service_type = ?, is_active = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+        SET name = ?, description = ?, price = ?, duration_months = ?, service_type = ?, is_active = ?, sort_order = ?, require_email = ?, require_phone = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(name, description, price, duration_months, service_type, is_active ? 1 : 0, sort_order, req.params.id);
+      `).run(name, description, price, duration_months, service_type, is_active ? 1 : 0, sort_order, require_email ? 1 : 0, require_phone ? 1 : 0, req.params.id);
       
       res.json({ ok: true });
     } catch (e) {
