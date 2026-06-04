@@ -99,15 +99,21 @@ export function registerAuthRoutes(app) {
 
   app.post('/api/bot/auth/upsert-oauth', requireApiKey, (req, res) => {
     try {
-      const { provider, email, displayName, discordId, discordUsername, discordAvatar, googleId, googleEmail } = req.body;
+      const { userId, provider, email, displayName, discordId, discordUsername, discordAvatar, googleId, googleEmail } = req.body;
       if (!provider) return res.status(400).json({ ok: false, error: 'Thiếu provider' });
 
       let user = null;
 
-      if (provider === 'discord' && discordId) {
-        user = db.prepare('SELECT * FROM web_users WHERE discord_id = ?').get(discordId);
-      } else if (provider === 'google' && googleId) {
-        user = db.prepare('SELECT * FROM web_users WHERE google_id = ?').get(googleId);
+      if (userId) {
+        user = db.prepare('SELECT * FROM web_users WHERE id = ?').get(userId);
+      }
+
+      if (!user) {
+        if (provider === 'discord' && discordId) {
+          user = db.prepare('SELECT * FROM web_users WHERE discord_id = ?').get(discordId);
+        } else if (provider === 'google' && googleId) {
+          user = db.prepare('SELECT * FROM web_users WHERE google_id = ?').get(googleId);
+        }
       }
 
       if (!user && email) {
