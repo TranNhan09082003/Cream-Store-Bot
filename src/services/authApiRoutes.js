@@ -120,6 +120,23 @@ export function registerAuthRoutes(app) {
         user = db.prepare('SELECT * FROM web_users WHERE email = ?').get(email.toLowerCase());
       }
 
+      // Xử lý xung đột tài khoản liên kết Discord
+      if (user && provider === 'discord' && discordId) {
+        const conflictingUser = db.prepare('SELECT * FROM web_users WHERE discord_id = ? AND id != ?')
+          .get(discordId, user.id);
+        
+        if (conflictingUser) {
+          if (!conflictingUser.google_id) {
+            // Xóa tài khoản chỉ có Discord để giải phóng discordId
+            db.prepare('DELETE FROM web_users WHERE id = ?').run(conflictingUser.id);
+          } else {
+            // Gỡ liên kết khỏi tài khoản Google cũ để tránh lỗi UNIQUE
+            db.prepare('UPDATE web_users SET discord_id = NULL, discord_username = NULL, discord_avatar = NULL, updated_at = ? WHERE id = ?')
+              .run(new Date().toISOString(), conflictingUser.id);
+          }
+        }
+      }
+
       const now = new Date().toISOString();
 
       if (user) {
