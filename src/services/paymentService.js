@@ -437,6 +437,7 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
   // TỰ ĐỘNG GIAO HÀNG TỪ KHO (AUTO-DELIVERY)
   let autoDelivered = false;
   let finalOrder = updated;
+  try {
     // Làm sạch tên sản phẩm để so khớp kho hàng chính xác theo từng sản phẩm cụ thể
     const cleanProductName = (updated.product_name || '')
       .replace(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g, '') // Bỏ Discord custom emoji
