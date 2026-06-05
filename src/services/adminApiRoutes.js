@@ -546,14 +546,25 @@ export function registerAdminRoutes(app) {
     }
   });
 
+// Global memory cache for Discord users to prevent hitting rate limits
+const discordUserCache = new Map();
+const DISCORD_USER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+const fetchWithTimeout = (promise, ms) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+  ]);
+};
+
   // ==== 10. TICKETS LIST (LIVE CHAT ADMIN) ====
   app.get('/api/bot/admin/tickets', requireAdminRole, async (req, res) => {
     try {
-      const tickets = db.prepare("SELECT * FROM tickets ORDER BY status ASC, created_at DESC").all();
-      const mapped = [];
+      // Limit to 150 to prevent crash/timeout on large database
+      const tickets = db.prepare("SELECT * FROM tickets ORDER BY status ASC, created_at DESC LIMIT 150").all();
       const client = req.app.locals.discordClient;
 
-      for (const t of tickets) {
+      const mapped = await Promise.all(tickets.map(async (t) => {
         let name = t.opened_by_id || 'Khách vãng lai';
         let avatar = null;
 
@@ -563,22 +574,42 @@ export function registerAdminRoutes(app) {
           avatar = webUser.discord_avatar;
         } else if (t.customer_id && t.customer_id !== 'web_user' && client) {
           try {
-            const dUser = client.users.cache.get(t.customer_id) || await client.users.fetch(t.customer_id).catch(() => null);
-            if (dUser) {
-              name = dUser.username;
-              avatar = dUser.displayAvatarURL();
+            // Check memory cache first
+            const cachedEntry = discordUserCache.get(t.customer_id);
+            if (cachedEntry && (Date.now() - cachedEntry.ts < DISCORD_USER_CACHE_TTL)) {
+              name = cachedEntry.name;
+              avatar = cachedEntry.avatar;
+            } else {
+              const cached = client.users.cache.get(t.customer_id);
+              if (cached) {
+                name = cached.username;
+                avatar = cached.displayAvatarURL();
+                discordUserCache.set(t.customer_id, { name, avatar, ts: Date.now() });
+              } else {
+                // Fetch in parallel with 1.5s timeout to prevent hanging the API request
+                const dUser = await fetchWithTimeout(client.users.fetch(t.customer_id), 1500).catch(() => null);
+                if (dUser) {
+                  name = dUser.username;
+                  avatar = dUser.displayAvatarURL();
+                  discordUserCache.set(t.customer_id, { name, avatar, ts: Date.now() });
+                }
+              }
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error(`Error resolving Discord user ${t.customer_id}:`, e.message);
+          }
         }
 
-        mapped.push({
+        return {
           ...t,
           customer_name: name,
           customer_avatar: avatar
-        });
-      }
+        };
+      }));
+
       res.json({ ok: true, data: mapped });
     } catch (e) {
+      console.error('[ADMIN TICKETS GET ERROR]', e);
       res.status(500).json({ ok: false, error: e.message });
     }
   });
