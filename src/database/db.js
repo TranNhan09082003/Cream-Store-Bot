@@ -365,6 +365,17 @@ export function initDatabase() {
     );
     CREATE INDEX IF NOT EXISTS idx_shop_panels_guild ON shop_panels (guild_id);
     CREATE INDEX IF NOT EXISTS idx_shop_panels_message ON shop_panels (message_id);
+
+    CREATE TABLE IF NOT EXISTS account_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_type TEXT NOT NULL,
+      credentials TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'AVAILABLE',
+      order_code TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      sold_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_stock_service ON account_stock (service_type, status);
   `);
 
   ensureColumn('guild_settings', 'warranty_category_id', 'TEXT');

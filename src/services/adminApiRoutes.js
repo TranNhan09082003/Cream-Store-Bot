@@ -1,5 +1,8 @@
 import { db } from '../database/db.js';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import Database from 'better-sqlite3';
 import {
   sanitizeString, sanitizePositiveInt, sanitizePagination,
   isValidRole, isValidOrderStatus, isValidServiceType,
@@ -386,6 +389,279 @@ export function registerAdminRoutes(app) {
       });
     } catch (e) {
       return errorResponse(res, 500, e.message);
+    }
+  });
+
+  // ==== 7. GENERAL CONFIG SETTINGS ====
+  app.get('/api/bot/admin/settings', requireAdminRole, (req, res) => {
+    try {
+      const rows = db.prepare('SELECT * FROM system_settings').all();
+      const settings = {};
+      rows.forEach(r => {
+        settings[r.key] = r.value;
+      });
+      res.json({ ok: true, data: settings });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/settings', requireAdminRole, (req, res) => {
+    try {
+      const { settings } = req.body;
+      if (!settings || typeof settings !== 'object') {
+        return res.status(400).json({ ok: false, error: 'Thiếu cấu hình gửi lên' });
+      }
+
+      const insertStmt = db.prepare('INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)');
+      const transact = db.transaction((sets) => {
+        for (const [k, v] of Object.entries(sets)) {
+          insertStmt.run(k, String(v));
+        }
+      });
+      transact(settings);
+
+      res.json({ ok: true, message: 'Đã cập nhật cấu hình hệ thống thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 8. DATABASE BACKUP & OPTIMIZATION ====
+  app.get('/api/bot/admin/data/backup', requireAdminRole, (req, res) => {
+    try {
+      const projectRoot = path.resolve(path.dirname(db.name), '..');
+      const backupDir = path.resolve(projectRoot, 'backups');
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+      const filename = `backup_${Date.now()}.sqlite`;
+      const filePath = path.join(backupDir, filename);
+
+      db.backup(filePath)
+        .then(() => {
+          res.download(filePath, filename);
+        })
+        .catch((err) => {
+          res.status(500).json({ ok: false, error: err.message });
+        });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.get('/api/bot/admin/data/backups-list', requireAdminRole, (req, res) => {
+    try {
+      const projectRoot = path.resolve(path.dirname(db.name), '..');
+      const backupDir = path.resolve(projectRoot, 'backups');
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+      const files = fs.readdirSync(backupDir)
+        .filter(f => f.startsWith('backup_') && f.endsWith('.sqlite'))
+        .map(f => {
+          const stat = fs.statSync(path.join(backupDir, f));
+          return {
+            filename: f,
+            sizeBytes: stat.size,
+            createdAt: stat.mtime.toISOString()
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      res.json({ ok: true, data: files });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/data/restore', requireAdminRole, (req, res) => {
+    try {
+      if (req.adminRole !== 'admin') {
+        return res.status(403).json({ ok: false, error: 'Chỉ Admin mới có quyền phục hồi dữ liệu.' });
+      }
+      const { filename } = req.body;
+      if (!filename) return res.status(400).json({ ok: false, error: 'Thiếu tên file khôi phục' });
+
+      const projectRoot = path.resolve(path.dirname(db.name), '..');
+      const backupDir = path.resolve(projectRoot, 'backups');
+      const filePath = path.join(backupDir, filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ ok: false, error: 'Không tìm thấy file backup tương ứng' });
+      }
+
+      const srcDb = new Database(filePath);
+      srcDb.backup(db.name)
+        .then(() => {
+          srcDb.close();
+          res.json({ ok: true, message: 'Khôi phục dữ liệu thành công!' });
+        })
+        .catch(e => {
+          srcDb.close();
+          res.status(500).json({ ok: false, error: e.message });
+        });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/data/optimize', requireAdminRole, (req, res) => {
+    try {
+      db.exec('VACUUM');
+      db.exec('ANALYZE');
+      res.json({ ok: true, message: 'Tối ưu hóa dung lượng database (VACUUM/ANALYZE) thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/data/purge', requireAdminRole, (req, res) => {
+    try {
+      if (req.adminRole !== 'admin') {
+        return res.status(403).json({ ok: false, error: 'Chỉ Admin mới có quyền dọn dẹp log.' });
+      }
+      const { days = 90 } = req.body;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+      const resultLogs = db.prepare("DELETE FROM staff_logs WHERE created_at < ?").run(cutoffDate);
+      const resultTrans = db.prepare("DELETE FROM wallet_transactions WHERE created_at < ?").run(cutoffDate);
+      const resultEvents = db.prepare("DELETE FROM payment_events WHERE created_at < ?").run(cutoffDate);
+
+      res.json({
+        ok: true,
+        message: `Dọn dẹp hoàn tất. Đã xóa: ${resultLogs.changes} audit logs, ${resultTrans.changes} transactions, ${resultEvents.changes} payment events.`
+      });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 9. WALLET LEDGER TRANSACTION ====
+  app.get('/api/bot/admin/users/:id/transactions', requireAdminRole, (req, res) => {
+    try {
+      const targetUserId = sanitizeString(req.params.id, 100);
+      const transactions = db.prepare('SELECT * FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC').all(targetUserId);
+      res.json({ ok: true, data: transactions });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 10. TICKETS LIST (LIVE CHAT ADMIN) ====
+  app.get('/api/bot/admin/tickets', requireAdminRole, async (req, res) => {
+    try {
+      const tickets = db.prepare("SELECT * FROM tickets WHERE ticket_type = 'SUPPORT' ORDER BY status ASC, created_at DESC").all();
+      const mapped = [];
+      const client = req.app.locals.discordClient;
+
+      for (const t of tickets) {
+        let name = t.opened_by_id || 'Khách vãng lai';
+        let avatar = null;
+
+        const webUser = db.prepare('SELECT display_name, discord_avatar FROM web_users WHERE id = ? OR discord_id = ?').get(t.customer_id, t.customer_id);
+        if (webUser) {
+          name = webUser.display_name;
+          avatar = webUser.discord_avatar;
+        } else if (t.customer_id && t.customer_id !== 'web_user' && client) {
+          try {
+            const dUser = client.users.cache.get(t.customer_id) || await client.users.fetch(t.customer_id).catch(() => null);
+            if (dUser) {
+              name = dUser.username;
+              avatar = dUser.displayAvatarURL();
+            }
+          } catch (e) {}
+        }
+
+        mapped.push({
+          ...t,
+          customer_name: name,
+          customer_avatar: avatar
+        });
+      }
+      res.json({ ok: true, data: mapped });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 10.1 CLOSE TICKET ====
+  app.post('/api/bot/admin/tickets/:code/close', requireAdminRole, async (req, res) => {
+    try {
+      const code = String(req.params.code || '').toUpperCase();
+      const ticket = db.prepare('SELECT * FROM tickets WHERE ticket_code = ?').get(code);
+      if (!ticket) return res.status(404).json({ ok: false, error: 'Không tìm thấy ticket' });
+
+      // Cập nhật database
+      db.prepare("UPDATE tickets SET status = 'CLOSED', closed_at = CURRENT_TIMESTAMP, closed_by_id = ? WHERE ticket_code = ?")
+        .run(req.header('x-user-id'), code);
+
+      // Thử đóng kênh Discord nếu có
+      const client = req.app.locals.discordClient;
+      if (client && ticket.channel_id && ticket.channel_id !== 'web') {
+        const guild = await client.guilds.fetch(ticket.guild_id).catch(() => null);
+        if (guild) {
+          const channel = await guild.channels.fetch(ticket.channel_id).catch(() => null);
+          if (channel) {
+            await channel.send('**[Hệ thống]**: Ticket đã được đóng từ Web Admin Panel. Kênh chat Discord này sẽ bị xóa sau 5 giây.').catch(() => null);
+            setTimeout(async () => {
+              await channel.delete('Closed from Web Admin Panel').catch(() => null);
+            }, 5000);
+          }
+        }
+      }
+
+      res.json({ ok: true, message: 'Đã đóng ticket thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 11. STOCK INVENTORY CRUD ====
+  app.get('/api/bot/admin/stock', requireAdminRole, (req, res) => {
+    try {
+      const counts = db.prepare(`
+        SELECT service_type,
+               SUM(CASE WHEN status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available_count,
+               SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END) AS sold_count
+        FROM account_stock
+        GROUP BY service_type
+      `).all();
+
+      const stock = db.prepare('SELECT * FROM account_stock ORDER BY id DESC LIMIT 500').all();
+      res.json({ ok: true, data: { counts, stock } });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/stock', requireAdminRole, (req, res) => {
+    try {
+      const { serviceType, credentials } = req.body;
+      if (!serviceType || !credentials) {
+        return res.status(400).json({ ok: false, error: 'Thiếu thông tin nhập kho' });
+      }
+
+      const lines = credentials.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const insertStmt = db.prepare('INSERT INTO account_stock (service_type, credentials, status) VALUES (?, ?, "AVAILABLE")');
+
+      const transact = db.transaction((type, accounts) => {
+        for (const acc of accounts) {
+          insertStmt.run(type.toLowerCase(), acc);
+        }
+      });
+      transact(serviceType, lines);
+
+      res.json({ ok: true, message: `Đã nhập thành công ${lines.length} tài khoản vào kho ${serviceType}.` });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.delete('/api/bot/admin/stock/:id', requireAdminRole, (req, res) => {
+    try {
+      db.prepare('DELETE FROM account_stock WHERE id = ?').run(req.params.id);
+      res.json({ ok: true, message: 'Đã xóa tài khoản khỏi kho thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
     }
   });
 }

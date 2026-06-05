@@ -73,6 +73,25 @@ export function registerBotApiRoutes(app) {
         });
     });
 
+    // ── PUBLIC SETTINGS ──────────────────────────────────────────
+    app.get('/api/bot/settings', (req, res) => {
+        const result = safeQuery(() => {
+            const rows = db.prepare('SELECT * FROM system_settings').all();
+            const settings = {};
+            rows.forEach(r => {
+                if ([
+                  'shop_name', 'shop_description', 'hotline', 
+                  'discord_link', 'facebook_link', 'support_email', 
+                  'maintenance_mode'
+                ].includes(r.key)) {
+                    settings[r.key] = r.value;
+                }
+            });
+            return settings;
+        });
+        res.json(result);
+    });
+
     // ── STATS — số liệu tổng để hiển thị web admin ────────────
     app.get('/api/bot/stats', (req, res) => {
         const result = safeQuery(() => {
@@ -983,12 +1002,18 @@ export function registerBotApiRoutes(app) {
                 let authorAvatar = m.author ? m.author.displayAvatarURL() : null;
 
                 if (m.author?.bot) {
-                    if (content.startsWith('**[Khách từ Web]**:')) {
+                    if (content.startsWith('**[Khách từ Web]**:') || content.startsWith('**[Khách hàng từ Web]**:')) {
                         authorType = 'customer';
-                        content = content.replace('**[Khách từ Web]**:', '').trim();
-                    } else if (content.startsWith('**[Khách hàng từ Web]**:')) {
-                        authorType = 'customer';
-                        content = content.replace('**[Khách hàng từ Web]**:', '').trim();
+                        content = content.replace(/^\*\*\[Khách\s*(hàng\s*)?từ\s*Web\]\*\*:/i, '').trim();
+                    } else if (content.startsWith('**[Staff ') && content.includes('từ Web]**:')) {
+                        authorType = 'staff';
+                        const match = content.match(/^\*\*\[Staff\s+(.*?)\s+từ\s+Web\]\*\*:/i);
+                        authorName = match ? match[1] : 'Staff';
+                        content = content.replace(/^\*\*\[Staff\s+.*?\s+từ\s*Web\]\*\*:/i, '').trim();
+                    } else if (content.startsWith('**[Admin từ Web]**:')) {
+                        authorType = 'staff';
+                        authorName = 'Admin';
+                        content = content.replace('**[Admin từ Web]**:', '').trim();
                     } else {
                         authorType = 'system';
                     }
@@ -1097,7 +1122,15 @@ export function registerBotApiRoutes(app) {
             }
 
             if (channel && channel.isTextBased()) {
-                await channel.send({ content: `**[Khách từ Web]**: ${content}` });
+                const userId = req.header('x-user-id');
+                let prefix = '**[Khách từ Web]**';
+                if (userId) {
+                    const user = db.prepare('SELECT role, display_name FROM web_users WHERE id = ?').get(userId);
+                    if (user && (user.role === 'admin' || user.role === 'staff')) {
+                        prefix = `**[Staff ${user.display_name || 'Admin'} từ Web]**`;
+                    }
+                }
+                await channel.send({ content: `${prefix}: ${content}` });
                 return res.json({ ok: true });
             } else {
                 return res.status(503).json({ ok: false, error: 'Không thể kết nối với hỗ trợ Discord lúc này' });

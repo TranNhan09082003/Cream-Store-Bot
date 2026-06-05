@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { AttachmentBuilder, EmbedBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import QRCode from 'qrcode';
 import { assertPaymentConfig, config, getPayOSCancelUrl, getPayOSReturnUrl, getWebhookUrl } from '../config.js';
+import { db } from '../database/db.js';
 import {
   getLatestOrderByTicketChannel,
   getOrderByCode,
@@ -12,6 +13,8 @@ import {
   savePaymentLinkData,
   savePaymentMessage,
   setOrderStatus,
+  markOrderCompleted,
+  saveDelivery,
 } from './orderService.js';
 import { findOrderByIncomingPaymentCode, syncPaymentCodeIfPossible } from './paymentOrderMatcher.js';
 import { getTopupByPayOSCode, finalizeTopup } from './walletService.js';
@@ -431,21 +434,128 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
     transactionContent,
   });
 
-  const guild = await client.guilds.fetch(updated.guild_id).catch(() => null);
-  if (guild) {
-    await updateOrderLogMessage(guild, updated);
-    await sendPaymentConfirmedFlow({
-      guild,
-      order: updated,
-      amount: updated.amount_paid,
-      transactionContent,
-    });
-    await applyCustomerRoles(guild, updated.customer_id);
-    await emitStaffLog(client, { guildId: updated.guild_id, targetId: updated.customer_id, action: 'PAYMENT_CONFIRMED', detail: transactionContent, relatedOrderCode: updated.order_code });
+  // TỰ ĐỘNG GIAO HÀNG TỪ KHO (AUTO-DELIVERY)
+  let autoDelivered = false;
+  let finalOrder = updated;
+    // Làm sạch tên sản phẩm để so khớp kho hàng chính xác theo từng sản phẩm cụ thể
+    const cleanProductName = (updated.product_name || '')
+      .replace(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g, '') // Bỏ Discord custom emoji
+      .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '') // Bỏ emoji
+      .trim()
+      .toLowerCase();
+
+    const serviceType = updated.service_type || 'netflix';
+    
+    // Tìm kiếm trong kho: ưu tiên khớp chính xác tên sản phẩm, fallback khớp service_type
+    let stockItem = db.prepare("SELECT * FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ? ORDER BY id ASC LIMIT 1").get(cleanProductName);
+    if (!stockItem) {
+      stockItem = db.prepare("SELECT * FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ? ORDER BY id ASC LIMIT 1").get(serviceType.toLowerCase());
+    }
+
+    if (stockItem) {
+      const parts = stockItem.credentials.split('|').map(p => p.trim());
+      const email = parts[0] || '';
+      const password = parts[1] || '';
+      const profile = parts[2] || '';
+      const pin = parts[3] || '';
+
+      // Đánh dấu tài khoản đã bán
+      db.prepare("UPDATE account_stock SET status = 'SOLD', order_code = ?, sold_at = ? WHERE id = ?")
+        .run(updated.order_code, nowIso(), stockItem.id);
+
+      // Cập nhật thông tin giao hàng trong order và đổi trạng thái thành COMPLETED
+      markOrderCompleted(updated.order_code, 'SYSTEM_AUTO', config.feedbackTimeoutHours);
+
+      const customer = await client.users.fetch(updated.customer_id).catch(() => null);
+      let dmChannelId = null;
+      let dmMessageId = null;
+
+      if (customer) {
+        const dmChannel = await customer.createDM().catch(() => null);
+        if (dmChannel) {
+          dmChannelId = dmChannel.id;
+          // Gửi DM chứa tài khoản cho khách
+          const { buildDeliveryCredentialEmbeds, buildDeliveryLoginComponents } = await import('../utils/embeds.js');
+
+          // Lấy thông tin order đầy đủ sau khi saveDelivery
+          const tempOrder = saveDelivery(updated.order_code, 'SYSTEM_AUTO', email, password, profile, pin, config.defaultLoginUrl, config.defaultDeliveryTerms, dmChannelId, null);
+
+          const dmMessage = await dmChannel.send({ 
+            embeds: buildDeliveryCredentialEmbeds(tempOrder), 
+            components: buildDeliveryLoginComponents(tempOrder) 
+          }).catch(() => null);
+
+          if (dmMessage) {
+            dmMessageId = dmMessage.id;
+            saveDelivery(updated.order_code, 'SYSTEM_AUTO', email, password, profile, pin, config.defaultLoginUrl, config.defaultDeliveryTerms, dmChannelId, dmMessageId);
+          }
+        }
+      }
+
+      autoDelivered = true;
+      finalOrder = getOrderByCode(updated.order_code) || updated;
+    }
+  } catch (err) {
+    console.error('[AUTO-DELIVERY ERROR]', err);
   }
 
-  syncCustomerStats(updated.guild_id, updated.customer_id);
-  return { updated, duplicate: false };
+  const guild = await client.guilds.fetch(finalOrder.guild_id).catch(() => null);
+  if (guild) {
+    await updateOrderLogMessage(guild, finalOrder);
+    await sendPaymentConfirmedFlow({
+      guild,
+      order: finalOrder,
+      amount: finalOrder.amount_paid,
+      transactionContent,
+    });
+    await applyCustomerRoles(guild, finalOrder.customer_id);
+
+    if (autoDelivered) {
+      // Ghi log giao hàng tự động thành công
+      await emitStaffLog(client, { guildId: finalOrder.guild_id, targetId: finalOrder.customer_id, action: 'ORDER_DELIVERED', detail: 'Hệ thống tự động giao hàng từ kho', relatedOrderCode: finalOrder.order_code });
+      
+      // Gửi log thông báo trong ticket channel
+      const ticketChannel = await guild.channels.fetch(finalOrder.ticket_channel_id).catch(() => null);
+      if (ticketChannel?.isTextBased()) {
+        const { buildDeliveryLogText } = await import('../utils/embeds.js');
+        await ticketChannel.send(buildDeliveryLogText(finalOrder)).catch(() => null);
+      }
+    } else {
+      // Ghi log thanh toán thành công thông thường
+      await emitStaffLog(client, { guildId: finalOrder.guild_id, targetId: finalOrder.customer_id, action: 'PAYMENT_CONFIRMED', detail: transactionContent, relatedOrderCode: finalOrder.order_code });
+
+      // Nếu kho hết hàng, bắn cảnh báo vào kênh staff_log
+      try {
+        const cleanProductName = (finalOrder.product_name || '')
+          .replace(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g, '')
+          .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '')
+          .trim()
+          .toLowerCase();
+        const serviceType = finalOrder.service_type || 'netflix';
+        
+        let counts = db.prepare("SELECT COUNT(*) AS count FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ?").get(cleanProductName);
+        if (!counts || counts.count === 0) {
+          counts = db.prepare("SELECT COUNT(*) AS count FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ?").get(serviceType.toLowerCase());
+        }
+        
+        if (!counts || counts.count === 0) {
+          const { getGuildConfig } = await import('./guildConfigService.js');
+          const gCfg = getGuildConfig(finalOrder.guild_id);
+          if (gCfg?.staff_log_channel_id) {
+            const chan = await guild.channels.fetch(gCfg.staff_log_channel_id).catch(() => null);
+            if (chan?.isTextBased()) {
+              await chan.send(`⚠️ **CẢNH BÁO HẾT KHO:** Đơn hàng \`${finalOrder.order_code}\` (**${finalOrder.product_name}**) đã thanh toán thành công nhưng **KHO HÀNG ĐÃ HẾT**. Vui lòng giao hàng thủ công!`);
+            }
+          }
+        }
+      } catch (errStock) {
+        console.error('[STOCK WARNING ERROR]', errStock);
+      }
+    }
+  }
+
+  syncCustomerStats(finalOrder.guild_id, finalOrder.customer_id);
+  return { updated: finalOrder, duplicate: false };
 }
 
 export async function handlePayOSWebhook({ client, body }) {
