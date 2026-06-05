@@ -41,8 +41,8 @@ try:
     run_cmd("pm2 flush || true")
     run_cmd("fuser -k 2753/tcp || kill -9 $(lsof -t -i:2753) || true")
 
-    # 2. Pull code mới từ Github
-    run_cmd("cd /opt/cenar-store && git pull origin main")
+    # 2. Pull code mới từ Github (xóa thay đổi local trên VPS trước để tránh conflict)
+    run_cmd("cd /opt/cenar-store && git checkout . && git pull origin main")
     
     # 3. Cập nhật các dependency nếu cần
     run_cmd("cd /opt/cenar-store && npm install --omit=dev")
