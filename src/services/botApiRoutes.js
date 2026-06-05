@@ -195,11 +195,11 @@ export function registerBotApiRoutes(app) {
     });
 
     // ── FEEDBACKS — lấy review của customer hoặc all ────────
-    app.get('/api/bot/feedbacks', (req, res) => {
-        const { customer_id, limit = 20, min_stars } = req.query;
-        const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    app.get('/api/bot/feedbacks', async (req, res) => {
+        try {
+            const { customer_id, limit = 20, min_stars } = req.query;
+            const lim = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
 
-        const result = safeQuery(() => {
             let sql = `
                 SELECT id, guild_id, order_code, customer_id, stars, content, created_at
                 FROM feedbacks WHERE 1=1
@@ -209,10 +209,146 @@ export function registerBotApiRoutes(app) {
             if (min_stars) { sql += ` AND stars >= @min_stars`; params.min_stars = parseInt(min_stars, 10) || 1; }
             sql += ` ORDER BY created_at DESC LIMIT @lim`;
             params.lim = lim;
-            return db.prepare(sql).all(params);
-        });
-        res.json(result);
+            
+            const feedbacks = db.prepare(sql).all(params);
+
+            const client = req.app.locals.discordClient;
+            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            let guild = null;
+            if (client) {
+                guild = await client.guilds.fetch(guildId).catch(() => null);
+            }
+
+            const richFeedbacks = await Promise.all(feedbacks.map(async (fb) => {
+                let displayName = `Khách #${fb.customer_id.slice(-4)}`;
+                let avatar = null;
+
+                if (client) {
+                    try {
+                        if (guild) {
+                            const member = await guild.members.fetch(fb.customer_id).catch(() => null);
+                            if (member) {
+                                displayName = member.displayName || member.user.username;
+                                avatar = member.user.displayAvatarURL({ size: 128 });
+                            } else {
+                                const user = await client.users.fetch(fb.customer_id).catch(() => null);
+                                if (user) {
+                                    displayName = user.username;
+                                    avatar = user.displayAvatarURL({ size: 128 });
+                                }
+                            }
+                        } else {
+                            const user = await client.users.fetch(fb.customer_id).catch(() => null);
+                            if (user) {
+                                displayName = user.username;
+                                avatar = user.displayAvatarURL({ size: 128 });
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error fetching user for feedback ${fb.customer_id}:`, e);
+                    }
+                }
+
+                return {
+                    id: fb.id,
+                    guild_id: fb.guild_id,
+                    order_code: fb.order_code,
+                    customer_id: fb.customer_id,
+                    stars: fb.stars,
+                    content: fb.content,
+                    created_at: fb.created_at,
+                    customer_name: displayName,
+                    customer_avatar: avatar
+                };
+            }));
+
+            res.json({ ok: true, data: richFeedbacks });
+        } catch (error) {
+            console.error('[BOT_API] Feedbacks error:', error);
+            res.status(500).json({ ok: false, error: error.message });
+        }
     });
+
+    // ── LEADERBOARD — Bảng xếp hạng tuần/tháng ──────────────────
+    app.get('/api/bot/leaderboard', async (req, res) => {
+        try {
+            const period = req.query.period || 'weekly'; // weekly or monthly
+            const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+            
+            let timeFilter = "datetime('now', '-7 days')";
+            if (period === 'monthly') {
+                timeFilter = "datetime('now', '-30 days')";
+            }
+
+            const sql = `
+                SELECT customer_id,
+                       COUNT(*) as orders,
+                       COALESCE(SUM(amount_paid), 0) as total_spent,
+                       MAX(created_at) as last_order_at
+                FROM orders
+                WHERE payment_status = 'PAID'
+                  AND status != 'CANCELLED'
+                  AND created_at >= ${timeFilter}
+                GROUP BY customer_id
+                ORDER BY total_spent DESC
+                LIMIT ?
+            `;
+            const rows = db.prepare(sql).all(limit);
+
+            const client = req.app.locals.discordClient;
+            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            let guild = null;
+            if (client) {
+                guild = await client.guilds.fetch(guildId).catch(() => null);
+            }
+
+            const richRows = await Promise.all(rows.map(async (row) => {
+                let displayName = `Khách #${row.customer_id.slice(-4)}`;
+                let avatar = null;
+
+                if (client) {
+                    try {
+                        if (guild) {
+                            const member = await guild.members.fetch(row.customer_id).catch(() => null);
+                            if (member) {
+                                displayName = member.displayName || member.user.username;
+                                avatar = member.user.displayAvatarURL({ size: 128 });
+                            } else {
+                                const user = await client.users.fetch(row.customer_id).catch(() => null);
+                                if (user) {
+                                    displayName = user.username;
+                                    avatar = user.displayAvatarURL({ size: 128 });
+                                }
+                            }
+                        } else {
+                            const user = await client.users.fetch(row.customer_id).catch(() => null);
+                            if (user) {
+                                displayName = user.username;
+                                avatar = user.displayAvatarURL({ size: 128 });
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error fetching user ${row.customer_id}:`, e);
+                    }
+                }
+
+                return {
+                    customer_id: row.customer_id,
+                    orders: row.orders,
+                    total_spent: row.total_spent,
+                    last_order_at: row.last_order_at,
+                    customer_name: displayName,
+                    customer_avatar: avatar
+                };
+            }));
+
+            res.json({ ok: true, data: richRows });
+        } catch (error) {
+            console.error('[BOT_API] Leaderboard error:', error);
+            res.status(500).json({ ok: false, error: error.message });
+        }
+    });
+
 
     // ── PRODUCTS — bảng giá sản phẩm bot bán ───────────────
     app.get('/api/bot/products', (req, res) => {
