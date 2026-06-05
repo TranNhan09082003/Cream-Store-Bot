@@ -864,7 +864,7 @@ export function registerBotApiRoutes(app) {
             const { contact, discord_id } = req.body;
             if (!contact) return res.status(400).json({ ok: false, error: 'Thiếu thông tin liên hệ (tên/SĐT)' });
 
-            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = process.env.GUILD_ID || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
             const customerId = discord_id || 'web_user';
             
             let channelId = `live-${contact.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'guest'}-${Math.random().toString().slice(2, 6)}`;
@@ -1036,7 +1036,7 @@ export function registerBotApiRoutes(app) {
                     content,
                     timestamp: m.createdAt.toISOString()
                 };
-            }).reverse().filter(msg => msg.content || msg.authorType === 'system');
+            }).reverse().filter(msg => msg.content && msg.content.trim());
 
             res.json({ ok: true, messages: formatted, status: ticketStatus });
         } catch (e) {

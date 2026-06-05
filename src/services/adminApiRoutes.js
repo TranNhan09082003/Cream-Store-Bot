@@ -549,7 +549,7 @@ export function registerAdminRoutes(app) {
   // ==== 10. TICKETS LIST (LIVE CHAT ADMIN) ====
   app.get('/api/bot/admin/tickets', requireAdminRole, async (req, res) => {
     try {
-      const tickets = db.prepare("SELECT * FROM tickets WHERE ticket_type = 'SUPPORT' ORDER BY status ASC, created_at DESC").all();
+      const tickets = db.prepare("SELECT * FROM tickets ORDER BY status ASC, created_at DESC").all();
       const mapped = [];
       const client = req.app.locals.discordClient;
 
