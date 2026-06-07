@@ -530,11 +530,11 @@ async function handleTicketClose(interaction, ticketId) {
 
     // Khóa tất cả, chỉ để bot + manager chat được
     const newOverwrites = [
-      { id: everyone.id, deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] },
+      { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] },
       { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
     ];
     if (ticket.customer_id) {
-      newOverwrites.push({ id: ticket.customer_id, deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] });
+      newOverwrites.push({ id: ticket.customer_id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] });
     }
     if (guildConfig?.manager_role_id) {
       newOverwrites.push({ id: guildConfig.manager_role_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
