@@ -466,6 +466,15 @@ export function initDatabase() {
   // Custom emoji slots cho từng guild
   ensureColumn('guild_settings', 'custom_emojis', 'TEXT');
 
+  ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
+
+  // Seed product catalog data
+  try {
+    seedProductCatalog(db);
+  } catch (err) {
+    console.error('❌ Failed to seed products:', err.message);
+  }
+
   // ═══════════════════════════════════════════════
   // Phase 8: VIP Tiers (DB-driven)
   // ═══════════════════════════════════════════════
@@ -580,4 +589,105 @@ export function nowIso() {
 
 export function getDatabasePath() {
   return resolvedDatabasePath;
+}
+
+export function seedProductCatalog(dbInstance) {
+  const products = [
+    // Discord Nitro Boost Log
+    { name: 'Discord Nitro Boost 1 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 2 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 110000, duration_months: 2, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 4 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 280000, duration_months: 4, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 6 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 380000, duration_months: 6, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 8 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 480000, duration_months: 8, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 12 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 680000, duration_months: 12, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 1 Năm (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 880000, duration_months: 12, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Gia hạn Discord Nitro Boost 2 Tháng', description: 'Dành cho khách hàng cũ đã từng mua Nitro 2 tháng tại shop. (Gia hạn chỉ 95k). Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 99000, duration_months: 2, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    // Discord Nitro Boost Trail
+    { name: 'Discord Nitro Boost 3 Tháng (Trail)', description: 'Dành cho tài khoản chưa từng sử dụng Nitro và đã tạo trên 1 tháng. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 50000, duration_months: 3, service_type: 'GAME', emoji: '⚡', original_price: 0 },
+
+    // Bót Server
+    { name: 'Discord Server Boost Level 2 (1 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 1 tháng. Giao hàng nhanh chóng.', price: 75000, duration_months: 1, service_type: 'GAME', emoji: '🔮', original_price: 0 },
+    { name: 'Discord Server Boost Level 3 (1 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 1 tháng. Giao hàng nhanh chóng.', price: 150000, duration_months: 1, service_type: 'GAME', emoji: '🔮', original_price: 0 },
+    { name: 'Discord Server Boost Level 2 (3 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 3 tháng. Giao hàng nhanh chóng.', price: 185000, duration_months: 3, service_type: 'GAME', emoji: '🔮', original_price: 0 },
+    { name: 'Discord Server Boost Level 3 (3 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 3 tháng. Giao hàng nhanh chóng.', price: 380000, duration_months: 3, service_type: 'GAME', emoji: '🔮', original_price: 0 },
+
+    // Decor Trang Trí - Có Nitro
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 25k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 25000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 66000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 72000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 50k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 50000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 92000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 105000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 70k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 70000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 111000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 79k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 79000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 131000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 88k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 88000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 141000 },
+
+    // Decor Trang Trí - Không Nitro
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 79000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 105000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 80k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 80000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 131000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 90k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 141000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 95k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 95000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 146000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 110k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 189000 },
+
+    // Decor Trang Trí - Dạng Gift
+    { name: 'Decor Discord Dạng Gift - Gói 50k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 50000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 66000 },
+    { name: 'Decor Discord Dạng Gift - Gói 58k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 58000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 79000 },
+    { name: 'Decor Discord Dạng Gift - Gói 70k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 70000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 92000 },
+    { name: 'Decor Discord Dạng Gift - Gói 85k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 85000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 105000 },
+    { name: 'Decor Discord Dạng Gift - Gói 95k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 95000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 131000 },
+    { name: 'Decor Discord Dạng Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 141000 },
+    { name: 'Decor Discord Combo Gift - Gói 90k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 118000 },
+    { name: 'Decor Discord Combo Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 146000 },
+    { name: 'Decor Discord Combo Gift - Gói 150k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 150000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 189000 },
+    { name: 'Decor Discord Combo Gift - Gói 180k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 180000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 220000 },
+
+    // AI & Phần Mềm
+    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Full BH)', description: 'Đăng ký sử dụng gói cước 1 năm, hỗ trợ bảo hành toàn diện từ shop.', price: 200000, duration_months: 12, service_type: 'AI', emoji: '✨', original_price: 350000 },
+    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Không BH)', description: 'Đăng ký sử dụng gói cước 1 năm, không đi kèm chính sách bảo hành.', price: 120000, duration_months: 12, service_type: 'AI', emoji: '✨', original_price: 0 },
+    { name: 'Claude Pro Add Team 1 Tháng (Full BH)', description: 'Thêm vào Team Claude Pro trong 1 tháng. Bảo hành trọn gói.', price: 390000, duration_months: 1, service_type: 'AI', emoji: '🎨', original_price: 490000 },
+    { name: 'ChatGPT Plus 1 Tháng (Cấp Tài Khoản)', description: 'Nhận tài khoản ChatGPT Plus đã kích hoạt sẵn trong 1 tháng.', price: 280000, duration_months: 1, service_type: 'AI', emoji: '🤖', original_price: 350000 },
+    { name: 'ChatGPT Plus 1 Tháng (Chính Chủ - Full BH)', description: 'Nâng cấp chính chủ tài khoản ChatGPT của bạn trong 1 tháng.', price: 390000, duration_months: 1, service_type: 'AI', emoji: '🤖', original_price: 490000 },
+    { name: 'Adobe Creative Cloud All Apps (1 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 1 tháng.', price: 80000, duration_months: 1, service_type: 'DESIGN', emoji: '🎨', original_price: 120000 },
+    { name: 'Adobe Creative Cloud All Apps (2 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 2 tháng.', price: 180000, duration_months: 2, service_type: 'DESIGN', emoji: '🎨', original_price: 240000 },
+    { name: 'Office 365 & 1 TB OneDrive (12 Tháng)', description: 'Tài khoản bản quyền Office 365 + 1 TB lưu trữ OneDrive trong 1 năm.', price: 200000, duration_months: 12, service_type: 'OTHER', emoji: '📈', original_price: 300000 },
+    { name: 'CapCut Pro 1 Tháng (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 1 tháng, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 100000, duration_months: 1, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
+    { name: 'CapCut Pro 7 Ngày (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 7 ngày, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 20000, duration_months: 1, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
+    { name: 'CapCut Pro 12 Tháng (3 Thiết Bị - Chính Chủ)', description: 'Nâng cấp chính chủ tài khoản CapCut Pro của bạn trong 12 tháng, dùng cho 3 thiết bị.', price: 1250000, duration_months: 12, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
+
+    // YouTube Premium
+    { name: 'YouTube Premium 3 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 3 tháng liên tục không bị ngắt quãng.', price: 180000, duration_months: 3, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
+    { name: 'YouTube Premium 6 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 6 tháng liên tục không bị ngắt quãng.', price: 290000, duration_months: 6, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
+    { name: 'YouTube Premium 12 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 12 tháng liên tục không bị ngắt quãng.', price: 520000, duration_months: 12, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
+    { name: 'YouTube Premium 3 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 90000, duration_months: 3, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
+    { name: 'YouTube Premium 6 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 180000, duration_months: 6, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
+    { name: 'YouTube Premium 12 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 250000, duration_months: 12, service_type: 'STREAMING', emoji: '▶️', original_price: 0 }
+  ];
+
+  const insertStmt = dbInstance.prepare(`
+    INSERT INTO product_catalog (guild_id, name, description, price, duration_months, service_type, emoji, is_active, sort_order, original_price)
+    VALUES ('WEB', ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `);
+
+  const updateStmt = dbInstance.prepare(`
+    UPDATE product_catalog
+    SET description = ?, price = ?, service_type = ?, emoji = ?, original_price = ?
+    WHERE name = ? AND duration_months = ? AND guild_id = 'WEB'
+  `);
+
+  const existsStmt = dbInstance.prepare(`
+    SELECT id FROM product_catalog WHERE name = ? AND duration_months = ? AND guild_id = 'WEB'
+  `);
+
+  let currentSort = 100;
+  
+  dbInstance.transaction(() => {
+    for (const p of products) {
+      const existing = existsStmt.get(p.name, p.duration_months);
+      if (existing) {
+        updateStmt.run(p.description, p.price, p.service_type, p.emoji, p.original_price, p.name, p.duration_months);
+      } else {
+        insertStmt.run(p.name, p.description, p.price, p.duration_months, p.service_type, p.emoji, currentSort++, p.original_price);
+      }
+    }
+  })();
+  console.log('🌱 Successfully seeded/updated ' + products.length + ' products in catalog!');
 }
