@@ -747,8 +747,13 @@ export function registerBotApiRoutes(app) {
                         authorType = 'system';
                     }
                 } else {
-                    authorType = 'staff';
-                    authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                    if (m.author?.id === order.customer_id) {
+                        authorType = 'customer';
+                        authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Khách hàng';
+                    } else {
+                        authorType = 'staff';
+                        authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                    }
                 }
 
                 if (!content && m.embeds && m.embeds.length > 0) {
@@ -1018,8 +1023,13 @@ export function registerBotApiRoutes(app) {
                         authorType = 'system';
                     }
                 } else {
-                    authorType = 'staff';
-                    authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                    if (m.author?.id === ticket.customer_id) {
+                        authorType = 'customer';
+                        authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Khách hàng';
+                    } else {
+                        authorType = 'staff';
+                        authorName = m.member?.displayName || m.author?.displayName || m.author?.username || 'Staff';
+                    }
                 }
 
                 if (!content && m.embeds && m.embeds.length > 0) {
