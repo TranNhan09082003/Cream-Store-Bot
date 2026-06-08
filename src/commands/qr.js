@@ -29,6 +29,9 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  // Defer first to avoid Unknown Interaction error (10062)
+  await interaction.deferReply({ flags: 64 });
+
   const manual = interaction.options.getBoolean('xac_nhan_tay') ?? false;
   const forceSync = interaction.options.getBoolean('dong_bo_payos') ?? false;
   const provider = interaction.options.getString('provider') ?? 'payos';
@@ -37,28 +40,27 @@ export async function execute(interaction) {
   const orderCode = rawCode?.trim().toUpperCase() || fallbackOrder?.order_code;
 
   if (!orderCode) {
-    await interaction.reply({ content: '⚠️ Không xác định được mã đơn trong kênh này.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Không xác định được mã đơn trong kênh này.' });
     return;
   }
 
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await interaction.reply({ content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await interaction.editReply({ content: '⚠️ Không tìm thấy đơn hàng.' });
     return;
   }
 
   // ═══ Xác nhận tay ═══
   if (manual) {
     if (order.payment_status === 'PAID') {
-      await interaction.reply({ content: 'ℹ️ Đơn này đã thanh toán rồi.', ephemeral: true });
+      await interaction.editReply({ content: 'ℹ️ Đơn này đã thanh toán rồi.' });
       return;
     }
 
     const amount = parseMoneyInput(interaction.options.getString('so_tien')) ?? order.total_amount;
     const updated = await confirmOrderPaidManually(interaction.guild, orderCode, amount);
-    await interaction.reply({
+    await interaction.editReply({
       content: `✅ Đã xác nhận tay thanh toán cho đơn \`${updated.order_code}\`.`,
-      ephemeral: true,
     });
     return;
   }
@@ -66,22 +68,19 @@ export async function execute(interaction) {
   // ═══ Đồng bộ PayOS ═══
   if (forceSync) {
     const result = await syncPaymentStatusFromPayOS({ client: interaction.client, orderCode });
-    await interaction.reply({
+    await interaction.editReply({
       content: result.synced
         ? `✅ Bot đã đồng bộ PayOS và cập nhật đơn \`${result.order.order_code}\` sang trạng thái ${result.state}.`
         : `ℹ️ PayOS hiện trả về trạng thái \`${result.state || 'UNKNOWN'}\` cho đơn \`${result.order.order_code}\`.` ,
-      ephemeral: true,
     });
     return;
   }
 
   // ═══ Gửi QR ═══
   if (order.payment_status === 'PAID') {
-    await interaction.reply({ content: 'ℹ️ Đơn này đã thanh toán rồi, không cần gửi lại QR.', ephemeral: true });
+    await interaction.editReply({ content: 'ℹ️ Đơn này đã thanh toán rồi, không cần gửi lại QR.' });
     return;
   }
-
-  await interaction.deferReply({ flags: 64 });
 
   try {
     if (provider === 'vietqr') {

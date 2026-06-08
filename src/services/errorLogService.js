@@ -78,6 +78,13 @@ export async function sendErrorLog(type, error, interaction = null) {
   // Always write JSON log locally
   writeJsonLog(type, error, interaction);
 
+  // Ignore Unknown Interaction errors (code 10062) from being sent to Discord channels
+  const errMessage = error?.message || String(error);
+  if (errMessage.includes('Unknown interaction') || error?.code === 10062 || error?.code === '10062') {
+    console.warn(`[ERROR LOGGER] Unknown Interaction error (10062) ignored for Discord log channel.`);
+    return;
+  }
+
   if (!botClient) return;
 
   try {
