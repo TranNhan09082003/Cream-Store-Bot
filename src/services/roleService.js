@@ -4,11 +4,11 @@ import { getCustomerProfile } from './customerService.js';
 import { getCustomerFlag } from './blacklistService.js';
 
 const VIP_TIERS = [
-  { id: '1282637775291551776', name: '👑 Super Khách Hàng (8 Triệu)', minSpent: 8000000 },
-  { id: '1282637814571466808', name: '💎 VIP Khách Hàng (5 Triệu)', minSpent: 5000000 },
-  { id: '1282637470139420694', name: '🌟 Khách Hàng Thân Thiết (3 Triệu)', minSpent: 3000000 },
-  { id: '1282637168149532724', name: '⭐ Khách Hàng (1 Triệu)', minSpent: 1000000 },
-  { id: '1282637103045279820', name: '🌱 New Customer (Khách Mới)', minSpent: 0, requireOrder: true } 
+  { id: '1282637775291551776', name: '🔮 ｜ Ruby Client (8M)', minSpent: 8000000 },
+  { id: '1282637814571466808', name: '💎 ｜ Diamond Client (5M)', minSpent: 5000000 },
+  { id: '1282637470139420694', name: '✨ ｜ Elite VIP (3M)', minSpent: 3000000 },
+  { id: '1282637168149532724', name: '🌟 ｜ VIP Client (1M)', minSpent: 1000000 },
+  { id: '1282637103045279820', name: '🛒 ｜ Active Customer', minSpent: 0, requireOrder: true } 
 ];
 
 export async function applyCustomerRoles(guild, customerId) {
