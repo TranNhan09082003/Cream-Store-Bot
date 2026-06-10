@@ -73,6 +73,7 @@ const WARRANTY_REASON_INPUT_ID = 'warranty_reason';
 
 const announcementCache = new Map();
 const ANNOUNCEMENT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
+const activeTicketCreations = new Set();
 
 function announcementCacheSet(key, value) {
   announcementCache.set(key, value);
@@ -237,84 +238,104 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   }
 
   const normalizedType = String(ticketType || 'ORDER').toUpperCase();
-  ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_${normalizedType}`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ ${config.ticketOpenCooldownSeconds} giây rồi thử lại.` });
-  const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
-  if (existingTicket) {
-    // Kiểm tra channel còn tồn tại không
-    const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
-    if (existingChannel) {
-      await safeReply(interaction, {
-        content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
-        ephemeral: true,
-      });
-      return;
+
+  // Khóa chống click đúp tạo 2 ticket
+  const lockKey = `${interaction.guildId}:${interaction.user.id}:${normalizedType}`;
+  if (activeTicketCreations.has(lockKey)) {
+    await safeReply(interaction, { content: '⚠️ Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.', ephemeral: true });
+    return;
+  }
+  activeTicketCreations.add(lockKey);
+
+  try {
+    ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_${normalizedType}`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ ${config.ticketOpenCooldownSeconds} giây rồi thử lại.` });
+    const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
+    if (existingTicket) {
+      // Kiểm tra channel còn tồn tại không
+      const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
+      if (existingChannel) {
+        await safeReply(interaction, {
+          content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
+          ephemeral: true,
+        });
+        return;
+      }
+      // Channel bị xóa thủ công → tự đóng ticket trong DB
+      closeTicket(existingTicket.id, interaction.client.user.id);
     }
-    // Channel bị xóa thủ công → tự đóng ticket trong DB
-    closeTicket(existingTicket.id, interaction.client.user.id);
+
+    const overwrites = [
+      { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+      { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
+      {
+        id: interaction.client.user.id,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels],
+      },
+    ];
+
+    if (guildConfig.support_role_id) {
+      overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+    }
+
+    const categoryId = getTicketCategoryId(guildConfig, normalizedType);
+    const channel = await interaction.guild.channels.create({
+      name: `ticket-${Math.random().toString().slice(2, 8)}`,
+      type: ChannelType.GuildText,
+      parent: categoryId,
+      permissionOverwrites: overwrites,
+    });
+
+    const ticket = createTicket({
+      guildId: interaction.guildId,
+      channelId: channel.id,
+      customerId: interaction.user.id,
+      openedById: interaction.user.id,
+      ticketType: normalizedType,
+    });
+
+    const hub = getCenarHub();
+    if (hub) {
+      hub.upsertUser({
+        discord_id: interaction.user.id,
+        discord_username: interaction.user.username,
+        display_name: interaction.member?.displayName,
+      }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+    }
+
+    await channel.setName(buildTicketChannelName(ticket.ticket_code)).catch(() => null);
+    const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+      ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
+    );
+    await channel.send({
+      components: [welcomeV2, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
+      flags: welcomeV2Flags,
+    });
+    // Ping user separately (no content allowed with V2)
+    await channel.send({ content: `<@${interaction.user.id}> — Ticket của bạn đã được tạo!` }).catch(() => null);
+
+    await emitStaffLog(interaction.client, {
+      guildId: interaction.guildId,
+      actorId: interaction.user.id,
+      targetId: interaction.user.id,
+      action: 'TICKET_CREATE',
+      detail: `Loại ticket: ${normalizedType}`,
+      relatedTicketCode: ticket.ticket_code,
+    });
+
+    await safeReply(interaction, {
+      content: `✅ Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
+      ephemeral: true,
+    });
+  } catch (error) {
+    if (error.code === 'RATE_LIMITED') {
+      await safeReply(interaction, { content: `⚠️ ${error.message}`, ephemeral: true });
+    } else {
+      console.error('[TICKET_CREATE] Lỗi:', error);
+      await safeReply(interaction, { content: `❌ Đã có lỗi xảy ra khi tạo ticket.`, ephemeral: true });
+    }
+  } finally {
+    activeTicketCreations.delete(lockKey);
   }
-
-  const overwrites = [
-    { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
-    {
-      id: interaction.client.user.id,
-      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels],
-    },
-  ];
-
-  if (guildConfig.support_role_id) {
-    overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
-  }
-
-  const categoryId = getTicketCategoryId(guildConfig, normalizedType);
-  const channel = await interaction.guild.channels.create({
-    name: `ticket-${Math.random().toString().slice(2, 8)}`,
-    type: ChannelType.GuildText,
-    parent: categoryId,
-    permissionOverwrites: overwrites,
-  });
-
-  const ticket = createTicket({
-    guildId: interaction.guildId,
-    channelId: channel.id,
-    customerId: interaction.user.id,
-    openedById: interaction.user.id,
-    ticketType: normalizedType,
-  });
-
-  const hub = getCenarHub();
-  if (hub) {
-    hub.upsertUser({
-      discord_id: interaction.user.id,
-      discord_username: interaction.user.username,
-      display_name: interaction.member?.displayName,
-    }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
-  }
-
-  await channel.setName(buildTicketChannelName(ticket.ticket_code)).catch(() => null);
-  const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
-    ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
-  );
-  await channel.send({
-    components: [welcomeV2, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
-    flags: welcomeV2Flags,
-  });
-  // Ping user separately (no content allowed with V2)
-  await channel.send({ content: `<@${interaction.user.id}> — Ticket của bạn đã được tạo!` }).catch(() => null);
-
-  await emitStaffLog(interaction.client, {
-    guildId: interaction.guildId,
-    actorId: interaction.user.id,
-    targetId: interaction.user.id,
-    action: 'TICKET_CREATE',
-    detail: `Loại ticket: ${normalizedType}`,
-    relatedTicketCode: ticket.ticket_code,
-  });
-
-  await safeReply(interaction, {
-    content: `✅ Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
-    ephemeral: true,
-  });
 }
 
 
@@ -390,98 +411,129 @@ async function handleProductPurchaseFlow(interaction, productId) {
   }
 
   const normalizedType = 'ORDER';
-  ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_ORDER`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ.` });
-  
-  const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
-  if (existingTicket) {
-    // Kiểm tra channel còn tồn tại không
-    const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
-    if (existingChannel) {
-      await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
-      return;
-    }
-    // Channel bị xóa thủ công → tự đóng ticket trong DB
-    closeTicket(existingTicket.id, interaction.client.user.id);
+
+  // Khóa chống click đúp tạo 2 ticket
+  const lockKey = `${interaction.guildId}:${interaction.user.id}:${normalizedType}`;
+  if (activeTicketCreations.has(lockKey)) {
+    await interaction.editReply('⚠️ Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.');
+    return;
   }
+  activeTicketCreations.add(lockKey);
 
-  import('discord.js').then(async ({ PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle }) => {
-    const overwrites = [
-      { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
-      { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] },
-    ];
-    if (guildConfig.support_role_id) overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
-
-    const categoryId = getTicketCategoryId(guildConfig, normalizedType);
-    const channel = await interaction.guild.channels.create({
-      name: `tmp-${Math.random().toString().slice(2, 8)}`,
-      type: ChannelType.GuildText,
-      parent: categoryId,
-      permissionOverwrites: overwrites,
-    });
-
-    const ticket = createTicket({
-      guildId: interaction.guildId,
-      channelId: channel.id,
-      customerId: interaction.user.id,
-      openedById: interaction.user.id,
-      ticketType: normalizedType,
-    });
-
-    const hub = getCenarHub();
-    if (hub) {
-      hub.upsertUser({
-        discord_id: interaction.user.id,
-        discord_username: interaction.user.username,
-        display_name: interaction.member?.displayName,
-      }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+  try {
+    ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `OPEN_TICKET_ORDER`, limit: 1, windowSeconds: config.ticketOpenCooldownSeconds, message: `Bạn vừa mở ticket rồi. Vui lòng chờ.` });
+    
+    const existingTicket = getOpenTicketByCustomer(interaction.guildId, interaction.user.id, normalizedType);
+    if (existingTicket) {
+      // Kiểm tra channel còn tồn tại không
+      const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
+      if (existingChannel) {
+        await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
+        activeTicketCreations.delete(lockKey);
+        return;
+      }
+      // Channel bị xóa thủ công → tự đóng ticket trong DB
+      closeTicket(existingTicket.id, interaction.client.user.id);
     }
 
-    const prefix = product.service_type.toLowerCase();
-    await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
+    import('discord.js').then(async ({ PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle }) => {
+      try {
+        const overwrites = [
+          { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
+          { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] },
+        ];
+        if (guildConfig.support_role_id) overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
 
-    const price = product.price * quantity;
-    const order = createOrder({
-      guildId: interaction.guildId,
-      ticketId: ticket.id,
-      ticketChannelId: channel.id,
-      customerId: interaction.user.id,
-      productName: product.name,
-      quantity,
-      totalAmount: price,
-      durationMonths: product.duration_months,
-      orderLogChannelId: guildConfig.order_log_channel_id ?? null,
-      createdById: interaction.client.user.id,
-    });
-
-    // Gửi welcome ticket V2 (không dùng content với IsComponentsV2)
-    const { container: welcomeContainer, flags: welcomeFlags } = buildTicketWelcomeV2(
-      ticket.ticket_code,
-      interaction.user.id,
-      normalizedType,
-      order.order_code,
-      product.name,
-      interaction.guildId
-    );
-    await channel.send({
-      components: [welcomeContainer, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
-      flags: welcomeFlags,
-    });
-    // Ping riêng (content không được dùng với V2 flag)
-    await channel.send({ content: `<@${interaction.user.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
-
-    // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
-    if (price > 0) {
-      import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr }) => {
-        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
-          console.error('[ORDER] Lỗi tạo QR PayOS:', err);
-          channel.send(`⚠️ Lỗi tạo mã QR thanh toán: ${err.message}`);
+        const categoryId = getTicketCategoryId(guildConfig, normalizedType);
+        const channel = await interaction.guild.channels.create({
+          name: `tmp-${Math.random().toString().slice(2, 8)}`,
+          type: ChannelType.GuildText,
+          parent: categoryId,
+          permissionOverwrites: overwrites,
         });
-      });
-    }
 
-    await interaction.editReply(`✅ Đã tạo đơn hàng tại <#${channel.id}>`);
-  });
+        const ticket = createTicket({
+          guildId: interaction.guildId,
+          channelId: channel.id,
+          customerId: interaction.user.id,
+          openedById: interaction.user.id,
+          ticketType: normalizedType,
+        });
+
+        const hub = getCenarHub();
+        if (hub) {
+          hub.upsertUser({
+            discord_id: interaction.user.id,
+            discord_username: interaction.user.username,
+            display_name: interaction.member?.displayName,
+          }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+        }
+
+        const prefix = product.service_type.toLowerCase();
+        await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
+
+        const price = product.price * quantity;
+        const order = createOrder({
+          guildId: interaction.guildId,
+          ticketId: ticket.id,
+          ticketChannelId: channel.id,
+          customerId: interaction.user.id,
+          productName: product.name,
+          quantity,
+          totalAmount: price,
+          durationMonths: product.duration_months,
+          orderLogChannelId: guildConfig.order_log_channel_id ?? null,
+          createdById: interaction.client.user.id,
+        });
+
+        // Gửi welcome ticket V2 (không dùng content với IsComponentsV2)
+        const { container: welcomeContainer, flags: welcomeFlags } = buildTicketWelcomeV2(
+          ticket.ticket_code,
+          interaction.user.id,
+          normalizedType,
+          order.order_code,
+          product.name,
+          interaction.guildId
+        );
+        await channel.send({
+          components: [welcomeContainer, ...buildTicketControlComponents(ticket.id, interaction.user.id)],
+          flags: welcomeFlags,
+        });
+        // Ping riêng (content không được dùng với V2 flag)
+        await channel.send({ content: `<@${interaction.user.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
+
+        // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
+        if (price > 0) {
+          import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr }) => {
+            await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
+              console.error('[ORDER] Lỗi tạo QR PayOS:', err);
+              channel.send(`⚠️ Lỗi tạo mã QR thanh toán: ${err.message}`);
+            });
+          });
+        }
+
+        await interaction.editReply(`✅ Đã tạo đơn hàng tại <#${channel.id}>`);
+      } catch (err) {
+        console.error('[ORDER_TICKET_CREATE_ASYNC] Lỗi:', err);
+        await interaction.editReply('❌ Đã có lỗi xảy ra khi tạo ticket đơn hàng.');
+      } finally {
+        activeTicketCreations.delete(lockKey);
+      }
+    }).catch(err => {
+      console.error('[IMPORT_ERROR] Lỗi import discord.js:', err);
+      activeTicketCreations.delete(lockKey);
+    });
+
+  } catch (error) {
+    activeTicketCreations.delete(lockKey);
+    if (error.code === 'RATE_LIMITED') {
+      await interaction.editReply(`⚠️ ${error.message}`);
+    } else {
+      console.error('[ORDER_TICKET_FLOW] Lỗi:', error);
+      await interaction.editReply('❌ Đã có lỗi xảy ra khi xử lý yêu cầu.');
+    }
+  }
 }
 
 // Bước 1: Hiện confirmation embed (chỉ admin/manager)
@@ -1748,6 +1800,9 @@ export function registerInteractionHandler(client, commands) {
           .setTitle('📝 Xác nhận thông báo')
           .setDescription(`**Nội dung sẽ gửi:**\n\n${content.substring(0, 4000)}`)
           .setColor(0x3498db)
+          .setFields([
+            { name: '🏷️ Các Role sẽ tag', value: 'Không có (chỉ gửi tin nhắn thường)', inline: false }
+          ])
           .setFooter({ text: 'Chọn role bên dưới nếu muốn tag, sau đó bấm Xác nhận gửi.' });
           
         const reply = await interaction.reply({
@@ -1778,7 +1833,58 @@ export function registerInteractionHandler(client, commands) {
           return;
         }
         cacheData.roles = interaction.values;
-        await interaction.deferUpdate().catch(() => null);
+        
+        // Cập nhật Embed hiển thị danh sách các role được tag
+        const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+        const roleMentions = cacheData.roles.map(r => `<@&${r}>`).join(', ') || 'Không có';
+        
+        const tags = [];
+        if (cacheData.tagEveryone) tags.push('@everyone');
+        if (cacheData.tagHere) tags.push('@here');
+        const tagSuffix = tags.length > 0 ? ` + ${tags.join(', ')}` : '';
+
+        embed.setFields([
+          { name: '🏷️ Các Role sẽ tag', value: `${roleMentions}${tagSuffix}`, inline: false }
+        ]);
+
+        const roleSelect = new RoleSelectMenuBuilder()
+          .setCustomId('announcement:roleselect')
+          .setPlaceholder('Gõ phím để tìm role (Discord mặc định chỉ hiện 25 Role)...')
+          .setMinValues(0)
+          .setMaxValues(10);
+        
+        if (cacheData.roles && cacheData.roles.length > 0) {
+          roleSelect.setDefaultRoles(...cacheData.roles);
+        }
+
+        const everyoneBtn = new ButtonBuilder()
+          .setCustomId('announcement:toggle_everyone')
+          .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
+          .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
+
+        const hereBtn = new ButtonBuilder()
+          .setCustomId('announcement:toggle_here')
+          .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
+          .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
+          
+        const confirmBtn = new ButtonBuilder()
+          .setCustomId('announcement:confirm')
+          .setLabel('🚀 Xác nhận gửi')
+          .setStyle(ButtonStyle.Success);
+          
+        const cancelBtn = new ButtonBuilder()
+          .setCustomId('announcement:cancel')
+          .setLabel('Hủy')
+          .setStyle(ButtonStyle.Danger);
+
+        await interaction.update({
+          embeds: [embed],
+          components: [
+            new ActionRowBuilder().addComponents(roleSelect),
+            new ActionRowBuilder().addComponents(everyoneBtn, hereBtn),
+            new ActionRowBuilder().addComponents(confirmBtn, cancelBtn)
+          ]
+        }).catch(() => null);
         return;
       }
 
@@ -1800,24 +1906,57 @@ export function registerInteractionHandler(client, commands) {
           if (isEveryone) cacheData.tagEveryone = !cacheData.tagEveryone;
           else cacheData.tagHere = !cacheData.tagHere;
           
-          const newRows = interaction.message.components.map(row => ActionRowBuilder.from(row));
-          newRows.forEach(row => {
-               row.components = row.components.map(comp => {
-                   if (comp.data?.custom_id === 'announcement:toggle_everyone') {
-                       return ButtonBuilder.from(comp)
-                           .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
-                           .setStyle(cacheData.tagEveryone ? 3 : 2); // 3=Success, 2=Secondary
-                   }
-                   if (comp.data?.custom_id === 'announcement:toggle_here') {
-                       return ButtonBuilder.from(comp)
-                           .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
-                           .setStyle(cacheData.tagHere ? 3 : 2);
-                   }
-                   return comp;
-               });
-          });
+          // Cập nhật Embed hiển thị danh sách các role được tag
+          const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+          const roleMentions = cacheData.roles.map(r => `<@&${r}>`).join(', ') || 'Không có';
           
-          await interaction.update({ components: newRows }).catch(() => null);
+          const tags = [];
+          if (cacheData.tagEveryone) tags.push('@everyone');
+          if (cacheData.tagHere) tags.push('@here');
+          const tagSuffix = tags.length > 0 ? ` + ${tags.join(', ')}` : '';
+
+          embed.setFields([
+            { name: '🏷️ Các Role sẽ tag', value: `${roleMentions}${tagSuffix}`, inline: false }
+          ]);
+
+          const roleSelect = new RoleSelectMenuBuilder()
+            .setCustomId('announcement:roleselect')
+            .setPlaceholder('Gõ phím để tìm role (Discord mặc định chỉ hiện 25 Role)...')
+            .setMinValues(0)
+            .setMaxValues(10);
+          
+          if (cacheData.roles && cacheData.roles.length > 0) {
+            roleSelect.setDefaultRoles(...cacheData.roles);
+          }
+
+          const everyoneBtn = new ButtonBuilder()
+            .setCustomId('announcement:toggle_everyone')
+            .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
+            .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
+
+          const hereBtn = new ButtonBuilder()
+            .setCustomId('announcement:toggle_here')
+            .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
+            .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
+            
+          const confirmBtn = new ButtonBuilder()
+            .setCustomId('announcement:confirm')
+            .setLabel('🚀 Xác nhận gửi')
+            .setStyle(ButtonStyle.Success);
+            
+          const cancelBtn = new ButtonBuilder()
+            .setCustomId('announcement:cancel')
+            .setLabel('Hủy')
+            .setStyle(ButtonStyle.Danger);
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              new ActionRowBuilder().addComponents(roleSelect),
+              new ActionRowBuilder().addComponents(everyoneBtn, hereBtn),
+              new ActionRowBuilder().addComponents(confirmBtn, cancelBtn)
+            ]
+          }).catch(() => null);
           return;
       }
 
