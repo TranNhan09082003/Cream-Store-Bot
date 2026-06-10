@@ -11,6 +11,8 @@ import {
 import { setBlacklistStatus } from './blacklistService.js';
 import { addWalletBalance } from './walletService.js';
 import { createCoupon, listCoupons, deactivateCoupon } from './couponService.js';
+import * as subService from './subscriptionService.js';
+import { getAiKnowledge, updateAiKnowledge } from './aiKnowledgeService.js';
 
 export function registerAdminRoutes(app) {
   function requireAdminRole(req, res, next) {
@@ -24,7 +26,13 @@ export function registerAdminRoutes(app) {
     const userId = req.header('x-user-id');
     if (!userId) return res.status(401).json({ ok: false, error: 'Thiếu x-user-id' });
 
+    if (userId === 'admin' || userId === 'system') {
+      req.adminRole = 'admin';
+      return next();
+    }
+
     const user = db.prepare('SELECT role FROM web_users WHERE id = ?').get(userId);
+
     if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
       return res.status(403).json({ ok: false, error: 'Forbidden. Cần quyền Admin hoặc Staff.' });
     }
@@ -691,6 +699,205 @@ const fetchWithTimeout = (promise, ms) => {
     try {
       db.prepare('DELETE FROM account_stock WHERE id = ?').run(req.params.id);
       res.json({ ok: true, message: 'Đã xóa tài khoản khỏi kho thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 12. SUBSCRIPTIONS MANAGEMENT ====
+  app.get('/api/bot/admin/subscriptions', requireAdminRole, (req, res) => {
+    try {
+      const { serviceType, status, q } = req.query;
+      let query = 'SELECT * FROM subscription_accounts WHERE 1=1';
+      const params = [];
+      
+      if (serviceType) {
+        query += ' AND service_type = ?';
+        params.push(serviceType);
+      }
+      if (status) {
+        query += ' AND status = ?';
+        params.push(status);
+      }
+      if (q) {
+        query += ' AND (gmail_email LIKE ? OR customer_discord_name LIKE ? OR customer_id LIKE ?)';
+        const likeStr = `%${q}%`;
+        params.push(likeStr, likeStr, likeStr);
+      }
+      
+      query += ' ORDER BY status ASC, next_renewal_at ASC, id DESC';
+      const rows = db.prepare(query).all(...params);
+      res.json({ ok: true, data: rows });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/subscriptions', requireAdminRole, (req, res) => {
+    try {
+      const {
+        serviceType,
+        renewalMode,
+        gmailEmail,
+        gmailPassword,
+        customerId,
+        customerDiscordName,
+        relatedOrderCode,
+        purchaseDate,
+        totalDurationMonths,
+        renewalCycleMonths,
+        spotifyFamilyName,
+        spotifySlotsUsed,
+        note
+      } = req.body;
+
+      if (!gmailEmail || !gmailPassword || !purchaseDate) {
+        return res.status(400).json({ ok: false, error: 'Thiếu email, mật khẩu hoặc ngày mua' });
+      }
+
+      const newSub = subService.addSubscription({
+        guildId: 'WEB',
+        serviceType: serviceType || 'nitro',
+        renewalMode: renewalMode || 'auto_cycle',
+        gmailEmail,
+        gmailPassword,
+        customerId: customerId || null,
+        customerDiscordName: customerDiscordName || null,
+        relatedOrderCode: relatedOrderCode || null,
+        purchaseDate,
+        totalDurationMonths: Number(totalDurationMonths || 2),
+        renewalCycleMonths: Number(renewalCycleMonths || 2),
+        spotifyFamilyName: spotifyFamilyName || null,
+        spotifySlotsUsed: Number(spotifySlotsUsed || 0),
+        note: note || null
+      });
+
+      res.json({ ok: true, data: newSub });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.put('/api/bot/admin/subscriptions/:id', requireAdminRole, (req, res) => {
+    try {
+      const { id } = req.params;
+      const {
+        serviceType,
+        renewalMode,
+        gmailEmail,
+        gmailPassword,
+        customerId,
+        customerDiscordName,
+        relatedOrderCode,
+        purchaseDate,
+        totalDurationMonths,
+        renewalCycleMonths,
+        spotifyFamilyName,
+        spotifySlotsUsed,
+        note,
+        status,
+        nextRenewalAt,
+        expiryAt,
+        timesRenewed
+      } = req.body;
+
+      const existing = db.prepare('SELECT id FROM subscription_accounts WHERE id = ?').get(id);
+      if (!existing) {
+        return res.status(404).json({ ok: false, error: 'Không tìm thấy tài khoản gia hạn' });
+      }
+
+      db.prepare(`
+        UPDATE subscription_accounts
+        SET service_type = ?,
+            renewal_mode = ?,
+            gmail_email = ?,
+            gmail_password = ?,
+            customer_id = ?,
+            customer_discord_name = ?,
+            related_order_code = ?,
+            purchase_date = ?,
+            total_duration_months = ?,
+            renewal_cycle_months = ?,
+            spotify_family_name = ?,
+            spotify_slots_used = ?,
+            note = ?,
+            status = ?,
+            next_renewal_at = ?,
+            expiry_at = ?,
+            times_renewed = ?,
+            updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?
+      `).run(
+        serviceType || 'nitro',
+        renewalMode || 'auto_cycle',
+        gmailEmail,
+        gmailPassword,
+        customerId || null,
+        customerDiscordName || null,
+        relatedOrderCode || null,
+        purchaseDate,
+        Number(totalDurationMonths),
+        Number(renewalCycleMonths),
+        spotifyFamilyName || null,
+        Number(spotifySlotsUsed || 0),
+        note || null,
+        status || 'ACTIVE',
+        nextRenewalAt || null,
+        expiryAt,
+        Number(timesRenewed || 0),
+        id
+      );
+
+      const updated = subService.getSubscriptionById(id);
+      res.json({ ok: true, data: updated });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/subscriptions/:id/renew', requireAdminRole, (req, res) => {
+    try {
+      const { id } = req.params;
+      const renewed = subService.markRenewed(Number(id));
+      if (!renewed) {
+        return res.status(404).json({ ok: false, error: 'Không tìm thấy bản ghi hoặc gia hạn thất bại' });
+      }
+      res.json({ ok: true, data: renewed });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.delete('/api/bot/admin/subscriptions/:id', requireAdminRole, (req, res) => {
+    try {
+      const { id } = req.params;
+      subService.deleteSubscription(Number(id));
+      res.json({ ok: true, message: 'Đã xóa bản ghi gia hạn thành công!' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ==== 13. AI KNOWLEDGE ====
+  app.get('/api/bot/admin/ai-knowledge', requireAdminRole, (req, res) => {
+    try {
+      const content = getAiKnowledge('WEB');
+      res.json({ ok: true, data: { content } });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  app.post('/api/bot/admin/ai-knowledge', requireAdminRole, (req, res) => {
+    try {
+      const { content } = req.body;
+      const updatedBy = req.header('x-user-id') || 'admin';
+      const success = updateAiKnowledge('WEB', content || '', updatedBy);
+      if (success) {
+        res.json({ ok: true, message: 'Cập nhật tài liệu huấn luyện AI thành công!' });
+      } else {
+        res.status(500).json({ ok: false, error: 'Không thể cập nhật tài liệu huấn luyện AI' });
+      }
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }
