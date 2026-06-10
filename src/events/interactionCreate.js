@@ -2003,48 +2003,56 @@ export function registerInteractionHandler(client, commands) {
            await interaction.update({ content: '⚠️ Phiên thao tác này đã hết hạn. Vui lòng gõ lại lệnh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
            return;
          }
+
+         // Cập nhật trạng thái gửi ngay lập tức để tránh timeout 3 giây của Discord
+         await interaction.update({ content: '⏳ Đang tiến hành gửi thông báo, vui lòng đợi...', embeds: [], components: [] }).catch(() => null);
          
-         let rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
-         if (cacheData.tagEveryone) rolePings += ' @everyone';
-         if (cacheData.tagHere) rolePings += ' @here';
-         
-         const prefix = rolePings.trim();
-         const fullContent = cacheData.content;
-         
-         const channel = await interaction.guild.channels.fetch(cacheData.channelId).catch(() => null);
-         if (channel) {
-             // Gửi role pings riêng nếu có (để mention đúng cách)
-             if (prefix) {
-               await channel.send({ content: prefix }).catch(() => null);
-             }
-             
-             // Split nội dung thành chunks <= 2000 ký tự
-             if (fullContent.length <= 2000) {
-               await channel.send({ content: fullContent });
-             } else {
-               const chunks = [];
-               let remaining = fullContent;
-               while (remaining.length > 0) {
-                 if (remaining.length <= 2000) {
-                   chunks.push(remaining);
-                   break;
-                 }
-                 // Tìm vị trí xuống dòng gần nhất trước 2000
-                 let splitAt = remaining.lastIndexOf('\n', 2000);
-                 if (splitAt <= 0) splitAt = remaining.lastIndexOf(' ', 2000);
-                 if (splitAt <= 0) splitAt = 2000;
-                 chunks.push(remaining.slice(0, splitAt));
-                 remaining = remaining.slice(splitAt).replace(/^\n/, '');
+         try {
+           let rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
+           if (cacheData.tagEveryone) rolePings += ' @everyone';
+           if (cacheData.tagHere) rolePings += ' @here';
+           
+           const prefix = rolePings.trim();
+           const fullContent = cacheData.content;
+           
+           const channel = await interaction.guild.channels.fetch(cacheData.channelId).catch(() => null);
+           if (channel) {
+               // Gửi role pings riêng nếu có (để mention đúng cách)
+               if (prefix) {
+                  await channel.send({ content: prefix }).catch(() => null);
                }
-               for (const chunk of chunks) {
-                 await channel.send({ content: chunk }).catch(() => null);
+               
+               // Split nội dung thành chunks <= 2000 ký tự
+               if (fullContent.length <= 2000) {
+                  await channel.send({ content: fullContent });
+               } else {
+                  const chunks = [];
+                  let remaining = fullContent;
+                  while (remaining.length > 0) {
+                    if (remaining.length <= 2000) {
+                      chunks.push(remaining);
+                      break;
+                    }
+                    // Tìm vị trí xuống dòng gần nhất trước 2000
+                    let splitAt = remaining.lastIndexOf('\n', 2000);
+                    if (splitAt <= 0) splitAt = remaining.lastIndexOf(' ', 2000);
+                    if (splitAt <= 0) splitAt = 2000;
+                    chunks.push(remaining.slice(0, splitAt));
+                    remaining = remaining.slice(splitAt).replace(/^\n/, '');
+                  }
+                  for (const chunk of chunks) {
+                    await channel.send({ content: chunk }).catch(() => null);
+                  }
                }
-             }
-             
-             announcementCache.delete(interaction.message.id);
-             await interaction.update({ content: '✅ Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
-         } else {
-             await interaction.update({ content: '❌ Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
+               
+               announcementCache.delete(interaction.message.id);
+               await interaction.editReply({ content: '✅ Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
+           } else {
+               await interaction.editReply({ content: '❌ Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
+           }
+         } catch (err) {
+           console.error('[ANNOUNCEMENT_CONFIRM] Lỗi:', err);
+           await interaction.editReply({ content: `❌ Có lỗi xảy ra khi đăng thông báo: ${err.message}`, embeds: [], components: [] }).catch(() => null);
          }
          return;
       }
