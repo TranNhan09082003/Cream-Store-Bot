@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { buildAutomationGuideEmbed } from '../utils/embeds.js';
 
@@ -7,6 +8,7 @@ export const data = new SlashCommandBuilder()
   .setDMPermission(false);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.reply({
     embeds: [buildAutomationGuideEmbed()],
     ephemeral: true,

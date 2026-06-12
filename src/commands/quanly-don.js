@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { getOrderByCode, cancelOrder, markOrderPaid, markOrderCompleted, ensureOrderExpiry } from '../services/orderService.js';
@@ -22,11 +23,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'MANAGE')) {
-    await interaction.editReply('⚠️ Chỉ staff/manager mới được dùng lệnh này.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Chỉ staff/manager mới được dùng lệnh này.`);
     return;
   }
 
@@ -35,14 +37,14 @@ export async function execute(interaction) {
   const currentOrder = getOrderByCode(orderCode);
 
   if (!currentOrder) {
-    await interaction.editReply('⚠️ Không tìm thấy mã đơn này.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn này.`);
     return;
   }
 
   try {
     if (action === 'CANCELLED') {
       if (currentOrder.status === 'CANCELLED') {
-        await interaction.editReply('ℹ️ Đơn này đã bị hủy từ trước.');
+        await interaction.editReply(`${E('status_info', 'ℹ️')} Đơn này đã bị hủy từ trước.`);
         return;
       }
       const order = cancelOrder(orderCode, 'Hủy thủ công qua lệnh quản lý');
@@ -59,13 +61,13 @@ export async function execute(interaction) {
         await customer.send(dmMsg).catch(() => null);
       } catch (e) {}
 
-      await interaction.editReply(`✅ Đã hủy đơn \`${orderCode}\` thành công! Đã DM thông báo cho khách.`);
+      await interaction.editReply(`${E('status_check', '✅')} Đã hủy đơn \`${orderCode}\` thành công! Đã DM thông báo cho khách.`);
       return;
     }
 
     if (action === 'PAID') {
       if (currentOrder.payment_status === 'PAID' || currentOrder.payment_status === 'FREE') {
-        await interaction.editReply('ℹ️ Đơn này đã được thanh toán hoặc miễn phí.');
+        await interaction.editReply(`${E('status_info', 'ℹ️')} Đơn này đã được thanh toán hoặc miễn phí.`);
         return;
       }
       const order = markOrderPaid(orderCode, { amountPaid: currentOrder.total_amount, transactionId: 'MANUAL', transactionContent: 'Xác nhận thủ công' });
@@ -78,13 +80,13 @@ export async function execute(interaction) {
         await customer.send(`💸 **Cenar Store** - Đơn hàng \`${orderCode}\` của bạn đã được xác nhận thanh toán thủ công! Đơn đang chờ xử lý.`).catch(() => null);
       } catch (e) {}
       
-      await interaction.editReply(`✅ Đã cập nhật trạng thái **Đã thanh toán** cho đơn \`${orderCode}\`!`);
+      await interaction.editReply(`${E('status_check', '✅')} Đã cập nhật trạng thái **Đã thanh toán** cho đơn \`${orderCode}\`!`);
       return;
     }
 
     if (action === 'COMPLETED') {
       if (currentOrder.status === 'COMPLETED') {
-        await interaction.editReply('ℹ️ Đơn này đã hoàn thành rồi.');
+        await interaction.editReply(`${E('status_info', 'ℹ️')} Đơn này đã hoàn thành rồi.`);
         return;
       }
       // Khác với /hoanthanh, lệnh này là Override admin, cho phép hoàn thành ngay cả khi chưa thanh toán xong (nếu staff muốn vậy)
@@ -93,11 +95,11 @@ export async function execute(interaction) {
       await updateOrderLogMessage(interaction.guild, order);
       const result = await sendCompletedFlow({ guild: interaction.guild, order, actorId: interaction.user.id, supportId: interaction.user.id });
       await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: order.customer_id, action: 'ORDER_COMPLETE_MANUAL', detail: 'Ép hoàn thành qua quản lý', relatedOrderCode: order.order_code });
-      await interaction.editReply(`✅ Đã ép **Hoàn thành** đơn \`${orderCode}\`! ${result.dmSent ? 'Đã gửi DM cho khách.' : 'Không thể gửi DM cho khách.'}`);
+      await interaction.editReply(`${E('status_check', '✅')} Đã ép **Hoàn thành** đơn \`${orderCode}\`! ${result.dmSent ? 'Đã gửi DM cho khách.' : 'Không thể gửi DM cho khách.'}`);
       return;
     }
   } catch (error) {
     console.error('[QUANLY_DON] Lỗi:', error);
-    await interaction.editReply(`❌ Có lỗi xảy ra: ${error.message}`);
+    await interaction.editReply(`${E('status_cross', '❌')} Có lỗi xảy ra: ${error.message}`);
   }
 }

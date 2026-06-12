@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { collectPaymentConfigIssues } from '../config.js';
 import { confirmPayOSWebhookUrl } from '../services/paymentService.js';
@@ -15,6 +16,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const shouldConfirm = interaction.options.getBoolean('xac_nhan_webhook') ?? false;
   const issues = collectPaymentConfigIssues();
   const notes = [];

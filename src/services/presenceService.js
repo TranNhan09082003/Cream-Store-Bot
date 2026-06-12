@@ -30,7 +30,7 @@ function getPresenceTemplates() {
     {
       status: 'online',
       type: ActivityType.Watching,
-      name: `Cenar Store | /oder`,
+      name: `Cenar Store | /order`,
     },
     {
       status: 'online',

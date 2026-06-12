@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import {
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -76,7 +77,7 @@ export function buildStockPanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
-    emoji: p.emoji || '📦',
+    emoji: p.emoji || `${E('order_product', '📦')}`,
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
@@ -110,6 +111,7 @@ export async function refreshStockPanel(client, guildId) {
 }
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   try {
@@ -129,9 +131,9 @@ export async function execute(interaction) {
       messageId: panelMessage.id,
     });
 
-    await interaction.editReply(`✅ Panel sản phẩm đã được gửi!`);
+    await interaction.editReply(`${E('status_check', '✅')} Panel sản phẩm đã được gửi!`);
   } catch (error) {
     console.error('[STOCK] Error:', error);
-    return interaction.editReply(`❌ Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
   }
 }

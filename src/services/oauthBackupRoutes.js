@@ -1,0 +1,429 @@
+import { config } from '../config.js';
+import { db } from '../database/db.js';
+import { EmbedBuilder } from 'discord.js';
+
+export function registerOauthRoutes(app) {
+  
+  // 1. Route redirect to Discord OAuth2 page
+  app.get('/oauth/login', (req, res) => {
+    const guildId = req.query.guild_id || config.guildId;
+    const clientId = config.clientId;
+    
+    if (!clientId) {
+      return res.status(500).send('CLIENT_ID is not configured in bot settings.');
+    }
+
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const baseUrl = config.publicBaseUrl || `${protocol}://${host}`;
+    const redirectUri = `${baseUrl}/oauth/callback`;
+
+    const authorizeUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify%20guilds.join&state=${guildId}`;
+    
+    res.redirect(authorizeUrl);
+  });
+
+  // 2. Route OAuth2 Callback
+  app.get('/oauth/callback', async (req, res) => {
+    const { code, state: guildId } = req.query;
+
+    if (!code) {
+      return res.status(400).send(buildErrorPage('Thiếu mã xác minh', 'Không tìm thấy mã xác minh từ Discord. Vui lòng thử lại.'));
+    }
+
+    const clientSecret = process.env.CLIENT_SECRET;
+    const clientId = config.clientId;
+
+    if (!clientSecret) {
+      return res.status(500).send(buildErrorPage('Lỗi cấu hình', 'CLIENT_SECRET chưa được cài đặt. Vui lòng liên hệ quản trị viên.'));
+    }
+
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const baseUrl = config.publicBaseUrl || `${protocol}://${host}`;
+    const redirectUri = `${baseUrl}/oauth/callback`;
+
+    try {
+      // Exchange code for token
+      const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+        method: 'POST',
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: redirectUri,
+        }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+
+      if (!tokenResponse.ok) {
+        const errText = await tokenResponse.text();
+        throw new Error(`Token exchange failed: ${errText}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = tokenData.access_token;
+      const refreshToken = tokenData.refresh_token;
+
+      // Fetch user profile
+      const userResponse = await fetch('https://discord.com/api/users/@me', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!userResponse.ok) {
+        throw new Error('Failed to fetch user profile.');
+      }
+
+      const userProfile = await userResponse.json();
+      const discordId = userProfile.id;
+      const username = `${userProfile.username}${userProfile.discriminator !== '0' ? '#' + userProfile.discriminator : ''}`;
+      const email = userProfile.email || null;
+
+      // Save user to database oauth_backups
+      db.prepare(`
+        INSERT INTO oauth_backups (discord_id, access_token, refresh_token, username, email, verified_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(discord_id) DO UPDATE SET
+          access_token = excluded.access_token,
+          refresh_token = excluded.refresh_token,
+          username = excluded.username,
+          email = excluded.email,
+          verified_at = CURRENT_TIMESTAMP
+      `).run(discordId, accessToken, refreshToken, username, email);
+
+      console.log(`[OAuth Verify] Verified and backed up user: ${username} (${discordId})`);
+
+      // Assign verified role in the target guild
+      const discordClient = req.app.locals.discordClient;
+      let roleGranted = false;
+      let assignedRoleName = '';
+      let errorMsg = '';
+      let guildName = '';
+
+      if (discordClient && guildId) {
+        try {
+          const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
+          if (guild) {
+            guildName = guild.name;
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            if (member) {
+              // Find the verified member role (prioritize customer_role_id from database)
+              const guildConfig = db.prepare('SELECT customer_role_id FROM guild_settings WHERE guild_id = ?').get(guildId);
+              let role = null;
+              if (guildConfig && guildConfig.customer_role_id) {
+                role = guild.roles.cache.get(guildConfig.customer_role_id);
+              }
+              if (!role) {
+                role = guild.roles.cache.find(r =>
+                  r.name.includes('Explorer') ||
+                  r.name.includes('Active Customer') ||
+                  r.name.includes('Thành Viên Mới') ||
+                  (r.name.toLowerCase().includes('member') && !r.name.toLowerCase().includes('bot'))
+                );
+              }
+              
+              if (role) {
+                // Check if already has the role
+                if (!member.roles.cache.has(role.id)) {
+                  await member.roles.add(role);
+                  roleGranted = true;
+                  assignedRoleName = role.name;
+                  console.log(`[OAuth Verify] Assigned role "${role.name}" to ${username} in ${guild.name}`);
+                } else {
+                  // Already has the role — still count as success
+                  roleGranted = true;
+                  assignedRoleName = role.name;
+                  console.log(`[OAuth Verify] ${username} already has role "${role.name}" in ${guild.name}`);
+                }
+
+                // ─── Gửi DM chào mừng sau khi verify thành công ───
+                try {
+                  const dmEmbed = new EmbedBuilder()
+                    .setColor(0x7C3AED)
+                    .setTitle('✅ Xác Minh Thành Công — Cenar Store')
+                    .setDescription([
+                      `Xin chào **${member.user.username}**! 🎉`,
+                      '',
+                      `Tài khoản Discord của bạn đã được **xác minh thành công** tại **${guild.name}**.`,
+                      '',
+                      '**Bạn đã nhận được:**',
+                      `> 🏷️ Vai trò: **${role.name}**`,
+                      '> 🔓 Quyền xem toàn bộ kênh của server',
+                      '> 💾 Tài khoản được sao lưu bảo mật (backup)',
+                      '',
+                      '**Bước tiếp theo:**',
+                      '> 💰 Xem bảng giá sản phẩm trong kênh `bảng-giá`',
+                      '> 🎫 Mở ticket mua hàng trong kênh `hỗ-trợ`',
+                      '> 💬 Tham gia trò chuyện trong `thảo-luận`',
+                      '',
+                      '*Nếu có vấn đề, hãy mở ticket hỗ trợ trong server.*'
+                    ].join('\n'))
+                    .setThumbnail(guild.iconURL({ forceStatic: false }) || undefined)
+                    .setFooter({ text: 'Cenar Store — Uy Tín & Chất Lượng 💜' })
+                    .setTimestamp();
+
+                  await member.send({ embeds: [dmEmbed] }).catch(() => {
+                    // DM có thể bị tắt — không phải lỗi nghiêm trọng
+                    console.log(`[OAuth Verify] DM disabled for ${username}, skipping.`);
+                  });
+                } catch (dmErr) {
+                  console.warn('[OAuth Verify] DM send failed:', dmErr.message);
+                }
+
+              } else {
+                console.warn(`[OAuth Verify] Verification role not found in guild ${guild.name}`);
+                errorMsg = 'Không tìm thấy vai trò xác minh trong server.';
+              }
+            } else {
+              console.warn(`[OAuth Verify] Member ${discordId} not in guild ${guild.name}`);
+              errorMsg = 'Bạn chưa vào server Discord. Hãy join server trước rồi thử lại.';
+            }
+          } else {
+            console.warn(`[OAuth Verify] Guild ${guildId} not found`);
+            errorMsg = 'Không tìm thấy server Discord.';
+          }
+        } catch (err) {
+          console.error('[OAuth Verify] Error assigning role:', err.message);
+          errorMsg = `Lỗi cấp quyền: ${err.message}`;
+        }
+      } else {
+        errorMsg = 'Bot đang khởi động hoặc server không hợp lệ. Vui lòng thử lại sau vài giây.';
+      }
+
+      // Render success/partial success page
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(buildSuccessPage(username, roleGranted, assignedRoleName, errorMsg, guildName));
+
+    } catch (err) {
+      console.error('[OAuth Verify] Callback Error:', err);
+      res.status(500).send(buildErrorPage('Xác Minh Thất Bại', `Lỗi trong quá trình kết nối: ${err.message}. Vui lòng thử lại hoặc mở ticket hỗ trợ.`));
+    }
+  });
+
+  // 3. Check if a Discord user is verified (used by admin API)
+  app.get('/oauth/status/:discordId', (req, res) => {
+    const { discordId } = req.params;
+    const row = db.prepare('SELECT discord_id, username, verified_at FROM oauth_backups WHERE discord_id = ?').get(discordId);
+    if (row) {
+      res.json({ verified: true, username: row.username, verified_at: row.verified_at });
+    } else {
+      res.json({ verified: false });
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────
+// HTML Page Builders
+// ─────────────────────────────────────────────────
+
+function buildSuccessPage(username, roleGranted, roleName, errorMsg, guildName) {
+  const isPartial = !roleGranted && errorMsg;
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cenar Store — ${roleGranted ? 'Xác Minh Thành Công' : 'Xác Minh Hoàn Tất'}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 40%);
+      color: #f4f4f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(18, 18, 28, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      border-radius: 24px;
+      padding: 48px 40px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(124, 58, 237, 0.1), 0 20px 40px rgba(0,0,0,0.4);
+      animation: fadeUp 0.7s ease-out both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .icon-wrap {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px; margin: 0 auto 28px;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+    }
+    @keyframes popIn {
+      from { transform: scale(0); }
+      to   { transform: scale(1); }
+    }
+    .icon-success {
+      background: linear-gradient(135deg, #7C3AED, #4F46E5);
+      box-shadow: 0 0 40px rgba(124, 58, 237, 0.5);
+    }
+    .icon-partial {
+      background: linear-gradient(135deg, #D97706, #F59E0B);
+      box-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+    }
+    h1 {
+      font-size: 28px; font-weight: 700; margin-bottom: 10px;
+      background: linear-gradient(135deg, #a78bfa, #818cf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 15px; opacity: 0.7; margin-bottom: 28px; line-height: 1.6;
+    }
+    .info-box {
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .info-box.warning {
+      background: rgba(245, 158, 11, 0.08);
+      border-color: rgba(245, 158, 11, 0.25);
+    }
+    .info-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .label { opacity: 0.55; min-width: 90px; font-size: 13px; }
+    .info-row .value { font-weight: 600; color: #a78bfa; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 16px; border-radius: 9999px;
+      font-size: 13px; font-weight: 600; margin-bottom: 24px;
+    }
+    .badge-success { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+    .badge-warning { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #7C3AED, #4F46E5);
+      color: white; text-decoration: none;
+      padding: 14px 32px; border-radius: 14px;
+      font-weight: 600; font-size: 15px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 4px 16px rgba(124,58,237,0.3);
+      transition: all 0.25s ease;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,58,237,0.5); }
+    .footer { margin-top: 32px; font-size: 12px; opacity: 0.35; }
+    .steps { text-align: left; margin: 20px 0; }
+    .step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; font-size: 14px; }
+    .step-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .step-text { line-height: 1.5; opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap ${isPartial ? 'icon-partial' : 'icon-success'}">${roleGranted ? '✓' : '⚠'}</div>
+    <h1>${roleGranted ? 'Xác Minh Thành Công!' : 'Xác Minh Hoàn Tất'}</h1>
+    <p class="subtitle">Xin chào <strong>${username}</strong>! ${roleGranted ? 'Tài khoản của bạn đã được xác thực.' : 'Tài khoản được lưu nhưng có lỗi cấp quyền.'}</p>
+
+    ${roleGranted
+      ? `<div class="badge badge-success">✅ Đã nhận vai trò: ${roleName || 'Thành Viên'}</div>`
+      : `<div class="badge badge-warning">⚠️ ${errorMsg}</div>`
+    }
+
+    <div class="info-box ${isPartial ? 'warning' : ''}">
+      <div class="info-row">
+        <span class="label">Tài khoản</span>
+        <span class="value">${username}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Server</span>
+        <span class="value">${guildName || 'Cenar Store'}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Trạng thái</span>
+        <span class="value">${roleGranted ? '✅ Đã xác minh & sao lưu' : '⚠️ Đã lưu, chưa cấp quyền'}</span>
+      </div>
+    </div>
+
+    ${roleGranted ? `
+    <div class="steps">
+      <div class="step"><span class="step-icon">💰</span><span class="step-text">Xem bảng giá sản phẩm trong kênh <strong>bảng-giá</strong></span></div>
+      <div class="step"><span class="step-icon">🎫</span><span class="step-text">Mở ticket mua hàng trong kênh <strong>hỗ-trợ</strong></span></div>
+      <div class="step"><span class="step-icon">💬</span><span class="step-text">Tham gia trò chuyện trong kênh <strong>thảo-luận</strong></span></div>
+    </div>
+    ` : ''}
+
+    <a href="https://discord.com/app" class="btn">
+      <span>↩</span> Quay lại Discord
+    </a>
+    <div class="footer">Cenar Store — Uy Tín & Bảo Mật 💜</div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildErrorPage(title, message) {
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cenar Store — Xác Minh Thất Bại</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0a0a0f;
+      background-image: radial-gradient(ellipse at 50% 50%, rgba(220, 38, 38, 0.1) 0%, transparent 60%);
+      color: #f4f4f5;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .card {
+      background: rgba(18, 18, 28, 0.9);
+      border: 1px solid rgba(220, 38, 38, 0.25);
+      border-radius: 24px; padding: 48px 40px;
+      max-width: 480px; width: 100%; text-align: center;
+      animation: fadeUp 0.6s ease-out both;
+    }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    .icon { font-size: 56px; margin-bottom: 24px; }
+    h1 { font-size: 24px; font-weight: 700; color: #f87171; margin-bottom: 12px; }
+    p { font-size: 14px; opacity: 0.75; line-height: 1.7; margin-bottom: 28px; }
+    .btn {
+      display: inline-block;
+      background: rgba(220,38,38,0.15);
+      border: 1px solid rgba(220,38,38,0.3);
+      color: #f87171; text-decoration: none;
+      padding: 12px 28px; border-radius: 12px; font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(220,38,38,0.25); }
+    .footer { margin-top: 28px; font-size: 12px; opacity: 0.3; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⛔</div>
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <a href="https://discord.com/app" class="btn">↩ Quay lại Discord</a>
+    <div class="footer">Cenar Store — Uy Tín & Bảo Mật 💜</div>
+  </div>
+</body>
+</html>`;
+}
+

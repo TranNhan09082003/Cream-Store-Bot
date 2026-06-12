@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getPublicUrl } from '../config.js';
 import {
@@ -96,8 +97,16 @@ function buildNetflixModal() {
 
 // ═══════════════ Embed builders ═══════════════
 
-function buildListEmbed(subs, filterType) {
-  const title = filterType ? `${SERVICE_EMOJI[filterType]} ${SERVICE_LABEL[filterType]}` : '📋 Tất Cả Subscriptions';
+function buildListEmbed(subs, filterType, guildId = null) {
+  const E = createEmojiResolver(guildId);
+  const serviceEmojis = {
+    nitro: E('icon_star', '🚀'),
+    spotify_family: E('brand_spotify', '🎵'),
+    youtube: E('brand_youtube', '📺'),
+    netflix: E('brand_netflix', '🎬')
+  };
+
+  const title = filterType ? `${serviceEmojis[filterType]} ${SERVICE_LABEL[filterType]}` : `${E('icon_history', '📋')} Tất Cả Subscriptions`;
   const color = filterType ? SERVICE_COLOR[filterType] : config.accentColorInfo;
 
   if (!subs.length) {
@@ -115,13 +124,13 @@ function buildListEmbed(subs, filterType) {
   let desc = '';
 
   for (const [type, items] of Object.entries(grouped)) {
-    desc += `\n### ${SERVICE_EMOJI[type]} ${SERVICE_LABEL[type]} (${items.length})\n`;
+    desc += `\n### ${serviceEmojis[type]} ${SERVICE_LABEL[type]} (${items.length})\n`;
     for (const s of items.slice(0, 15)) {
       const renewInfo = s.renewal_mode === 'auto_cycle'
-        ? `🔄 ${s.times_renewed}/${getTotalRenewalsNeeded(s)} lần | Kỳ tới: <t:${Math.floor(new Date(s.next_renewal_at).getTime() / 1000)}:R>`
-        : s.renewal_mode === 'full_paid' ? '✅ Đã trả hết' : '🔂 Mua lẻ';
+        ? `${E('icon_clock', '🔄')} ${s.times_renewed}/${getTotalRenewalsNeeded(s)} lần | Kỳ tới: <t:${Math.floor(new Date(s.next_renewal_at).getTime() / 1000)}:R>`
+        : s.renewal_mode === 'full_paid' ? `${E('status_check', '✅')} Đã trả hết` : '🔂 Mua lẻ';
       const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '_Chưa gán_');
-      const noteExtra = (s.service_type === 'netflix' && s.note) ? ` 🎬 ${s.note}` : '';
+      const noteExtra = (s.service_type === 'netflix' && s.note) ? ` ${E('brand_netflix', '🎬')} ${s.note}` : '';
       const extra = s.spotify_family_name ? ` 🏠 ${s.spotify_family_name} (${s.spotify_slots_used}/5)` : noteExtra;
       desc += `> **ID ${s.id}** · \`${s.gmail_email}\` · ${customer}${extra}\n> ${renewInfo} · Hết hạn: <t:${Math.floor(new Date(s.expiry_at).getTime() / 1000)}:D>\n`;
     }
@@ -133,9 +142,17 @@ function buildListEmbed(subs, filterType) {
   return embed;
 }
 
-function buildCheckEmbed(subs, days) {
+function buildCheckEmbed(subs, days, guildId = null) {
+  const E = createEmojiResolver(guildId);
+  const serviceEmojis = {
+    nitro: E('icon_star', '🚀'),
+    spotify_family: E('brand_spotify', '🎵'),
+    youtube: E('brand_youtube', '📺'),
+    netflix: E('brand_netflix', '🎬')
+  };
+
   const embed = new EmbedBuilder()
-    .setTitle(`⏰ Cần Gia Hạn Trong ${days} Ngày Tới`)
+    .setTitle(`${E('icon_clock', '⏰')} Cần Gia Hạn Trong ${days} Ngày Tới`)
     .setColor(0xE74C3C)
     .setTimestamp();
 
@@ -146,8 +163,13 @@ function buildCheckEmbed(subs, days) {
 
   let desc = `Tìm thấy **${subs.length}** subscription cần xử lý:\n\n`;
   for (const s of subs.slice(0, 20)) {
-    const emoji = SERVICE_EMOJI[s.service_type] || '📦';
-    const mode = MODE_LABEL[s.renewal_mode] || s.renewal_mode;
+    const emoji = serviceEmojis[s.service_type] || E('order_product', '📦');
+    const modeLabels = {
+      auto_cycle: `${E('icon_clock', '🔄')} Định kỳ`,
+      one_time: '🔂 Mua lẻ',
+      full_paid: `${E('status_check', '✅')} Đã trả hết`
+    };
+    const mode = modeLabels[s.renewal_mode] || s.renewal_mode;
     const dateField = s.renewal_mode === 'auto_cycle' ? s.next_renewal_at : s.expiry_at;
     const ts = Math.floor(new Date(dateField).getTime() / 1000);
     const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '—');
@@ -163,6 +185,7 @@ function buildCheckEmbed(subs, days) {
 // ═══════════════ Execute ═══════════════
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'add-nitro') return interaction.showModal(buildNitroModal());
@@ -176,25 +199,31 @@ export async function execute(interaction) {
     if (sub === 'list') {
       const filterType = interaction.options.getString('loai');
       const subs = getAllActiveSubscriptions(interaction.guildId, filterType);
-      return interaction.editReply({ embeds: [buildListEmbed(subs, filterType)] });
+      return interaction.editReply({ embeds: [buildListEmbed(subs, filterType, interaction.guildId)] });
     }
 
     if (sub === 'check') {
       const days = interaction.options.getInteger('so_ngay') || 7;
       const subs = getSubscriptionsDueInDays(interaction.guildId, days);
-      return interaction.editReply({ embeds: [buildCheckEmbed(subs, days)] });
+      return interaction.editReply({ embeds: [buildCheckEmbed(subs, days, interaction.guildId)] });
     }
 
     if (sub === 'renew') {
       const id = interaction.options.getInteger('id', true);
       const existing = getSubscriptionById(id);
       if (!existing || existing.guild_id !== interaction.guildId) {
-        return interaction.editReply('❌ Không tìm thấy subscription với ID này.');
+        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy subscription với ID này.`);
       }
       const updated = markRenewed(id);
-      if (!updated) return interaction.editReply('❌ Lỗi khi gia hạn.');
+      if (!updated) return interaction.editReply(`${E('status_cross', '❌')} Lỗi khi gia hạn.`);
 
-      const emoji = SERVICE_EMOJI[updated.service_type];
+      const serviceEmojis = {
+        nitro: E('icon_star', '🚀'),
+        spotify_family: E('brand_spotify', '🎵'),
+        youtube: E('brand_youtube', '📺'),
+        netflix: E('brand_netflix', '🎬')
+      };
+      const emoji = serviceEmojis[updated.service_type] || E('order_product', '📦');
       const nextTs = updated.next_renewal_at ? `<t:${Math.floor(new Date(updated.next_renewal_at).getTime() / 1000)}:F>` : '_Đã hết chu kỳ_';
       const embed = new EmbedBuilder()
         .setTitle(`${emoji} Đã Gia Hạn Thành Công`)
@@ -214,7 +243,7 @@ export async function execute(interaction) {
       const id = interaction.options.getInteger('id', true);
       const existing = getSubscriptionById(id);
       if (!existing || existing.guild_id !== interaction.guildId) {
-        return interaction.editReply('❌ Không tìm thấy subscription với ID này.');
+        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy subscription với ID này.`);
       }
       deleteSubscription(id);
       return interaction.editReply(`🗑️ Đã xóa subscription **ID ${id}** — \`${existing.gmail_email}\` (${SERVICE_LABEL[existing.service_type]})`);
@@ -228,9 +257,16 @@ export async function execute(interaction) {
       }
       const dueIn7 = getSubscriptionsDueInDays(interaction.guildId, 7);
 
+      const serviceEmojis = {
+        nitro: E('icon_star', '🚀'),
+        spotify_family: E('brand_spotify', '🎵'),
+        youtube: E('brand_youtube', '📺'),
+        netflix: E('brand_netflix', '🎬')
+      };
+
       let statsText = '';
       for (const [type, count] of Object.entries(counts)) {
-        statsText += `${SERVICE_EMOJI[type] || '📦'} **${SERVICE_LABEL[type] || type}:** ${count} tài khoản\n`;
+        statsText += `${serviceEmojis[type] || E('order_product', '📦')} **${SERVICE_LABEL[type] || type}:** ${count} tài khoản\n`;
       }
       if (!statsText) statsText = '_Chưa có subscription nào._\n';
 
@@ -238,7 +274,7 @@ export async function execute(interaction) {
       const subApiUrl = getPublicUrl('/dashboard/api/subscriptions');
 
       const embed = new EmbedBuilder()
-        .setTitle('📊 Tổng Quan Subscriptions')
+        .setTitle(`${E('icon_chart', '📊')} Tổng Quan Subscriptions`)
         .setColor(config.accentColorInfo)
         .setDescription([
           '### 📈 Thống Kê',
@@ -247,7 +283,7 @@ export async function execute(interaction) {
           `**Cần gia hạn trong 7 ngày:** ${dueIn7.length}`,
           '',
           '### 🌐 Web Dashboard',
-          webUrl ? `Xem tổng quan tài khoản tại:` : '⚠️ Chưa cấu hình PUBLIC_BASE_URL',
+          webUrl ? `Xem tổng quan tài khoản tại:` : `${E('status_warn', '⚠️')} Chưa cấu hình PUBLIC_BASE_URL`,
         ].join('\n'))
         .setTimestamp()
         .setFooter({ text: 'Cream Store Subscription Manager' });

@@ -24,11 +24,31 @@ export async function buildClient() {
     startPresenceRotation(readyClient);
     startScheduler(readyClient);
     startWebhookServer(readyClient);
+
+    // Tự động đồng bộ emoji cho tất cả các guild bot đang tham gia
+    import('./services/emojiService.js').then(({ autoSyncGuildEmojis }) => {
+      for (const guild of readyClient.guilds.cache.values()) {
+        try {
+          const result = autoSyncGuildEmojis(guild);
+          console.log(`[EMOJI-SYNC] Synced ${result.syncedCount} emojis for guild: ${guild.name}`);
+        } catch (e) {
+          console.error(`[EMOJI-SYNC] Failed to auto-sync for guild ${guild.name}:`, e);
+        }
+      }
+    }).catch(err => console.error('Failed to import emojiService for ready event', err));
   });
 
   import('./events/messageCreate.js').then((module) => {
     client.on(module.name, (...args) => module.execute(...args));
   }).catch(err => console.error('Failed to load messageCreate event', err));
+
+  import('./events/guildMemberAdd.js').then((module) => {
+    client.on(module.name, (...args) => module.execute(...args));
+  }).catch(err => console.error('Failed to load guildMemberAdd event', err));
+
+  import('./events/guildMemberRemove.js').then((module) => {
+    client.on(module.name, (...args) => module.execute(...args));
+  }).catch(err => console.error('Failed to load guildMemberRemove event', err));
 
   client.salesCommands = commands;
   return client;

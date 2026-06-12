@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { createShopPanel, buildShopPanelV2 } from '../services/shopPanelService.js';
 
@@ -27,6 +28,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   try {
@@ -59,9 +61,9 @@ export async function execute(interaction) {
       features,
     });
 
-    await interaction.editReply(`✅ Panel Shop **${title}** (danh mục: \`${category}\`) đã được thả vào kênh thành công!`);
+    await interaction.editReply(`${E('status_check', '✅')} Panel Shop **${title}** (danh mục: \`${category}\`) đã được thả vào kênh thành công!`);
   } catch (error) {
     console.error('[SETUP-SHOP] Error:', error);
-    await interaction.editReply(`❌ Lỗi: ${error.message}`);
+    await interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
   }
 }

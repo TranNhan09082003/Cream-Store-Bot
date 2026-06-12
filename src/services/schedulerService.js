@@ -7,10 +7,12 @@ import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
 import { emitStaffLog } from './staffLogService.js';
 import { setOrderStatus } from './orderService.js';
+import { runAutoVinhDanh } from './vinhDanhService.js';
 
 let schedulerHandle = null;
 let backupHandle = null;
 let bootstrapped = false;
+let lastVinhDanhRun = 0;
 
 function autoBackupDatabase() {
   backupDatabase().catch(e => console.error('[BACKUP] Lỗi hệ thống sao lưu tự động:', e));
@@ -32,6 +34,17 @@ export function startScheduler(client) {
       await runSubscriptionNotifications(client);
     } catch (error) {
       console.error('[SCHEDULER] Lỗi subscription notifications:', error);
+    }
+
+    // Tự động cập nhật vinh danh định kỳ mỗi 1 tiếng
+    const nowMs = Date.now();
+    if (nowMs - lastVinhDanhRun >= 60 * 60 * 1000) {
+      try {
+        await runAutoVinhDanh(client);
+        lastVinhDanhRun = nowMs;
+      } catch (error) {
+        console.error('[SCHEDULER] Lỗi tự động vinh danh:', error);
+      }
     }
 
     try {

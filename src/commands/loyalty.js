@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { getPoints, getPointHistory, redeemForCredit, getLoyaltyLeaderboard } from '../services/loyaltyService.js';
 
@@ -23,6 +24,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'points') {
@@ -33,7 +35,7 @@ export async function execute(interaction) {
       .setTitle('⭐ Điểm Tích Luỹ')
       .setDescription([
         `> 🎯 **Điểm hiện có:** \`${pts.points}\``,
-        `> 📊 **Tổng điểm tích luỹ:** \`${pts.lifetime_points}\``,
+        `> ${E('icon_chart', '📊')} **Tổng điểm tích luỹ:** \`${pts.lifetime_points}\``,
         '',
         '💡 *Mỗi 10,000đ mua hàng = 1 điểm. 1 điểm = 100đ khi đổi.*',
       ].join('\n'))
@@ -48,16 +50,16 @@ export async function execute(interaction) {
     const result = redeemForCredit(interaction.guildId, interaction.user.id, points);
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross', '❌')} ${result.error}`, ephemeral: true });
     }
 
     const embed = new EmbedBuilder()
       .setColor(0x22c55e)
       .setTitle('🎁 Đổi Điểm Thành Công!')
       .setDescription([
-        `> ⭐ **Đã đổi:** ${points} điểm`,
-        `> 💰 **Nhận:** ${result.creditAmount.toLocaleString('vi-VN')}đ vào ví`,
-        `> 📊 **Điểm còn lại:** ${result.remaining}`,
+        `> ${E('icon_star', '⭐')} **Đã đổi:** ${points} điểm`,
+        `> ${E('payment_money', '💰')} **Nhận:** ${result.creditAmount.toLocaleString('vi-VN')}đ vào ví`,
+        `> ${E('icon_chart', '📊')} **Điểm còn lại:** ${result.remaining}`,
       ].join('\n'))
       .setTimestamp();
 

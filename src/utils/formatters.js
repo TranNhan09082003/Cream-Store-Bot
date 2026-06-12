@@ -1,25 +1,26 @@
-const ORDER_STATUS_LABELS = {
-  PENDING_PAYMENT: '💳 CHỜ THANH TOÁN',
-  PROCESSING: '⏰ ĐANG XỬ LÝ',
-  COMPLETED: '✅ ĐÃ HOÀN THÀNH',
-  DELIVERED: '📦 ĐÃ GIAO HÀNG',
-  CANCELLED: '❌ ĐÃ HỦY',
-  WARRANTY_OPEN: '🛠️ ĐANG BẢO HÀNH',
-};
+import { createEmojiResolver } from './emojiHelper.js';
 
-const PAYMENT_STATUS_LABELS = {
-  UNPAID: 'Chưa thanh toán',
-  PAID: 'Đã thanh toán',
-  FREE: 'Không thu tiền',
-  CANCELLED: 'Đã hủy',
-};
-
-export function getOrderStatusLabel(status) {
-  return ORDER_STATUS_LABELS[status] ?? String(status ?? 'Không xác định');
+export function getOrderStatusLabel(status, guildId = null) {
+  const E = createEmojiResolver(guildId);
+  const map = {
+    PENDING_PAYMENT: `${E('order_pending', '⏳')} CHỜ THANH TOÁN`,
+    PROCESSING: `${E('order_processing', '⚙️')} ĐANG XỬ LÝ`,
+    COMPLETED: `${E('order_complete', '🎉')} ĐÃ HOÀN THÀNH`,
+    DELIVERED: `${E('order_product', '📦')} ĐÃ GIAO HÀNG`,
+    CANCELLED: `${E('order_cancel', '❌')} ĐÃ HỦY`,
+    WARRANTY_OPEN: `${E('panel_warranty', '🛠️')} ĐANG BẢO HÀNH`,
+  };
+  return map[status] ?? String(status ?? 'Không xác định');
 }
 
 export function getPaymentStatusLabel(status) {
-  return PAYMENT_STATUS_LABELS[status] ?? String(status ?? 'Không xác định');
+  const map = {
+    UNPAID: 'Chưa thanh toán',
+    PAID: 'Đã thanh toán',
+    FREE: 'Không thu tiền',
+    CANCELLED: 'Đã hủy',
+  };
+  return map[status] ?? String(status ?? 'Không xác định');
 }
 
 export function formatOrderProduct(quantity, productName) {
@@ -39,21 +40,23 @@ export function resolveTicketLabel(order) {
   return `<#${order.ticket_channel_id}>`;
 }
 
-export function buildOrderLogContent(order) {
+export function buildOrderLogContent(order, guildId = null) {
   const orderCode = `> \`${order.order_code}\``;
   const customer = `<@${order.customer_id}>`;
   const product = `**${formatOrderProduct(order.quantity, order.product_name)}**`;
-  const status = `\`${getOrderStatusLabel(order.status)}\``;
+  const status = `\`${getOrderStatusLabel(order.status, guildId || order.guild_id || null)}\``;
   const ticket = resolveTicketLabel(order);
   return `${orderCode} ${customer} ${product} ${status} | ${ticket}`;
 }
 
-export function toStars(stars) {
-  return '⭐'.repeat(Math.max(1, Math.min(5, Number(stars) || 1)));
+export function toStars(stars, guildId = null) {
+  const E = createEmojiResolver(guildId);
+  return E('icon_star', '⭐').repeat(Math.max(1, Math.min(5, Number(stars) || 1)));
 }
 
-export function numericEmoji(stars) {
-  return `⭐ ${Math.max(1, Math.min(5, Number(stars) || 1))}`;
+export function numericEmoji(stars, guildId = null) {
+  const E = createEmojiResolver(guildId);
+  return `${E('icon_star', '⭐')} ${Math.max(1, Math.min(5, Number(stars) || 1))}`;
 }
 
 export function sanitizeChannelName(input) {

@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { buildBlacklistEmbed } from '../utils/embeds.js';
 import { clearWarnings, getCustomerFlag, setBlacklistStatus, warnCustomer } from '../services/blacklistService.js';
@@ -17,10 +18,11 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) => sub.setName('xoacanhbao').setDescription('Xóa cảnh báo của khách').addUserOption((opt) => opt.setName('khach').setDescription('Khách hàng').setRequired(true)));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'MANAGE')) {
-    await interaction.reply({ content: '⚠️ Chỉ manager mới được dùng lệnh này.', ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn', '⚠️')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true });
     return;
   }
   const action = interaction.options.getSubcommand(true);

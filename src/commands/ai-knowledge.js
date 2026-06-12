@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { getAiKnowledge, updateAiKnowledge } from '../services/aiKnowledgeService.js';
 import { config } from '../config.js';
@@ -14,6 +15,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   try {
@@ -41,6 +43,6 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[AI KNOWLEDGE] Error:', error);
-    await interaction.editReply('❌ Đã xảy ra lỗi khi cập nhật AI Knowledge.');
+    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi khi cập nhật AI Knowledge.`);
   }
 }

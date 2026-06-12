@@ -6,6 +6,7 @@ import { handleSepayWebhook } from './sepayService.js';
 import { registerBotApiRoutes } from './botApiRoutes.js';
 import { registerAuthRoutes } from './authApiRoutes.js';
 import { registerAdminRoutes } from './adminApiRoutes.js';
+import { registerOauthRoutes } from './oauthBackupRoutes.js';
 import { securityHeaders, generalLimiter, webhookLimiter } from './rateLimitMiddleware.js';
 
 let httpServer = null;
@@ -153,6 +154,7 @@ export async function startWebhookServer(client = null) {
   registerDashboardRoutes(app);
   registerBotApiRoutes(app);
   registerAuthRoutes(app);
+  registerOauthRoutes(app);
   registerAdminRoutes(app);
 
   const port = Number(process.env.HTTP_PORT ?? 3000);

@@ -12,13 +12,14 @@ import {
   TextInputStyle,
   EmbedBuilder,
   RoleSelectMenuBuilder,
+  StringSelectMenuBuilder,
 } from 'discord.js';
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config } from '../config.js';
-import { getGuildConfig } from '../services/guildConfigService.js';
+import { getGuildConfig, upsertGuildConfig } from '../services/guildConfigService.js';
 import { getCustomerFlag, getTicketMuteStatus, setTicketMuteStatus } from '../services/blacklistService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
 import {
@@ -61,8 +62,9 @@ import { buildTicketChannelName, parseMoneyInput, buildOrderLogContent } from '.
 import { TICKET_MEMBER_PERMISSIONS, isStaffMember, isManager, assertStaffCapability } from '../utils/permissions.js';
 import { ensureRateLimit } from '../services/abuseService.js';
 import { keepTicketOpen, scheduleTicketAutoClose } from '../services/ticketService.js';
-import { getActiveProducts, getProductById, updateProduct } from '../services/productCatalogService.js';
+import { getActiveProducts, getProductById, updateProduct, addProduct, getAllProducts, getProductByName } from '../services/productCatalogService.js';
 import { getCenarHub } from '../services/cenarHub.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,6 +72,86 @@ const commandsDirectory = path.resolve(__dirname, '..', 'commands');
 const FEEDBACK_TEXT_INPUT_ID = 'feedback_content';
 const WARRANTY_ORDER_INPUT_ID = 'warranty_order_code';
 const WARRANTY_REASON_INPUT_ID = 'warranty_reason';
+
+const CHAR_TO_SLOT = {
+  '🛍️': 'panel_order',
+  '🆘': 'panel_support',
+  '🤝': 'panel_partnership',
+  '🛠️': 'panel_warranty',
+  '✏️': 'panel_edit',
+  '📌': 'order_queue',
+  '🎉': 'order_complete',
+  '📦': 'order_product',
+  '🏦': 'payment_vietqr',
+  '📱': 'payment_qr',
+  '↩️': 'payment_refund',
+  '🔒': 'ticket_close',
+  '🛡️': 'ticket_claim',
+  '🎫': 'ticket_open',
+  '👤': 'ticket_user',
+  '🧑‍💼': 'ticket_staff',
+  '⏰': 'icon_clock',
+  '📅': 'icon_calendar',
+  '📜': 'icon_history',
+  'ℹ️': 'status_info',
+  '🎬': 'brand_netflix',
+  '🎵': 'brand_spotify',
+  '📺': 'brand_youtube',
+  '🤖': 'brand_chatgpt',
+  '💬': 'brand_discord',
+  '🏪': 'icon_store',
+  '⭐': 'icon_star',
+  '🔥': 'icon_fire',
+  '💎': 'icon_gem',
+  '🎁': 'icon_gift',
+  '✨': 'icon_sparkle',
+  '👑': 'icon_crown',
+  '📊': 'icon_chart',
+  '📍': 'icon_location',
+  '🔑': 'icon_key',
+  '🔗': 'icon_link',
+  '✅': 'status_check',
+  '❌': 'status_cross',
+  '⚠️': 'status_warn',
+  '⏳': 'status_loading',
+  '💰': 'payment_money',
+  '💳': 'payment_payos',
+  '⚙️': 'icon_settings',
+  '⏱️': 'icon_duration',
+  '⛔': 'status_cross',
+  '🔇': 'status_cross'
+};
+
+const EMOJI_REGEX = new RegExp(Object.keys(CHAR_TO_SLOT).join('|'), 'g');
+
+function resolvePayloadEmojis(payload, E) {
+  if (!payload) return payload;
+
+  if (typeof payload === 'string') {
+    return payload.replace(EMOJI_REGEX, (char) => E(CHAR_TO_SLOT[char], char));
+  }
+
+  try {
+    const plainPayload = JSON.parse(JSON.stringify(payload));
+    const jsonStr = JSON.stringify(plainPayload);
+    const resolvedStr = jsonStr.replace(EMOJI_REGEX, (char) => {
+      const slot = CHAR_TO_SLOT[char];
+      return slot ? E(slot, char) : char;
+    });
+    
+    const resolvedPayload = JSON.parse(resolvedStr);
+    
+    for (const key of Object.keys(payload)) {
+      if (!(key in resolvedPayload)) {
+        resolvedPayload[key] = payload[key];
+      }
+    }
+    return resolvedPayload;
+  } catch (error) {
+    console.error('[EMOJI] Lỗi khi xử lý payload emoji:', error);
+    return payload;
+  }
+}
 
 const announcementCache = new Map();
 const ANNOUNCEMENT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
@@ -386,6 +468,852 @@ async function handleProductSelect(interaction) {
   });
 }
 
+// Helper to parse price input (e.g. 180k -> 180000, 180000 -> 180000)
+function parsePrice(raw) {
+  if (!raw) return null;
+  const cleaned = String(raw).trim().toLowerCase();
+  let multiplier = 1;
+  let normalized = cleaned;
+  if (normalized.endsWith('k')) {
+    multiplier = 1000;
+    normalized = normalized.slice(0, -1);
+  }
+  const digits = normalized.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const value = Number.parseInt(digits, 10) * multiplier;
+  return Number.isFinite(value) ? value : null;
+}
+
+async function handlePriceListSelect(interaction) {
+  const category = interaction.values[0];
+  const products = getActiveProducts(interaction.guildId).filter(
+    p => p.service_type && p.service_type.toLowerCase() === category.toLowerCase()
+  );
+  const guildConfig = getGuildConfig(interaction.guildId);
+
+  const defaults = getDefaultCategoryDetails(category);
+  let embedColor = Number.parseInt(defaults.color, 16) || 0xF3A6D7;
+  let title = defaults.title;
+  let categoryName = defaults.name;
+  let bannerUrl = null;
+  let displayMode = defaults.display_mode || 'detailed';
+  let subtitle = defaults.subtitle || '';
+
+  let customConfigs = {};
+  if (guildConfig?.price_list_category_configs) {
+    try {
+      customConfigs = JSON.parse(guildConfig.price_list_category_configs);
+    } catch (e) {}
+  }
+  const catConfig = customConfigs[category.toLowerCase()] || {};
+
+  if (catConfig.title) title = catConfig.title;
+  if (catConfig.color) {
+    const cleanColor = catConfig.color.replace('#', '');
+    const parsedColor = Number.parseInt(cleanColor, 16);
+    if (!Number.isNaN(parsedColor)) {
+      embedColor = parsedColor;
+    }
+  }
+  if (catConfig.image_url) {
+    bannerUrl = catConfig.image_url;
+  }
+  if (catConfig.display_mode) displayMode = catConfig.display_mode;
+  if (catConfig.subtitle) subtitle = catConfig.subtitle;
+
+  const embeds = [];
+  let currentEmbed = new EmbedBuilder()
+    .setColor(embedColor)
+    .setTitle(title);
+
+  if (bannerUrl) {
+    currentEmbed.setImage(bannerUrl);
+  }
+
+  // ─── Compact mode (decor-style: bullet list with price pairs) ───
+  if (displayMode === 'compact') {
+    let desc = '';
+
+    // Custom description or subtitle heading
+    if (catConfig.description) {
+      desc = catConfig.description + '\n\n';
+    } else if (subtitle) {
+      desc = `## ${subtitle}  ⭐\n\n`;
+    }
+
+    if (products.length === 0) {
+      desc += '*Hiện tại danh mục này chưa có sản phẩm nào hoạt động.*';
+    } else {
+      for (const p of products) {
+        const mainPrice = Number(p.price).toLocaleString('vi-VN') + ' VND';
+        // Description can contain a secondary price (e.g., "22000", "22k", or "22.000")
+        const secondaryPrice = parseCompactSecondaryPrice(p.description);
+
+        if (secondaryPrice) {
+          desc += `• **\`${mainPrice}\`** — **\`${secondaryPrice}\`**\n`;
+        } else {
+          const emoji = p.emoji || '📦';
+          desc += `• ${emoji} **\`${p.name}\`** — **\`${mainPrice}\`**\n`;
+        }
+      }
+    }
+
+    currentEmbed.setDescription(desc);
+    currentEmbed.setTimestamp();
+    embeds.push(currentEmbed);
+
+  // ─── Detailed mode (default: full product cards) ───
+  } else {
+    let desc = '';
+    if (catConfig.description) {
+      desc = catConfig.description + '\n\n';
+    } else {
+      desc = `### 🌟 Danh sách gói dịch vụ [${categoryName}] đang mở bán:\n\n`;
+    }
+
+    if (products.length === 0) {
+      desc += '*Hiện tại danh mục này chưa có sản phẩm nào hoạt động.*';
+      currentEmbed.setDescription(desc);
+      embeds.push(currentEmbed);
+    } else {
+      for (const p of products) {
+        const priceText = Number(p.price).toLocaleString('vi-VN') + 'đ';
+        let statusText = '`Sẵn hàng ✨`';
+        if (p.description && p.description.includes('Hot')) statusText = '`Hot 🔥`';
+        else if (p.description && p.description.includes('Bán chạy')) statusText = '`Bán chạy ⚡`';
+        else if (p.description && p.description.includes('Mới')) statusText = '`Mới 🌟`';
+        else if (p.description && p.description.includes('Ưu đãi')) statusText = '`Ưu đãi 💥`';
+
+        let productDesc = `### ${p.emoji || '📦'} ${p.name}\n`;
+        productDesc += `> 💰 **Giá:** \`${priceText}\` | ⏱️ **Thời hạn:** \`${p.duration_months} tháng\`\n`;
+        if (p.description) {
+          productDesc += `> ℹ️ **Chi tiết:** *${p.description}*\n`;
+        } else {
+          productDesc += `> ℹ️ **Chi tiết:** *Đang mở bán*\n`;
+        }
+        productDesc += `> ⚡ **Trạng thái:** ${statusText}\n\n`;
+
+        if (desc.length + productDesc.length > 3900) {
+          currentEmbed.setDescription(desc);
+          embeds.push(currentEmbed);
+          currentEmbed = new EmbedBuilder().setColor(embedColor);
+          desc = productDesc;
+        } else {
+          desc += productDesc;
+        }
+      }
+      currentEmbed.setDescription(desc);
+      currentEmbed.setTimestamp();
+      embeds.push(currentEmbed);
+    }
+  }
+
+  const rows = [];
+
+  // Dropdown mua hàng
+  if (products.length > 0) {
+    const selectOptions = products.slice(0, 25).map(p => ({
+      label: `${p.name}`.slice(0, 100),
+      description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
+      value: `${p.id}`,
+      emoji: p.emoji || '🛒'
+    }));
+
+    const purchaseRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('product:select')
+        .setPlaceholder('🛒 Chọn gói dịch vụ bạn muốn đặt mua')
+        .addOptions(selectOptions)
+    );
+    rows.push(purchaseRow);
+  }
+
+  // Quản lý gói sản phẩm (luôn hiển thị cho mọi người dùng)
+  const adminRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`price_list:admin:add_product:${category}`)
+      .setLabel('Thêm Gói')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('➕'),
+    new ButtonBuilder()
+      .setCustomId(`price_list:admin:edit_product:${category}`)
+      .setLabel('Sửa Gói')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('✏️'),
+    new ButtonBuilder()
+      .setCustomId(`price_list:admin:edit_category:${category}`)
+      .setLabel('Sửa Chi Tiết')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('⚙️')
+  );
+  rows.push(adminRow);
+
+  await interaction.reply({
+    embeds: embeds,
+    components: rows,
+    ephemeral: true
+  });
+}
+
+/**
+ * Parse secondary price from product description for compact mode.
+ * Supports formats like: "22000", "22k", "22.000", "22,000", "22.000 VND"
+ * Returns formatted price string or null if description isn't a price.
+ */
+function parseCompactSecondaryPrice(description) {
+  if (!description) return null;
+  const cleaned = description.trim();
+
+  // Check if description looks like a price value
+  // Match: digits optionally with dots/commas as thousands separators, optional 'k' suffix, optional 'VND'/'đ'
+  const priceMatch = cleaned.match(/^([\d.,]+)\s*(k|K)?\s*(VND|vnd|đ)?$/);
+  if (!priceMatch) return null;
+
+  let numStr = priceMatch[1].replace(/[.,]/g, '');
+  let value = Number.parseInt(numStr, 10);
+  if (!Number.isFinite(value)) return null;
+
+  if (priceMatch[2]?.toLowerCase() === 'k') {
+    value *= 1000;
+  }
+
+  return value.toLocaleString('vi-VN') + ' VND';
+}
+
+async function handlePriceListAdminEditPortalButton(interaction) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId('price_list:admin:edit_portal_modal')
+    .setTitle('✏️ Chỉnh Sửa Bảng Giá Chính');
+
+  const defaultTitle = guildConfig?.price_list_title || '📺  PREMIUM SERVICES CATALOG — CENAR STORE  📺';
+  const defaultDesc = guildConfig?.price_list_description || [
+    '# 🌟 CHÀO MỪNG BẠN ĐẾN VỚI HỆ THỐNG DỊCH VỤ PREMIUM 🌟',
+    '',
+    'Cửa hàng chuyên cung cấp các tài khoản giải trí, học tập và làm việc Premium chính chủ với giá siêu ưu đãi, bảo hành trọn vẹn thời gian sử dụng.',
+    '',
+    '---',
+    '',
+    '### 🛍️ DANH MỤC DỊCH VỤ NỔI BẬT:',
+    '📺 **YouTube Premium** — Xem video không quảng cáo, chạy nền tiện lợi.',
+    '🎵 **Spotify Premium** — Nghe nhạc chất lượng cao offline không giới hạn.',
+    '🍿 **Netflix Premium** — Trải nghiệm phim ảnh chất lượng UltraHD 4K.',
+    '💎 **Discord Nitro** — Đầy đủ đặc quyền VIP, nhận 2 Boosts Server.',
+    '🚀 **Discord Boost Server** — Tối ưu hóa cộng đồng của bạn nhanh chóng.',
+    '',
+    '---',
+    '',
+    '### 💡 HƯỚNG DẪN MUA HÀNG:',
+    '1. Sử dụng **Menu Thả Xuống** bên dưới để chọn dịch vụ bạn muốn xem bảng giá.',
+    '2. Bảng giá chi tiết sẽ hiện lên riêng tư kèm nút đặt mua.',
+    '3. Chọn gói và điền thông tin để hệ thống tự động mở ticket xử lý nhanh chóng.',
+    '',
+    '🛡️ *Mọi giao dịch đều được đảm bảo an toàn & bảo hành trọn vẹn thời hạn sử dụng!*'
+  ].join('\n');
+  const defaultImage = guildConfig?.price_list_image_url || '';
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('title')
+        .setLabel('Tiêu đề bảng giá')
+        .setValue(defaultTitle.slice(0, 100))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(100)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel('Nội dung chi tiết')
+        .setValue(defaultDesc.slice(0, 4000))
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(4000)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('image_url')
+        .setLabel('URL ảnh / GIF banner (Không bắt buộc)')
+        .setValue(defaultImage.slice(0, 500))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(500)
+    )
+  );
+
+  await interaction.showModal(modal);
+}
+
+async function handlePriceListAdminEditPortalModal(interaction) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const title = interaction.fields.getTextInputValue('title');
+  const description = interaction.fields.getTextInputValue('description');
+  const imageUrl = interaction.fields.getTextInputValue('image_url') || null;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const updated = upsertGuildConfig({
+    guild_id: interaction.guildId,
+    price_list_title: title,
+    price_list_description: description,
+    price_list_image_url: imageUrl
+  });
+
+  const channelId = updated.price_list_channel_id;
+  const messageId = updated.price_list_message_id;
+
+  if (channelId && messageId) {
+    const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+    if (channel) {
+      const msg = await channel.messages.fetch(messageId).catch(() => null);
+      if (msg) {
+        const embed = new EmbedBuilder()
+          .setColor(0xF3A6D7)
+          .setTitle(title)
+          .setDescription(description)
+          .setFooter({ text: 'Cenar Store • An toàn - Uy tín - Chất lượng 💙' })
+          .setTimestamp();
+
+        if (imageUrl && imageUrl.startsWith('http')) {
+          embed.setImage(imageUrl);
+        }
+
+        await msg.edit({
+          embeds: [embed],
+          components: msg.components
+        }).catch(e => console.error('Failed to update price list message:', e));
+      }
+    }
+  }
+
+  await interaction.editReply({
+    content: '✅ Đã chỉnh sửa bảng giá chính thành công! Tin nhắn bảng giá đã được cập nhật ngay lập tức.'
+  });
+}
+
+async function handlePriceListAdminAddButton(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  // Check if this category is in compact mode
+  const defaults = getDefaultCategoryDetails(category);
+  let customConfigs = {};
+  if (guildConfig?.price_list_category_configs) {
+    try {
+      customConfigs = JSON.parse(guildConfig.price_list_category_configs);
+    } catch (e) {}
+  }
+  const catConfig = customConfigs[category.toLowerCase()] || {};
+  const isCompact = (catConfig.display_mode || defaults.display_mode) === 'compact';
+
+  const modal = new ModalBuilder()
+    .setCustomId(`price_list:admin:add_modal:${category}`)
+    .setTitle(`➕ Thêm Gói [${category.toUpperCase()}]`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('name')
+        .setLabel('Tên gói sản phẩm')
+        .setPlaceholder(isCompact ? 'VD: Decor Effect 1' : 'VD: YouTube Premium 3 Tháng')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(80)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('price')
+        .setLabel(isCompact ? 'Giá NPL (VNĐ)' : 'Giá tiền (VNĐ)')
+        .setPlaceholder('VD: 66000 hoặc 66k')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('duration')
+        .setLabel('Thời hạn (Tháng)')
+        .setPlaceholder('VD: 3')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue('1')
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('emoji')
+        .setLabel('Icon / Emoji')
+        .setPlaceholder('VD: 📺')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel(isCompact ? 'Giá LOG ACC (VNĐ) — Cột giá thứ 2' : 'Mô tả ngắn / Status (VD: Sẵn hàng, Hot...)')
+        .setPlaceholder(isCompact ? 'VD: 22000 hoặc 22k (hiển thị cạnh giá chính)' : 'VD: Xem không quảng cáo, tặng kèm YouTube Music VIP')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setMaxLength(200)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handlePriceListAdminAddModal(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const name = interaction.fields.getTextInputValue('name')?.trim();
+  const rawPrice = interaction.fields.getTextInputValue('price')?.trim();
+  const rawDuration = interaction.fields.getTextInputValue('duration')?.trim();
+  const emoji = interaction.fields.getTextInputValue('emoji')?.trim() || '📦';
+  const description = interaction.fields.getTextInputValue('description')?.trim() || '';
+
+  const price = parsePrice(rawPrice);
+  if (price === null) {
+    await interaction.editReply('❌ Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).');
+    return;
+  }
+
+  const duration = Number.parseInt(rawDuration, 10);
+  if (Number.isNaN(duration) || duration <= 0) {
+    await interaction.editReply('❌ Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.');
+    return;
+  }
+
+  try {
+    addProduct({
+      guildId: 'WEB',
+      name,
+      description,
+      price,
+      durationMonths: duration,
+      serviceType: category,
+      emoji
+    });
+
+    await interaction.editReply(`✅ Đã thêm thành công sản phẩm **${name}** vào danh mục \`${category}\`!\nHãy chọn lại danh mục để tải lại bảng giá mới.`);
+  } catch (error) {
+    console.error('[PRICE LIST ADD PRODUCT]', error);
+    await interaction.editReply(`❌ Lỗi thêm sản phẩm: ${error.message}`);
+  }
+}
+
+function getDefaultCategoryDetails(category) {
+  const cat = category.toLowerCase();
+  if (cat === 'youtube') {
+    return { title: '📺 BẢNG GIÁ YOUTUBE PREMIUM (SIÊU ỔN ĐỊNH)', color: 'ED4245', name: 'YouTube Premium' };
+  }
+  if (cat === 'spotify') {
+    return { title: '🎵 BẢNG GIÁ SPOTIFY PREMIUM (SIÊU ỔN ĐỊNH)', color: '57F287', name: 'Spotify Premium' };
+  }
+  if (cat === 'netflix') {
+    return { title: '🍿 BẢNG GIÁ NETFLIX EXTRA PREMIUM', color: 'E50914', name: 'Netflix Premium' };
+  }
+  if (cat === 'nitro') {
+    return { title: '💎 BẢNG GIÁ DISCORD NITRO PREMIUM', color: '5865F2', name: 'Discord Nitro' };
+  }
+  if (cat === 'boost') {
+    return { title: '🚀 BẢNG GIÁ DISCORD BOOST SERVER', color: 'EB459E', name: 'Discord Boost' };
+  }
+  if (cat === 'decor') {
+    return { title: '⚙️ DECOR / NPL', color: 'EB459E', name: 'Decor Discord', display_mode: 'compact', subtitle: '⚙️ DEC/NPL ( LOG ACC )' };
+  }
+  return { title: `BẢNG GIÁ ${category.toUpperCase()}`, color: 'F3A6D7', name: category.toUpperCase() };
+}
+
+async function handlePriceListAdminEditCategoryButton(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  let customConfigs = {};
+  if (guildConfig?.price_list_category_configs) {
+    try {
+      customConfigs = JSON.parse(guildConfig.price_list_category_configs);
+    } catch (e) {}
+  }
+  const catConfig = customConfigs[category.toLowerCase()] || {};
+  const defaults = getDefaultCategoryDetails(category);
+
+  const defaultTitle = catConfig.title || defaults.title;
+  const defaultColor = catConfig.color || defaults.color;
+  const defaultImage = catConfig.image_url || '';
+  const defaultDesc = catConfig.description || `### 🌟 Danh sách gói dịch vụ [${defaults.name}] đang mở bán:`;
+  const currentMode = catConfig.display_mode || defaults.display_mode || 'detailed';
+  const currentSubtitle = catConfig.subtitle || defaults.subtitle || '';
+  // Combine display_mode and subtitle into one field for the modal
+  const displayModeValue = currentMode === 'compact'
+    ? (currentSubtitle ? `compact | ${currentSubtitle}` : 'compact')
+    : 'detailed';
+
+  const modal = new ModalBuilder()
+    .setCustomId(`price_list:admin:edit_category_modal:${category}`)
+    .setTitle(`✏️ Sửa Chi Tiết [${category.toUpperCase()}]`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('title')
+        .setLabel('Tiêu đề bảng giá')
+        .setValue(defaultTitle.slice(0, 100))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(100)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel('Nội dung giới thiệu (Markdown)')
+        .setValue(defaultDesc.slice(0, 1000))
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setMaxLength(1000)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('color')
+        .setLabel('Màu viền Embed (Mã Hex)')
+        .setValue(defaultColor.slice(0, 10))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(10)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('image_url')
+        .setLabel('URL ảnh / GIF banner (Không bắt buộc)')
+        .setValue(defaultImage.slice(0, 500))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(500)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('display_mode')
+        .setLabel('Kiểu hiển thị: detailed / compact | Phụ đề')
+        .setValue(displayModeValue.slice(0, 100))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('VD: compact | DEC/NPL (LOG ACC)')
+        .setMaxLength(100)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handlePriceListAdminEditCategoryModal(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const title = interaction.fields.getTextInputValue('title')?.trim();
+  const description = interaction.fields.getTextInputValue('description')?.trim() || '';
+  const color = interaction.fields.getTextInputValue('color')?.trim().replace('#', '');
+  const imageUrl = interaction.fields.getTextInputValue('image_url')?.trim() || '';
+  const displayModeRaw = interaction.fields.getTextInputValue('display_mode')?.trim() || '';
+
+  const parsedColor = Number.parseInt(color, 16);
+  if (color && (Number.isNaN(parsedColor) || color.length < 3 || color.length > 6)) {
+    await interaction.editReply('❌ Mã màu Hex không hợp lệ. Vui lòng nhập mã Hex hợp lệ (VD: ED4245).');
+    return;
+  }
+
+  // Parse display_mode field: "compact | subtitle" or "detailed"
+  let displayMode = 'detailed';
+  let subtitleValue = '';
+  if (displayModeRaw) {
+    const parts = displayModeRaw.split('|').map(s => s.trim());
+    const mode = parts[0].toLowerCase();
+    if (mode === 'compact') {
+      displayMode = 'compact';
+      subtitleValue = parts[1] || '';
+    } else {
+      displayMode = 'detailed';
+    }
+  }
+
+  let customConfigs = {};
+  if (guildConfig?.price_list_category_configs) {
+    try {
+      customConfigs = JSON.parse(guildConfig.price_list_category_configs);
+    } catch (e) {}
+  }
+
+  customConfigs[category.toLowerCase()] = {
+    title,
+    description,
+    color,
+    image_url: imageUrl,
+    display_mode: displayMode,
+    subtitle: subtitleValue
+  };
+
+  try {
+    const { db } = await import('../database/db.js');
+    const ts = new Date().toISOString();
+    const result = db.prepare(`
+      UPDATE guild_settings
+      SET price_list_category_configs = @configs, updated_at = @now
+      WHERE guild_id = @guild_id
+    `).run({
+      configs: JSON.stringify(customConfigs),
+      now: ts,
+      guild_id: interaction.guildId
+    });
+
+    if (result.changes === 0) {
+      db.prepare(`
+        INSERT INTO guild_settings (guild_id, ticket_category_id, price_list_category_configs, updated_at)
+        VALUES (@guild_id, '', @configs, @now)
+      `).run({
+        guild_id: interaction.guildId,
+        configs: JSON.stringify(customConfigs),
+        now: ts
+      });
+    }
+
+    await interaction.editReply(`✅ Đã cập nhật chi tiết danh mục **${category.toUpperCase()}** thành công!\nHãy chọn lại danh mục để xem thay đổi.`);
+  } catch (error) {
+    console.error('[PRICE LIST EDIT CATEGORY]', error);
+    await interaction.editReply(`❌ Lỗi cập nhật chi tiết danh mục: ${error.message}`);
+  }
+}
+
+async function handlePriceListAdminEditButton(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  const products = getAllProducts(interaction.guildId).filter(
+    p => p.service_type && p.service_type.toLowerCase() === category.toLowerCase()
+  );
+
+  if (products.length === 0) {
+    await safeReply(interaction, {
+      content: `❌ Không tìm thấy sản phẩm nào trong danh mục \`${category}\` để chỉnh sửa.`,
+      ephemeral: true
+    });
+    return;
+  }
+
+  const selectOptions = products.slice(0, 25).map(p => {
+    const statusText = p.is_active ? '🟢' : '🔴';
+    return {
+      label: `${p.name}`.slice(0, 100),
+      description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T | Trạng thái: ${statusText}`.slice(0, 100),
+      value: `${p.id}`,
+      emoji: p.emoji || '📦'
+    };
+  });
+
+  const row = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`price_list:admin:select_product_to_edit:${category}`)
+      .setPlaceholder('✏️ Chọn sản phẩm bạn muốn sửa thông tin')
+      .addOptions(selectOptions)
+  );
+
+  await safeReply(interaction, {
+    content: `🔧 Vui lòng chọn sản phẩm trong danh mục \`${category}\` để bắt đầu chỉnh sửa:`,
+    components: [row],
+    ephemeral: true
+  });
+}
+
+async function handlePriceListAdminSelectProductToEdit(interaction, category) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  const productId = interaction.values[0];
+  const product = getProductById(Number(productId));
+  if (!product) {
+    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`price_list:admin:edit_modal:${product.id}`)
+    .setTitle(`✏️ Sửa: ${product.name}`.slice(0, 45));
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('name')
+        .setLabel('Tên gói sản phẩm')
+        .setValue(product.name)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(80)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('price')
+        .setLabel('Giá tiền (VNĐ)')
+        .setValue(String(product.price))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('duration')
+        .setLabel('Thời hạn (Tháng)')
+        .setValue(String(product.duration_months))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('emoji')
+        .setLabel('Icon / Emoji')
+        .setValue(product.emoji || '📦')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('is_active')
+        .setLabel('Kích hoạt hiển thị (1 = Có, 0 = Không)')
+        .setValue(String(product.is_active))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(1)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handlePriceListAdminEditModal(interaction, productId) {
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
+
+  if (!isAdmin) {
+    await interaction.reply({
+      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const name = interaction.fields.getTextInputValue('name')?.trim();
+  const rawPrice = interaction.fields.getTextInputValue('price')?.trim();
+  const rawDuration = interaction.fields.getTextInputValue('duration')?.trim();
+  const emoji = interaction.fields.getTextInputValue('emoji')?.trim() || '📦';
+  const rawActive = interaction.fields.getTextInputValue('is_active')?.trim();
+
+  const price = parsePrice(rawPrice);
+  if (price === null) {
+    await interaction.editReply('❌ Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).');
+    return;
+  }
+
+  const duration = Number.parseInt(rawDuration, 10);
+  if (Number.isNaN(duration) || duration <= 0) {
+    await interaction.editReply('❌ Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.');
+    return;
+  }
+
+  const isActive = rawActive === '1' ? 1 : 0;
+
+  try {
+    updateProduct(Number(productId), {
+      name,
+      price,
+      durationMonths: duration,
+      emoji,
+      isActive: isActive === 1
+    });
+
+    await interaction.editReply(`✅ Đã cập nhật thành công sản phẩm **${name}**!\nHãy chọn lại danh mục để xem bảng giá mới.`);
+  } catch (error) {
+    console.error('[PRICE LIST EDIT PRODUCT]', error);
+    await interaction.editReply(`❌ Lỗi cập nhật sản phẩm: ${error.message}`);
+  }
+}
+
 async function handleProductPurchaseFlow(interaction, productId) {
   const product = getProductById(Number(productId));
   if (!product) {
@@ -540,13 +1468,21 @@ async function handleProductPurchaseFlow(interaction, productId) {
 async function handleTicketCloseRequest(interaction, ticketId) {
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!isManager(member, guildConfig)) {
-    await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể đóng ticket.', ephemeral: true });
+
+  // Tìm ticket trước để đảm bảo tồn tại
+  const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
+  if (!ticket) {
+    await safeReply(interaction, { content: '⚠️ Không tìm thấy thông tin ticket này. Có thể đã bị xóa khỏi hệ thống.', ephemeral: true });
     return;
   }
-  const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
-  if (!ticket || ticket.status !== 'OPEN') {
-    await safeReply(interaction, { content: '⚠️ Ticket này không còn hợp lệ hoặc đã đóng.', ephemeral: true });
+  if (ticket.status !== 'OPEN') {
+    await safeReply(interaction, { content: `🔒 Ticket \`${ticket.ticket_code}\` đã được đóng trước đó rồi.`, ephemeral: true });
+    return;
+  }
+
+  // Sau khi xác nhận ticket tồn tại và OPEN mới check quyền
+  if (!isManager(member, guildConfig)) {
+    await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể đóng ticket.\n> Nếu bạn muốn yêu cầu staff đóng hộ, hãy nhắn vào ticket.', ephemeral: true });
     return;
   }
   await safeReply(interaction, {
@@ -1030,7 +1966,7 @@ async function handleProductEditModal(interaction, productId) {
   });
 }
 
-import { addProduct, getProductByName } from '../services/productCatalogService.js';
+// Duplicate import removed
 
 async function handleProductAddModal(interaction) {
   const name = interaction.fields.getTextInputValue('name');
@@ -1160,6 +2096,30 @@ async function handleProductSaleModal(interaction) {
   }
 
   await safeReply(interaction, { content: replyText, ephemeral: true });
+}
+
+async function handleSaleRunModal(interaction) {
+  const parts = interaction.customId.split(':');
+  const percent = Number.parseInt(parts[3], 10) || 0;
+  const bulkData = interaction.fields.getTextInputValue('bulk_data');
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const { runSale } = await import('../services/saleService.js');
+    await runSale(interaction.client, interaction.guildId, percent, bulkData);
+    
+    await safeReply(interaction, {
+      content: `✅ Khởi chạy chương trình Sale **${percent}%** thành công! Bảng giá sale đã được ghim/cập nhật.`,
+      ephemeral: true
+    });
+  } catch (error) {
+    console.error('[SALE RUN MODAL] Error:', error);
+    await safeReply(interaction, {
+      content: `❌ Lỗi khi khởi chạy Sale: ${error.message}`,
+      ephemeral: true
+    });
+  }
 }
 
 // ═══════════════ Subscription Handlers ═══════════════
@@ -1405,6 +2365,35 @@ async function handlePrefixDone(message, args) {
 export function registerInteractionHandler(client, commands) {
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
+      if (interaction.guildId) {
+        const E = createEmojiResolver(interaction.guildId);
+        
+        if (typeof interaction.reply === 'function') {
+          const originalReply = interaction.reply.bind(interaction);
+          interaction.reply = async (payload) => {
+            return originalReply(resolvePayloadEmojis(payload, E));
+          };
+        }
+        if (typeof interaction.editReply === 'function') {
+          const originalEditReply = interaction.editReply.bind(interaction);
+          interaction.editReply = async (payload) => {
+            return originalEditReply(resolvePayloadEmojis(payload, E));
+          };
+        }
+        if (typeof interaction.followUp === 'function') {
+          const originalFollowUp = interaction.followUp.bind(interaction);
+          interaction.followUp = async (payload) => {
+            return originalFollowUp(resolvePayloadEmojis(payload, E));
+          };
+        }
+        if (typeof interaction.update === 'function') {
+          const originalUpdate = interaction.update.bind(interaction);
+          interaction.update = async (payload) => {
+            return originalUpdate(resolvePayloadEmojis(payload, E));
+          };
+        }
+      }
+
       // ── Autocomplete handler ──
       if (interaction.isAutocomplete()) {
         const command = commands.get(interaction.commandName);
@@ -1455,6 +2444,12 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      // Sale run modal: sale:run:modal:percent
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('sale:run:modal:')) {
+        await handleSaleRunModal(interaction);
+        return;
+      }
+
       // ═══════ Subscription Modal Handlers ═══════
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith('sub:add:')) {
@@ -1479,6 +2474,73 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('product:purchase:modal:')) {
         const productId = interaction.customId.split(':')[3];
         await handleProductPurchaseFlow(interaction, productId);
+        return;
+      }
+
+      // ═══════ Price List Dropdown ═══════
+      if (interaction.isStringSelectMenu() && interaction.customId === 'price_list:select') {
+        await handlePriceListSelect(interaction);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Portal Button ═══════
+      if (interaction.isButton() && interaction.customId === 'price_list:admin:edit_portal') {
+        await handlePriceListAdminEditPortalButton(interaction);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Portal Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId === 'price_list:admin:edit_portal_modal') {
+        await handlePriceListAdminEditPortalModal(interaction);
+        return;
+      }
+
+      // ═══════ Price List Admin Add Button ═══════
+      if (interaction.isButton() && interaction.customId.startsWith('price_list:admin:add_product:')) {
+        const category = interaction.customId.split(':')[3];
+        await handlePriceListAdminAddButton(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Add Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('price_list:admin:add_modal:')) {
+        const category = interaction.customId.split(':')[3];
+        await handlePriceListAdminAddModal(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Button ═══════
+      if (interaction.isButton() && interaction.customId.startsWith('price_list:admin:edit_product:')) {
+        const category = interaction.customId.split(':')[3];
+        await handlePriceListAdminEditButton(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Category Button ═══════
+      if (interaction.isButton() && interaction.customId.startsWith('price_list:admin:edit_category:')) {
+        const category = interaction.customId.split(':')[3];
+        await handlePriceListAdminEditCategoryButton(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Category Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('price_list:admin:edit_category_modal:')) {
+        const category = interaction.customId.split(':')[4];
+        await handlePriceListAdminEditCategoryModal(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Select Product to Edit Menu ═══════
+      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('price_list:admin:select_product_to_edit:')) {
+        const category = interaction.customId.split(':')[4];
+        await handlePriceListAdminSelectProductToEdit(interaction, category);
+        return;
+      }
+
+      // ═══════ Price List Admin Edit Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('price_list:admin:edit_modal:')) {
+        const productId = interaction.customId.split(':')[3];
+        await handlePriceListAdminEditModal(interaction, productId);
         return;
       }
 
@@ -1561,7 +2623,6 @@ export function registerInteractionHandler(client, commands) {
         const panelImage = interaction.fields.getTextInputValue('panel_image_url')?.trim() || null;
 
         const guildConfig = getGuildConfig(interaction.guildId);
-        const { upsertGuildConfig } = await import('../services/guildConfigService.js');
         const updated = upsertGuildConfig({
           guild_id: interaction.guildId,
           panel_title: panelTitle,
@@ -1570,34 +2631,39 @@ export function registerInteractionHandler(client, commands) {
           updated_by: interaction.user.id,
         });
 
-        // Xóa panel cũ → gửi panel mới
+        // Cập nhật panel (sửa tin nhắn cũ hoặc gửi tin nhắn mới nếu không tìm thấy)
         try {
           if (updated.ticket_panel_channel_id) {
             const panelChannel = await interaction.guild.channels.fetch(updated.ticket_panel_channel_id).catch(() => null);
             if (panelChannel) {
-              // Xóa tin nhắn cũ nếu còn tồn tại
-              if (updated.ticket_panel_message_id) {
-                const oldMsg = await panelChannel.messages.fetch(updated.ticket_panel_message_id).catch(() => null);
-                if (oldMsg) await oldMsg.delete().catch(() => null);
-              }
-
-              // Gửi panel mới
               const { buildTicketPanelV2 } = await import('../utils/embeds.js');
               const { container, rows, flags } = buildTicketPanelV2({ ...updated, guild_id: interaction.guildId });
-              const newMsg = await panelChannel.send({ components: [container, ...rows], flags });
 
-              // Lưu message ID mới vào DB
-              upsertGuildConfig({
-                guild_id: interaction.guildId,
-                ticket_panel_message_id: newMsg.id,
-              });
+              let edited = false;
+              if (updated.ticket_panel_message_id) {
+                const oldMsg = await panelChannel.messages.fetch(updated.ticket_panel_message_id).catch(() => null);
+                if (oldMsg) {
+                  await oldMsg.edit({ components: [container, ...rows], flags }).catch(() => null);
+                  edited = true;
+                }
+              }
+
+              if (!edited) {
+                // Gửi panel mới nếu không tìm thấy tin nhắn cũ để sửa
+                const newMsg = await panelChannel.send({ components: [container, ...rows], flags });
+                // Lưu message ID mới vào DB
+                upsertGuildConfig({
+                  guild_id: interaction.guildId,
+                  ticket_panel_message_id: newMsg.id,
+                });
+              }
             }
           }
         } catch (editErr) {
           console.error('[PANEL EDIT] Lỗi cập nhật panel:', editErr);
         }
 
-        await interaction.editReply('✅ Panel đã được làm mới thành công! Nội dung cũ đã bị xóa.');
+        await interaction.editReply('✅ Panel đã được cập nhật thành công!');
         return;
       }
 
@@ -1962,6 +3028,65 @@ export function registerInteractionHandler(client, commands) {
 
       ensureRateLimit({ guildId: interaction.guildId, userId: interaction.user.id, action: `BUTTON_${interaction.customId.split(':')[0]}`, limit: 1, windowSeconds: config.buttonCooldownSeconds, message: 'Bạn bấm nút quá nhanh, vui lòng chờ vài giây.' });
 
+      if (interaction.customId === 'oauth:verify:button') {
+        const host = process.env.PUBLIC_BASE_URL || 'https://api2.cenarstore.xyz';
+        const loginUrl = `${host.replace(/\/$/, '')}/oauth/login?guild_id=${interaction.guildId}`;
+        const guildConfig = getGuildConfig(interaction.guildId);
+
+        // Kiểm tra nếu đã có role verified chưa (tránh verify lại)
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const alreadyVerified = member && member.roles.cache.some(r =>
+          r.name.includes('Explorer') || r.name.includes('Active Customer') ||
+          r.name.includes('Thành Viên Mới') || r.name.toLowerCase().includes('member')
+        );
+
+        if (alreadyVerified) {
+          const alreadyEmbed = new EmbedBuilder()
+            .setColor(0x10B981)
+            .setTitle('✅ Bạn Đã Xác Minh Rồi!')
+            .setDescription([
+              `Tài khoản **${interaction.user.tag}** đã được xác minh và có đầy đủ quyền truy cập.`,
+              '',
+              '> 💬 Bạn có thể xem toàn bộ kênh và tạo ticket mua hàng ngay!',
+              '> 🎫 Dùng lệnh `/order` hoặc bấm **Mở Ticket** trong kênh hỗ trợ.'
+            ].join('\n'))
+            .setFooter({ text: 'Cenar Store — Cảm ơn bạn đã tin tưởng 💜' });
+          await safeReply(interaction, { embeds: [alreadyEmbed], ephemeral: true });
+          return;
+        }
+
+        const verifyEmbed = new EmbedBuilder()
+          .setColor(0x7C3AED)
+          .setTitle('🛡️ Xác Minh Tài Khoản Discord')
+          .setDescription([
+            `Chào **${interaction.user.username}**! Để mở khóa toàn bộ server bạn cần xác minh tài khoản.`,
+            '',
+            '**Tại sao cần xác minh?**',
+            '> 🔒 Bảo vệ server khỏi spam / raid',
+            '> 💾 Bot lưu thông tin — tự động kéo bạn sang server dự phòng nếu bị quét',
+            '> 🔓 Mở khóa: bảng giá, phòng chat, tạo ticket mua hàng',
+            '',
+            '> 👇 **Bấm nút bên dưới để bắt đầu xác minh qua Discord OAuth2:**',
+            '> *(Chỉ mất 5 giây, không lấy mật khẩu của bạn)*'
+          ].join('\n'))
+          .setThumbnail(interaction.user.displayAvatarURL({ forceStatic: false }))
+          .setFooter({ text: 'Cenar Store — Bảo Mật & Uy Tín 💜' });
+
+        const verifyLinkRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('🔗  Xác Minh Ngay Tại Đây')
+            .setStyle(ButtonStyle.Link)
+            .setURL(loginUrl)
+        );
+
+        await safeReply(interaction, {
+          embeds: [verifyEmbed],
+          components: [verifyLinkRow],
+          ephemeral: true
+        });
+        return;
+      }
+
       if (interaction.customId.startsWith('ticket:create:')) {
         const [, , ticketType] = interaction.customId.split(':');
         await handleTicketCreate(interaction, ticketType);
@@ -2202,6 +3327,7 @@ export function getClientOptions() {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.GuildMembers,
     ],
     partials: [Partials.Channel],
   };

@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import {
   ChannelType,
   PermissionFlagsBits,
@@ -30,11 +31,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   const channel = interaction.channel;
   if (!isTicketChannel(channel)) {
-    await interaction.editReply('⚠️ Lệnh này chỉ dùng trong ticket.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Lệnh này chỉ dùng trong ticket.`);
     return;
   }
 
@@ -42,15 +44,15 @@ export async function execute(interaction) {
   const safe = sanitizeChannelName(raw);
 
   if (!safe) {
-    await interaction.editReply('⚠️ Tên mới không hợp lệ.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Tên mới không hợp lệ.`);
     return;
   }
 
   try {
     await channel.setName(safe, `Đổi tên bởi ${interaction.user.tag}`);
-    await interaction.editReply(`✅ Đã đổi tên ticket thành \`${safe}\`.`);
+    await interaction.editReply(`${E('status_check', '✅')} Đã đổi tên ticket thành \`${safe}\`.`);
   } catch (error) {
     console.error('[TICKET/RENAME] Lỗi:', error);
-    await interaction.editReply(`❌ Không thể đổi tên ticket: ${error.message ?? 'Lỗi không xác định'}`);
+    await interaction.editReply(`${E('status_cross', '❌')} Không thể đổi tên ticket: ${error.message ?? 'Lỗi không xác định'}`);
   }
 }

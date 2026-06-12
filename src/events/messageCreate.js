@@ -3,6 +3,8 @@ import { getTicketByChannelId, updateTicketAiStatus } from '../services/ticketSe
 import { processAiMessage } from '../services/aiService.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { moderateMessage } from '../services/aiModerationService.js';
+import { isMrBeastScam, incrementLinkWarningCount, logAbuseEvent } from '../utils/antiScam.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 
 export const name = Events.MessageCreate;
@@ -30,10 +32,64 @@ export async function execute(message) {
   const guildConfig = getGuildConfig(message.guildId);
   if (!guildConfig) return;
 
+  const E = createEmojiResolver(message.guildId);
+
   const ticket = getTicketByChannelId(message.channel.id);
   const isStaff = message.member?.roles?.cache?.has(guildConfig.support_role_id) || 
                   message.member?.roles?.cache?.has(guildConfig.manager_role_id) || 
                   message.member?.permissions?.has('ManageGuild');
+
+  // ═══════════════════════════════════════════════
+  // ANTI-SCAM & LINK CHECK (Chỉ áp dụng cho User thường)
+  // ═══════════════════════════════════════════════
+  if (!isStaff && message.member) {
+    // 1. Kiểm tra MrBeast Scam Image
+    const isScam = await isMrBeastScam(message);
+    if (isScam) {
+      console.log(`[Anti-Scam] MrBeast scam detected from user ${message.author.tag}. Deleting message and banning.`);
+      await message.delete().catch(() => null);
+      
+      logAbuseEvent(message.guildId, message.author.id, 'MRBEAST_SCAM_BAN', `Nội dung: ${message.content || 'chỉ có ảnh'}`);
+      
+      await message.member.ban({ reason: 'Gửi hình ảnh MrBeast scam / lừa đảo.' }).catch(err => {
+        console.error(`[Anti-Scam] Failed to ban user ${message.author.tag}:`, err.message);
+      });
+      
+      await message.channel.send(`${E('status_warn', '🚨')} **Cảnh báo bảo mật:** Tài khoản của <@${message.author.id}> đã bị cấm khỏi server vì gửi hình ảnh/nội dung lừa đảo giả mạo (MrBeast Scam).`).catch(() => null);
+      return;
+    }
+
+    // 2. Kiểm tra chặn Link (Trừ kênh ticket)
+    const isTicketChan = message.channel.name.startsWith('ticket-') || message.channel.name.startsWith('bao-hanh-') || !!ticket;
+    const linkRegex = /(https?:\/\/[^\s]+|discord\.gg\/[^\s]+)/gi;
+    const hasLink = linkRegex.test(message.content);
+
+    if (hasLink && !isTicketChan) {
+      console.log(`[Anti-Link] Link detected from user ${message.author.tag} in non-ticket channel. Deleting.`);
+      await message.delete().catch(() => null);
+      
+      const newCount = incrementLinkWarningCount(message.author.id, message.guildId);
+      logAbuseEvent(message.guildId, message.author.id, 'LINK_WARNING', `Link: ${message.content}, Lần thứ: ${newCount}`);
+
+      if (newCount <= 3) {
+        await message.channel.send(`${E('status_warn', '⚠️')} <@${message.author.id}>, không được phép gửi liên kết quảng cáo tại kênh này! Đây là lần nhắc nhở thứ **${newCount}/3** của bạn.`).catch(() => null);
+      } else if (newCount === 4) {
+        // Mute (timeout) 24h
+        const timeoutMs = 24 * 60 * 60 * 1000;
+        await message.member.timeout(timeoutMs, 'Gửi liên kết quảng cáo quá 3 lần.').catch(err => {
+          console.error(`[Anti-Link] Failed to timeout user ${message.author.tag}:`, err.message);
+        });
+        await message.channel.send(`${E('status_cross', '🔇')} <@${message.author.id}> đã bị cấm chat **24 giờ** vì cố tình gửi liên kết quảng cáo quá 3 lần.`).catch(() => null);
+      } else {
+        // Lần 5+ -> Ban
+        await message.member.ban({ reason: 'Gửi liên kết quảng cáo liên tục lần thứ 5.' }).catch(err => {
+          console.error(`[Anti-Link] Failed to ban user ${message.author.tag}:`, err.message);
+        });
+        await message.channel.send(`${E('status_cross', '🔨')} **Trừng phạt:** <@${message.author.id}> đã bị cấm khỏi server vì tiếp tục gửi liên kết quảng cáo (Lần thứ ${newCount}).`).catch(() => null);
+      }
+      return;
+    }
+  }
 
   // ═══════════════════════════════════════════════
   // AI KIỂM DUYỆT (MODERATION)
@@ -43,7 +99,8 @@ export async function execute(message) {
   const suspiciousKeywords = ['lừa đảo', 'scam', 'chậm', 'lâu', 'chưa thấy', 'đợi', 'thái độ', 'rác', 'cứt', 'địt', 'lồn', 'cặc', 'loz', 'đm', 'vkl', 'vl', 'đéo', 'ngu', 'câm', 'dở', 'tệ', 'kém', 'phốt', 'chửi'];
   const isSuspicious = suspiciousKeywords.some(kw => contentLower.includes(kw));
 
-  if (!isStaff && message.content.length >= 6 && isSuspicious) {
+  // AI Moderation disabled by user request to prevent false positives when customers send account credentials
+  if (false) {
     const modResult = await moderateMessage(message.content);
     if (modResult) {
       if (modResult.category === 'INSULT') {

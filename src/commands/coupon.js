@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { createCoupon, listCoupons, deactivateCoupon, getCouponStats } from '../services/couponService.js';
 
@@ -31,6 +32,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'create') {
@@ -59,16 +61,16 @@ export async function execute(interaction) {
         .setTitle('🎟️ Mã Giảm Giá Đã Tạo')
         .addFields(
           { name: '🏷️ Mã', value: `\`${coupon.code}\``, inline: true },
-          { name: '💰 Giảm', value: valueText, inline: true },
+          { name: `${E('payment_money', '💰')} Giảm`, value: valueText, inline: true },
           { name: '🛒 Đơn tối thiểu', value: minOrder > 0 ? `${minOrder.toLocaleString('vi-VN')}đ` : 'Không', inline: true },
           { name: '🔢 Lượt dùng tối đa', value: maxUses > 0 ? `${maxUses}` : 'Không giới hạn', inline: true },
-          { name: '📅 Hết hạn', value: expires || 'Không', inline: true },
+          { name: `${E('icon_calendar', '📅')} Hết hạn`, value: expires || 'Không', inline: true },
         )
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (e) {
-      await interaction.reply({ content: `❌ Lỗi: ${e.message}`, ephemeral: true });
+      await interaction.reply({ content: `${E('status_cross', '❌')} Lỗi: ${e.message}`, ephemeral: true });
     }
   }
 
@@ -80,7 +82,7 @@ export async function execute(interaction) {
 
     const lines = coupons.slice(0, 15).map(c => {
       const valueText = c.type === 'percent' ? `${c.value}%` : `${c.value.toLocaleString('vi-VN')}đ`;
-      const status = c.is_active ? '✅' : '❌';
+      const status = c.is_active ? `${E('status_check', '✅')}` : `${E('status_cross', '❌')}`;
       return `${status} \`${c.code}\` — Giảm **${valueText}** — Đã dùng: **${c.used_count}/${c.max_uses || '∞'}**`;
     });
 
@@ -106,9 +108,9 @@ export async function execute(interaction) {
       .setColor(0xf59e0b)
       .setTitle('📊 Thống Kê Coupon')
       .addFields(
-        { name: '✅ Đang hoạt động', value: `${stats.activeCoupons}`, inline: true },
+        { name: `${E('status_check', '✅')} Đang hoạt động`, value: `${stats.activeCoupons}`, inline: true },
         { name: '🔢 Tổng lần dùng', value: `${stats.totalTimesUsed}`, inline: true },
-        { name: '💰 Tổng giảm giá', value: `${stats.totalDiscountGiven.toLocaleString('vi-VN')}đ`, inline: true },
+        { name: `${E('payment_money', '💰')} Tổng giảm giá`, value: `${stats.totalDiscountGiven.toLocaleString('vi-VN')}đ`, inline: true },
       )
       .setTimestamp();
 

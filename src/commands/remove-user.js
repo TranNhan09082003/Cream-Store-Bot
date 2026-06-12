@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import {
   ChannelType,
   PermissionFlagsBits,
@@ -19,11 +20,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   const channel = interaction.channel;
   if (!isTicketChannel(channel)) {
-    await interaction.editReply('⚠️ Lệnh này chỉ dùng trong ticket.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Lệnh này chỉ dùng trong ticket.`);
     return;
   }
 
@@ -36,9 +38,9 @@ export async function execute(interaction) {
       ReadMessageHistory: false,
     });
 
-    await interaction.editReply(`✅ Đã gỡ quyền của <@${user.id}> khỏi ticket.`);
+    await interaction.editReply(`${E('status_check', '✅')} Đã gỡ quyền của <@${user.id}> khỏi ticket.`);
   } catch (error) {
     console.error('[TICKET/REMOVE-USER] Lỗi:', error);
-    await interaction.editReply(`❌ Không thể xóa user: ${error.message ?? 'Lỗi không xác định'}`);
+    await interaction.editReply(`${E('status_cross', '❌')} Không thể xóa user: ${error.message ?? 'Lỗi không xác định'}`);
   }
 }

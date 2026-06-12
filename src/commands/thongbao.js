@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import {
   ActionRowBuilder,
   ModalBuilder,
@@ -13,6 +14,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   // Show a Modal to get the announcement content
   const modal = new ModalBuilder()
     .setCustomId('announcement:modal')

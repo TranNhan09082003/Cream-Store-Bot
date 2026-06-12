@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { config } from '../config.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
@@ -15,28 +16,29 @@ export const data = new SlashCommandBuilder()
   .addStringOption((option) => option.setName('ma_don').setDescription('Mã đơn hàng, ví dụ CN_123456').setRequired(true));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'MANAGE')) {
-    await interaction.editReply({ content: '⚠️ Chỉ manager mới được dùng lệnh này.', ephemeral: true });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true });
     return;
   }
 
   const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
   const currentOrder = getOrderByCode(orderCode);
   if (!currentOrder) {
-    await interaction.editReply({ content: '⚠️ Không tìm thấy mã đơn này trong database.', ephemeral: true });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không tìm thấy mã đơn này trong database.`, ephemeral: true });
     return;
   }
 
   if (currentOrder.total_amount > 0 && currentOrder.payment_status !== 'PAID') {
-    await interaction.editReply({ content: '⚠️ Đơn này chưa thanh toán xong.', ephemeral: true });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Đơn này chưa thanh toán xong.`, ephemeral: true });
     return;
   }
 
   if (currentOrder.status === 'COMPLETED') {
-    await interaction.editReply({ content: `ℹ️ Đơn \`${currentOrder.order_code}\` đã hoàn thành trước đó rồi.`, ephemeral: true });
+    await interaction.editReply({ content: `${E('status_info', 'ℹ️')} Đơn \`${currentOrder.order_code}\` đã hoàn thành trước đó rồi.`, ephemeral: true });
     return;
   }
 

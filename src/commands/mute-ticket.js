@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { getTicketMuteStatus, setTicketMuteStatus } from '../services/blacklistService.js';
@@ -37,6 +38,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
 
   const guildConfig = getGuildConfig(interaction.guildId);
@@ -50,7 +52,7 @@ export async function execute(interaction) {
   const target = interaction.options.getUser('user');
 
   if (target.bot) {
-    await interaction.editReply({ content: '⚠️ Không thể mute ticket đối với bot.' });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không thể mute ticket đối với bot.` });
     return;
   }
 
@@ -67,7 +69,7 @@ export async function execute(interaction) {
     const current = getTicketMuteStatus(interaction.guildId, target.id);
     if (current.is_ticket_muted) {
       await interaction.editReply({
-        content: `⚠️ User <@${target.id}> đã bị mute ticket rồi.\n> **Lý do cũ:** ${current.ticket_mute_reason ?? '_Không rõ_'}`,
+        content: `${E('status_warn', '⚠️')} User <@${target.id}> đã bị mute ticket rồi.\n> **Lý do cũ:** ${current.ticket_mute_reason ?? '_Không rõ_'}`,
       });
       return;
     }
@@ -81,7 +83,7 @@ export async function execute(interaction) {
   if (sub === 'unset') {
     const current = getTicketMuteStatus(interaction.guildId, target.id);
     if (!current.is_ticket_muted) {
-      await interaction.editReply({ content: `⚠️ User <@${target.id}> hiện không bị mute ticket.` });
+      await interaction.editReply({ content: `${E('status_warn', '⚠️')} User <@${target.id}> hiện không bị mute ticket.` });
       return;
     }
     setTicketMuteStatus(interaction.guildId, target.id, false, interaction.user.id, null);

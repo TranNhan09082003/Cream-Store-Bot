@@ -797,6 +797,32 @@ export function buildCompletionDmEmbed(order) {
   );
 }
 
+export function buildPublicOrderLogEmbed(order) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+
+  const color = 0x22c55e; // Green COMPLETED color
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`📦  GIAO HÀNG THÀNH CÔNG — ${order.order_code}`)
+    .setDescription(`> 💜 Cảm ơn quý khách đã tin tưởng và mua hàng tại Cenar Store!`)
+    .addFields(
+      { name: '👤 Khách Hàng', value: `<@${order.customer_id}>`, inline: true },
+      { name: '🛍️ Sản Phẩm', value: `**${formatOrderProduct(order.quantity, order.product_name)}**`, inline: true },
+      { name: '💰 Tổng Tiền', value: `\`${vnd(order.total_amount)}đ\``, inline: true },
+      { name: '💳 Thanh Toán', value: statusPill(order.payment_status || 'PAID'), inline: true },
+      { name: '🎫 Ticket', value: order.ticket_channel_id ? `<#${order.ticket_channel_id}>` : `\`${order.ticket_code || 'N/A'}\``, inline: true },
+      order.completed_at
+        ? { name: '⏰ Hoàn Thành', value: T.rel(order.completed_at), inline: true }
+        : { name: '\u200b', value: '\u200b', inline: true }
+    )
+    .setTimestamp(order.completed_at ? new Date(order.completed_at) : undefined);
+
+  return applyBranding(embed);
+}
+
+
 // ═══════════════════════════════════════════════
 // Feedback
 // ═══════════════════════════════════════════════
@@ -1054,7 +1080,7 @@ export function buildAutomationGuideEmbed() {
       .setDescription([
         '**🛍️ Luồng Mua Hàng:**',
         '`1.` Khách bấm **Mua Hàng** → Tạo ticket riêng tư',
-        '`2.` Staff dùng `/oder` → Tạo đơn, gắn sản phẩm và giá',
+        '`2.` Staff dùng `/order` → Tạo đơn, gắn sản phẩm và giá',
         '`3.` Bot tạo QR + link PayOS → Chờ thanh toán',
         '`4.` PayOS webhook xác nhận → Bot tự cập nhật trạng thái',
         '`5.` Staff dùng `/giaohang` → Giao tài khoản qua DM',
@@ -1064,7 +1090,7 @@ export function buildAutomationGuideEmbed() {
         '`7.` Khách bấm **Bảo Hành** → Chọn sản phẩm → Mở ticket bảo hành',
       ].join('\n'))
       .addFields(
-        { name: '🔧 Lệnh Staff', value: '`/oder` `/giaohang` `/qr` `/hoanthanh` `/sua-don` `/renew`' },
+        { name: '🔧 Lệnh Staff', value: '`/order` `/giaohang` `/qr` `/hoanthanh` `/sua-don` `/renew`' },
         { name: '⚙️ Lệnh Admin', value: '`/setup-ticket` `/setup-payos` `/blacklist` `/mute-ticket` `/thongke`' },
       )
       .setTimestamp(),

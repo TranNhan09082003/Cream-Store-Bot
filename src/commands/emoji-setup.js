@@ -20,6 +20,7 @@ import {
   parseDiscordEmoji,
 } from '../services/emojiService.js';
 import { refreshAllPanels } from '../services/panelRefreshService.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 export const data = new SlashCommandBuilder()
   .setName('emoji-setup')
@@ -94,9 +95,31 @@ export async function handleAutocomplete(interaction) {
 
 // ─── Execute ─────────────────────────────────────────────────────────────────
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
+
+  // ── /emoji-setup sync ──
+  if (sub === 'sync') {
+    const syncResult = autoSyncGuildEmojis(interaction.guild);
+    const refreshNote = await tryRefreshPanels(interaction.guild);
+    
+    const embed = new EmbedBuilder()
+      .setColor(0x3b82f6)
+      .setTitle(`${E('status_check', '🔄')} Tự Động Đồng Bộ Emoji`)
+      .setDescription(
+        `Đã quét toàn bộ custom emoji của máy chủ **${interaction.guild.name}**.\n\n` +
+        `✅ Đồng bộ thành công: **${syncResult.syncedCount}** slot(s) mới.\n` +
+        (syncResult.updatedSlots.length > 0 
+          ? `Các slot được cập nhật: ${syncResult.updatedSlots.map(s => `\`${s}\``).join(', ')}` 
+          : 'Không có slot nào cần cập nhật mới.') +
+        `\n\n${refreshNote}`
+      )
+      .setFooter({ text: 'Đặt tên emoji khớp với các slot hoặc alias để tự động đồng bộ!' });
+
+    return interaction.editReply({ embeds: [embed] });
+  }
 
   // ── /emoji-setup list ──
   if (sub === 'list') {
@@ -104,14 +127,14 @@ export async function execute(interaction) {
     const lines = Object.entries(EMOJI_SLOTS).map(([key, meta]) => {
       const cur = map[key];
       const isCustom = cur !== meta.default;
-      return `${isCustom ? '✅' : '⬜'} **${meta.label}**\n> Slot: \`${key}\` | Emoji: ${cur}`;
+      return `${isCustom ? E('status_check', '✅') : '⬜'} **${meta.label}**\n> Slot: \`${key}\` | Emoji: ${cur}`;
     }).join('\n\n');
 
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
       .setTitle('🎨 Cấu Hình Custom Emoji — Cream Store')
       .setDescription(lines)
-      .setFooter({ text: '✅ = đang dùng custom | ⬜ = emoji mặc định' });
+      .setFooter({ text: `${E('status_check', '✅')} = đang dùng custom | ⬜ = emoji mặc định` });
 
     return interaction.editReply({ embeds: [embed] });
   }
@@ -121,17 +144,17 @@ export async function execute(interaction) {
     const slot = interaction.options.getString('slot');
     if (slot) {
       if (!EMOJI_SLOTS[slot]) {
-        return interaction.editReply(`❌ Slot \`${slot}\` không tồn tại.`);
+        return interaction.editReply(`${E('status_cross', '❌')} Slot \`${slot}\` không tồn tại.`);
       }
       setEmoji(guildId, slot, null);
       const refreshNote = await tryRefreshPanels(interaction.guild);
       return interaction.editReply(
-        `✅ Slot **${EMOJI_SLOTS[slot].label}** đã reset về mặc định: ${EMOJI_SLOTS[slot].default}\n${refreshNote}`
+        `${E('status_check', '✅')} Slot **${EMOJI_SLOTS[slot].label}** đã reset về mặc định: ${EMOJI_SLOTS[slot].default}\n${refreshNote}`
       );
     } else {
       resetAllEmojis(guildId);
       const refreshNote = await tryRefreshPanels(interaction.guild);
-      return interaction.editReply(`✅ Đã reset **tất cả** emoji về mặc định!\n${refreshNote}`);
+      return interaction.editReply(`${E('status_check', '✅')} Đã reset **tất cả** emoji về mặc định!\n${refreshNote}`);
     }
   }
 
@@ -141,43 +164,30 @@ export async function execute(interaction) {
     const emojiStr = interaction.options.getString('emoji', true);
 
     if (!EMOJI_SLOTS[slot]) {
-      return interaction.editReply(`❌ Slot \`${slot}\` không tồn tại.`);
+      return interaction.editReply(`${E('status_cross', '❌')} Slot \`${slot}\` không tồn tại.`);
     }
     if (emojiStr === 'none') {
-      return interaction.editReply('❌ Không tìm thấy emoji phù hợp. Hãy thêm custom emoji vào server trước!');
+      return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy emoji phù hợp. Hãy thêm custom emoji vào server trước!`);
     }
 
-    // Validate: phải là custom emoji Discord hoặc unicode
-    const parsed = parseDiscordEmoji(emojiStr);
-    const isUnicode = !emojiStr.startsWith('<') && emojiStr.trim().length <= 8;
-
-    if (!parsed && !isUnicode) {
+    const resolved = resolveEmoji(interaction.guild, emojiStr);
+    if (!resolved) {
       return interaction.editReply(
-        `❌ Emoji không hợp lệ. Hãy chọn từ autocomplete hoặc dán định dạng \`<:name:id>\`.`
+        `${E('status_cross', '❌')} Emoji không hợp lệ. Hãy dán Unicode emoji (e.g. 🛍️), định dạng custom emoji \`<:name:id>\` hoặc ID/tên emoji thuộc server này.`
       );
     }
 
-    // Kiểm tra emoji có tồn tại trong server không
-    if (parsed) {
-      const exists = interaction.guild.emojis.cache.has(parsed.id);
-      if (!exists) {
-        return interaction.editReply(
-          `⚠️ Emoji **:${parsed.name}:** (ID: ${parsed.id}) không thuộc server này. Bot chỉ có thể dùng emoji của server hiện tại.`
-        );
-      }
-    }
-
-    setEmoji(guildId, slot, emojiStr.trim());
+    setEmoji(guildId, slot, resolved);
 
     const meta = EMOJI_SLOTS[slot];
     const refreshNote = await tryRefreshPanels(interaction.guild);
     const embed = new EmbedBuilder()
       .setColor(0x22c55e)
-      .setTitle('✅ Đã Cập Nhật Emoji!')
+      .setTitle(`${E('status_check', '✅')} Đã Cập Nhật Emoji!`)
       .addFields(
         { name: 'Slot', value: `\`${slot}\``, inline: true },
         { name: 'Tên UI', value: meta.label, inline: true },
-        { name: 'Emoji mới', value: emojiStr.trim(), inline: true },
+        { name: 'Emoji mới', value: resolved, inline: true },
       )
       .setDescription(refreshNote)
       .setFooter({ text: 'Áp dụng ngay cho tất cả giao diện bot!' });
@@ -188,17 +198,18 @@ export async function execute(interaction) {
 
 // ─── Helper: refresh panels và trả về note ngắn ────────────────────────────
 async function tryRefreshPanels(guild) {
+  const E = createEmojiResolver(guild.id);
   try {
     const results = await refreshAllPanels(guild);
     const success = results.filter(r => r.result.ok);
     const failed = results.filter(r => !r.result.ok);
     const lines = [];
     if (success.length) {
-      lines.push(`🔄 Đã refresh: ${success.map(s => `\`${s.panel}\``).join(', ')}`);
+      lines.push(`${E('status_check', '🔄')} Đã refresh: ${success.map(s => `\`${s.panel}\``).join(', ')}`);
     }
     if (failed.length) {
       const failNotes = failed.map(f => `\`${f.panel}\` (${f.result.error})`).join(', ');
-      lines.push(`⚠️ Bỏ qua: ${failNotes}`);
+      lines.push(`${E('status_warn', '⚠️')} Bỏ qua: ${failNotes}`);
     }
     return lines.join('\n') || '_Không có panel nào để refresh._';
   } catch (e) {

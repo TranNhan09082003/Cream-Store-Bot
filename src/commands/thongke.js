@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { getRevenueStatsRaw } from '../services/v11DbHelpers.js';
 
@@ -19,6 +20,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: false });
 
   try {
@@ -57,15 +59,15 @@ export async function execute(interaction) {
     const formatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
 
     embed.addFields(
-      { name: '💰 Tổng Doanh Thu', value: `**${formatter.format(stats.total_revenue || 0)}**`, inline: false },
-      { name: '📦 Tổng Đơn Hàng', value: `${stats.total_orders || 0} đơn`, inline: true },
-      { name: '✅ Đã Hoàn Thành', value: `${stats.completed_orders || 0} đơn`, inline: true },
-      { name: '⏳ Chưa Thanh Toán', value: `${stats.unpaid_orders || 0} đơn`, inline: true }
+      { name: `${E('payment_money', '💰')} Tổng Doanh Thu`, value: `**${formatter.format(stats.total_revenue || 0)}**`, inline: false },
+      { name: `${E('order_product', '📦')} Tổng Đơn Hàng`, value: `${stats.total_orders || 0} đơn`, inline: true },
+      { name: `${E('status_check', '✅')} Đã Hoàn Thành`, value: `${stats.completed_orders || 0} đơn`, inline: true },
+      { name: `${E('order_pending', '⏳')} Chưa Thanh Toán`, value: `${stats.unpaid_orders || 0} đơn`, inline: true }
     );
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[THONGKE] Error:', error);
-    await interaction.editReply('❌ Đã xảy ra lỗi khi tính toán thống kê.');
+    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi khi tính toán thống kê.`);
   }
 }

@@ -83,7 +83,7 @@ export function isValidOrderStatus(status) {
  * Validate service type
  */
 export function isValidServiceType(type) {
-  return ['netflix', 'spotify', 'youtube', 'discord', 'other'].includes(type);
+  return ['netflix', 'spotify', 'youtube', 'discord', 'decor', 'other'].includes(type);
 }
 
 /**

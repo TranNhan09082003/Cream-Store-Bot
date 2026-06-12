@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { buildTicketPanelComponents, buildTicketPanelEmbed, buildTicketPanelV2 } from '../utils/embeds.js';
 import { upsertGuildConfig } from '../services/guildConfigService.js';
@@ -26,6 +27,7 @@ export const data = new SlashCommandBuilder()
   .addChannelOption(opt => opt.setName('reminder_channel').setDescription('Kênh nhắc việc tự động').addChannelTypes(ChannelType.GuildText).setRequired(false));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   try {
     await interaction.deferReply({ ephemeral: true });
 
@@ -79,14 +81,14 @@ export async function execute(interaction) {
       .addFields(
         { name: '📋 Panel Ticket', value: `${panelChannel}`, inline: true },
         { name: '🗂️ Category Mặc Định', value: `${ticketCategory}`, inline: true },
-        { name: '📦 Log Đơn Hàng', value: `${orderLogChannel}`, inline: true },
-        { name: '⭐ Kênh Feedback', value: `${feedbackChannel}`, inline: true },
-        { name: '🛠️ Category Bảo Hành', value: warrantyCategory ? `${warrantyCategory}` : `_Dùng mặc định_`, inline: true },
-        { name: '🆘 Category Hỗ Trợ', value: supportCategory ? `${supportCategory}` : `_Dùng mặc định_`, inline: true },
-        { name: '⚠️ Category Khiếu Nại', value: complaintCategory ? `${complaintCategory}` : `_Dùng mặc định_`, inline: true },
-        { name: '🤝 Category Hợp Tác', value: partnershipCategory ? `${partnershipCategory}` : `_Dùng mặc định_`, inline: true },
+        { name: `${E('order_product', '📦')} Log Đơn Hàng`, value: `${orderLogChannel}`, inline: true },
+        { name: `${E('icon_star', '⭐')} Kênh Feedback`, value: `${feedbackChannel}`, inline: true },
+        { name: `${E('panel_warranty', '🛠️')} Category Bảo Hành`, value: warrantyCategory ? `${warrantyCategory}` : `_Dùng mặc định_`, inline: true },
+        { name: `${E('panel_support', '🆘')} Category Hỗ Trợ`, value: supportCategory ? `${supportCategory}` : `_Dùng mặc định_`, inline: true },
+        { name: `${E('status_warn', '⚠️')} Category Khiếu Nại`, value: complaintCategory ? `${complaintCategory}` : `_Dùng mặc định_`, inline: true },
+        { name: `${E('panel_partnership', '🤝')} Category Hợp Tác`, value: partnershipCategory ? `${partnershipCategory}` : `_Dùng mặc định_`, inline: true },
         { name: '👥 Role Support', value: supportRole ? `${supportRole}` : `_Chưa cấu hình_`, inline: true },
-        { name: '🛡️ Role Manager', value: managerRole ? `${managerRole}` : `_Chưa cấu hình_`, inline: true },
+        { name: `${E('ticket_claim', '🛡️')} Role Manager`, value: managerRole ? `${managerRole}` : `_Chưa cấu hình_`, inline: true },
         { name: '📄 Transcript', value: transcriptChannel ? `${transcriptChannel}` : `_Chưa cấu hình_`, inline: true },
         { name: '📝 Staff Log', value: staffLogChannel ? `${staffLogChannel}` : `_Chưa cấu hình_`, inline: true },
       )
@@ -97,9 +99,9 @@ export async function execute(interaction) {
   } catch (error) {
     console.error('[SETUP TICKET] Lỗi:', error);
     if (interaction.deferred || interaction.replied) {
-      await interaction.editReply('❌ Setup ticket thất bại, kiểm tra log console.').catch(() => null);
+      await interaction.editReply(`${E('status_cross', '❌')} Setup ticket thất bại, kiểm tra log console.`).catch(() => null);
     } else {
-      await interaction.reply({ content: '❌ Setup ticket thất bại, kiểm tra log console.', ephemeral: true }).catch(() => null);
+      await interaction.reply({ content: `${E('status_cross', '❌')} Setup ticket thất bại, kiểm tra log console.`, ephemeral: true }).catch(() => null);
     }
   }
 }

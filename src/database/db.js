@@ -59,6 +59,9 @@ export function initDatabase() {
       bank_bin TEXT,
       bank_account_no TEXT,
       bank_account_name TEXT,
+      sale_channel_id TEXT,
+      sale_message_id TEXT,
+      sale_percent INTEGER DEFAULT 0,
       updated_by TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -466,6 +469,10 @@ export function initDatabase() {
   // Custom emoji slots cho từng guild
   ensureColumn('guild_settings', 'custom_emojis', 'TEXT');
 
+  ensureColumn('guild_settings', 'sale_channel_id', 'TEXT');
+  ensureColumn('guild_settings', 'sale_message_id', 'TEXT');
+  ensureColumn('guild_settings', 'sale_percent', 'INTEGER DEFAULT 0');
+
   ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
 
   // Seed product catalog data
@@ -612,33 +619,33 @@ export function seedProductCatalog(dbInstance) {
     { name: 'Discord Server Boost Level 3 (3 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 3 tháng. Giao hàng nhanh chóng.', price: 380000, duration_months: 3, service_type: 'GAME', emoji: '🔮', original_price: 0 },
 
     // Decor Trang Trí - Có Nitro
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 25k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 25000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 66000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 72000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 50k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 50000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 92000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 105000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 70k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 70000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 111000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 79k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 79000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 131000 },
-    { name: 'Decor Discord (Acc Có Nitro) - Gói 88k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 88000, duration_months: 1, service_type: 'GAME', emoji: '✨', original_price: 141000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 25k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 25000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 66000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 72000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 50k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 50000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 92000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 105000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 70k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 70000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 111000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 79k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 79000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 131000 },
+    { name: 'Decor Discord (Acc Có Nitro) - Gói 88k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 88000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 141000 },
 
     // Decor Trang Trí - Không Nitro
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 79000 },
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 105000 },
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 80k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 80000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 131000 },
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 90k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 141000 },
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 95k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 95000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 146000 },
-    { name: 'Decor Discord (Acc Không Nitro) - Gói 110k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎨', original_price: 189000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 35k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 35000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 79000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 60k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 60000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 105000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 80k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 80000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 131000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 90k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 90000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 141000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 95k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 95000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 146000 },
+    { name: 'Decor Discord (Acc Không Nitro) - Gói 110k', description: 'Trang trí hồ sơ cho tài khoản CHƯA CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 110000, duration_months: 1, service_type: 'decor', emoji: '🎨', original_price: 189000 },
 
     // Decor Trang Trí - Dạng Gift
-    { name: 'Decor Discord Dạng Gift - Gói 50k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 50000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 66000 },
-    { name: 'Decor Discord Dạng Gift - Gói 58k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 58000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 79000 },
-    { name: 'Decor Discord Dạng Gift - Gói 70k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 70000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 92000 },
-    { name: 'Decor Discord Dạng Gift - Gói 85k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 85000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 105000 },
-    { name: 'Decor Discord Dạng Gift - Gói 95k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 95000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 131000 },
-    { name: 'Decor Discord Dạng Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 141000 },
-    { name: 'Decor Discord Combo Gift - Gói 90k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 118000 },
-    { name: 'Decor Discord Combo Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 146000 },
-    { name: 'Decor Discord Combo Gift - Gói 150k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 150000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 189000 },
-    { name: 'Decor Discord Combo Gift - Gói 180k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 180000, duration_months: 1, service_type: 'GAME', emoji: '🎁', original_price: 220000 },
+    { name: 'Decor Discord Dạng Gift - Gói 50k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 50000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 66000 },
+    { name: 'Decor Discord Dạng Gift - Gói 58k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 58000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 79000 },
+    { name: 'Decor Discord Dạng Gift - Gói 70k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 70000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 92000 },
+    { name: 'Decor Discord Dạng Gift - Gói 85k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 85000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 105000 },
+    { name: 'Decor Discord Dạng Gift - Gói 95k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 95000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 131000 },
+    { name: 'Decor Discord Dạng Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 141000 },
+    { name: 'Decor Discord Combo Gift - Gói 90k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 90000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 118000 },
+    { name: 'Decor Discord Combo Gift - Gói 110k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 110000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 146000 },
+    { name: 'Decor Discord Combo Gift - Gói 150k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 150000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 189000 },
+    { name: 'Decor Discord Combo Gift - Gói 180k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 180000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 220000 },
 
     // AI & Phần Mềm
     { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Full BH)', description: 'Đăng ký sử dụng gói cước 1 năm, hỗ trợ bảo hành toàn diện từ shop.', price: 200000, duration_months: 12, service_type: 'AI', emoji: '✨', original_price: 350000 },

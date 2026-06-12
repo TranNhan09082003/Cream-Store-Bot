@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { getCustomerRecentOrders, syncCustomerStats } from '../services/customerService.js';
 import { buildCustomerProfileEmbed } from '../utils/embeds.js';
@@ -10,6 +11,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const user = interaction.options.getUser('user') ?? interaction.user;
   const profile = syncCustomerStats(interaction.guildId, user.id);
   const orders = getCustomerRecentOrders(interaction.guildId, user.id, 5);

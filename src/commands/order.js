@@ -15,7 +15,7 @@ import { config } from '../config.js';
 import { getCenarHub } from '../services/cenarHub.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('oder')
+  .setName('order')
   .setDescription('Tạo đơn hàng và liên kết trực tiếp với ticket hiện tại.')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addUserOption((option) => option.setName('khach_hang').setDescription('Khách hàng của đơn này').setRequired(true))

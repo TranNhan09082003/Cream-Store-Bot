@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AttachmentBuilder, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
@@ -10,9 +11,10 @@ function rowsToCsv(rows) { if (!rows.length) return ''; const headers = Object.k
 export const data = new SlashCommandBuilder().setName('export').setDescription('Backup dữ liệu hoặc export CSV nhanh.').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild).addStringOption((opt) => opt.setName('loai').setDescription('Loại export').setRequired(true).addChoices({ name: 'Database sqlite', value: 'db' }, { name: 'Đơn hàng CSV', value: 'orders' }, { name: 'Khách hàng CSV', value: 'customers' }, { name: 'Nhật ký staff CSV', value: 'stafflogs' }));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!assertStaffCapability(member, guildConfig, 'MANAGE')) { await interaction.reply({ content: '⚠️ Chỉ manager mới được dùng lệnh này.', ephemeral: true }); return; }
+  if (!assertStaffCapability(member, guildConfig, 'MANAGE')) { await interaction.reply({ content: `${E('status_warn', '⚠️')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true }); return; }
   await interaction.deferReply({ ephemeral: true });
   const kind = interaction.options.getString('loai', true);
   if (kind === 'db') { const dbPath = getDatabasePath(); const fileName = path.basename(dbPath); await interaction.editReply({ files: [new AttachmentBuilder(dbPath, { name: fileName })] }); return; }

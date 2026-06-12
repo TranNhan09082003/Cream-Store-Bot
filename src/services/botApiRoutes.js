@@ -13,6 +13,7 @@
  */
 
 import { db, nowIso } from '../database/db.js';
+import { config } from '../config.js';
 
 /**
  * Middleware xác thực API key
@@ -704,6 +705,24 @@ export function registerBotApiRoutes(app) {
                 return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
             }
 
+            // Proxy check to route to the correct bot process
+            if (order.guild_id && order.guild_id !== config.guildId) {
+                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 2753;
+                try {
+                    const response = await fetch(`http://127.0.0.1:${targetPort}${req.originalUrl || req.url}`, {
+                        method: 'GET',
+                        headers: {
+                            'X-Bot-Api-Key': req.header('X-Bot-Api-Key') || ''
+                        }
+                    });
+                    const data = await response.json();
+                    return res.status(response.status).json(data);
+                } catch (proxyError) {
+                    console.error('[GET CHAT PROXY ERROR]', proxyError);
+                    return res.status(502).json({ ok: false, error: 'Failed to proxy request to target bot' });
+                }
+            }
+
             const channelId = order.ticket_channel_id;
             if (!channelId || channelId === 'web' || channelId.startsWith('web-')) {
                 return res.json({ ok: true, messages: [] });
@@ -788,6 +807,26 @@ export function registerBotApiRoutes(app) {
             const order = db.prepare(`SELECT * FROM orders WHERE order_code = ?`).get(code);
             if (!order) {
                 return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
+            }
+
+            // Proxy check to route to the correct bot process
+            if (order.guild_id && order.guild_id !== config.guildId) {
+                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 2753;
+                try {
+                    const response = await fetch(`http://127.0.0.1:${targetPort}${req.originalUrl || req.url}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Bot-Api-Key': req.header('X-Bot-Api-Key') || ''
+                        },
+                        body: JSON.stringify(req.body)
+                    });
+                    const data = await response.json();
+                    return res.status(response.status).json(data);
+                } catch (proxyError) {
+                    console.error('[POST CHAT PROXY ERROR]', proxyError);
+                    return res.status(502).json({ ok: false, error: 'Failed to proxy request to target bot' });
+                }
             }
 
             let channelId = order.ticket_channel_id;

@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } from 'discord.js';
 import { db } from '../database/db.js';
 
@@ -7,6 +8,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
 
   const guild = interaction.guild;
@@ -14,7 +16,7 @@ export async function execute(interaction) {
   // ─── Lấy config guild ───
   const guildConfig = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?').get(guild.id);
   if (!guildConfig) {
-    return interaction.editReply({ content: '❌ Chưa setup bot! Dùng `/setup-ticket` trước.' });
+    return interaction.editReply({ content: `${E('status_cross', '❌')} Chưa setup bot! Dùng \`/setup-ticket\` trước.` });
   }
 
   // ─── Lấy tất cả category ticket ───
@@ -99,7 +101,7 @@ export async function execute(interaction) {
       '**Danh sách sẽ xóa:**',
       channelList + moreText,
       '',
-      `📊 **Giữ lại:** ${dbChannelIds.size} ticket có dữ liệu`,
+      `${E('icon_chart', '📊')} **Giữ lại:** ${dbChannelIds.size} ticket có dữ liệu`,
       `🗑️ **Sẽ xóa:** ${orphanChannels.length} kênh orphan`,
     ].join('\n'))
     .setFooter({ text: 'Bấm Xác Nhận để xóa. Hết hạn sau 60 giây.' })
@@ -128,11 +130,11 @@ export async function execute(interaction) {
     });
 
     if (btn.customId === 'reset_orphan_cancel') {
-      return btn.update({ content: '❌ Đã hủy.', embeds: [], components: [] });
+      return btn.update({ content: `${E('status_cross', '❌')} Đã hủy.`, embeds: [], components: [] });
     }
 
     await btn.update({
-      content: `⏳ Đang xóa ${orphanChannels.length} kênh... Vui lòng chờ.`,
+      content: `${E('order_pending', '⏳')} Đang xóa ${orphanChannels.length} kênh... Vui lòng chờ.`,
       embeds: [],
       components: [],
     });
@@ -154,7 +156,7 @@ export async function execute(interaction) {
       // Cập nhật tiến trình mỗi 10 kênh
       if ((deleted + failed) % 10 === 0) {
         await interaction.editReply({
-          content: `⏳ Đang xóa... ${deleted + failed}/${orphanChannels.length} (${deleted} thành công, ${failed} lỗi)`,
+          content: `${E('order_pending', '⏳')} Đang xóa... ${deleted + failed}/${orphanChannels.length} (${deleted} thành công, ${failed} lỗi)`,
         }).catch(() => {});
       }
     }
@@ -166,9 +168,9 @@ export async function execute(interaction) {
       .setDescription([
         '**Kết quả:**',
         '',
-        `✅ Đã xóa: **${deleted}** kênh`,
-        failed > 0 ? `❌ Thất bại: **${failed}** kênh` : '',
-        `📊 Giữ nguyên: **${dbChannelIds.size}** ticket có dữ liệu`,
+        `${E('status_check', '✅')} Đã xóa: **${deleted}** kênh`,
+        failed > 0 ? `${E('status_cross', '❌')} Thất bại: **${failed}** kênh` : '',
+        `${E('icon_chart', '📊')} Giữ nguyên: **${dbChannelIds.size}** ticket có dữ liệu`,
         '',
         '> 💡 Các ticket có dữ liệu vẫn hoạt động bình thường!',
       ].filter(Boolean).join('\n'))
@@ -183,10 +185,10 @@ export async function execute(interaction) {
 
   } catch (e) {
     if (e.code === 'InteractionCollectorError') {
-      return interaction.editReply({ content: '⏰ Hết thời gian.', embeds: [], components: [] });
+      return interaction.editReply({ content: `${E('icon_clock', '⏰')} Hết thời gian.`, embeds: [], components: [] });
     }
     console.error('[RESET-TICKETS]', e);
-    return interaction.editReply({ content: `❌ Lỗi: ${e.message}`, embeds: [], components: [] });
+    return interaction.editReply({ content: `${E('status_cross', '❌')} Lỗi: ${e.message}`, embeds: [], components: [] });
   }
 }
 

@@ -36,16 +36,21 @@ try:
         return out, err
 
     # 1. Pre-deploy cleanup on VPS
-    run_cmd("pm2 stop cenar-store-bot || true")
-    run_cmd("pm2 delete cenar-store-bot || true")
+    run_cmd("pm2 stop cenar-store-bot cenar-store-bot-2 || true")
+    run_cmd("pm2 delete cenar-store-bot cenar-store-bot-2 || true")
     run_cmd("pm2 flush || true")
     run_cmd("fuser -k 2753/tcp || kill -9 $(lsof -t -i:2753) || true")
+    run_cmd("fuser -k 8080/tcp || kill -9 $(lsof -t -i:8080) || true")
 
     # 2. Pull code mới từ Github (xóa thay đổi local trên VPS trước để tránh conflict)
     run_cmd("cd /opt/cenar-store && git checkout . && git pull origin main")
     
     # 3. Cập nhật các dependency nếu cần
     run_cmd("cd /opt/cenar-store && npm install --omit=dev")
+
+    # 3.5 Deploy slash commands cho cả 2 server (guilds)
+    run_cmd("cd /opt/cenar-store && ENV_FILE=.env node src/deploy-commands.js")
+    run_cmd("cd /opt/cenar-store && ENV_FILE=.env.store2 node src/deploy-commands.js")
 
     # 4. Khởi động lại bot bằng PM2 sạch sẽ
     run_cmd("cd /opt/cenar-store && pm2 start ecosystem.config.cjs")

@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import {
   addProduct,
@@ -54,6 +55,7 @@ export function parsePrice(raw) {
 }
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const sub = interaction.options.getSubcommand();
 
   try {
@@ -116,7 +118,7 @@ export async function execute(interaction) {
       const productId = interaction.options.getInteger('id', true);
       const product = getProductById(productId);
       if (!product || product.guild_id !== interaction.guildId) {
-        return interaction.reply({ content: '❌ Không tìm thấy sản phẩm với ID này.', ephemeral: true });
+        return interaction.reply({ content: `${E('status_cross', '❌')} Không tìm thấy sản phẩm với ID này.`, ephemeral: true });
       }
 
       import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
@@ -153,7 +155,7 @@ export async function execute(interaction) {
             new TextInputBuilder()
               .setCustomId('emoji')
               .setLabel('Icon / Emoji')
-              .setValue(product.emoji || '📦')
+              .setValue(product.emoji || `${E('order_product', '📦')}`)
               .setStyle(TextInputStyle.Short)
               .setRequired(false)
           ),
@@ -207,7 +209,7 @@ Spotify Premium | 25k | 1`;
       const productId = interaction.options.getInteger('id', true);
       const product = getProductById(productId);
       if (!product || product.guild_id !== interaction.guildId) {
-        return interaction.editReply('❌ Không tìm thấy sản phẩm với ID này.');
+        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy sản phẩm với ID này.`);
       }
       deleteProduct(productId);
       return interaction.editReply(`🗑️ Đã xóa sản phẩm **${product.name}** (ID: ${product.id}).`);
@@ -216,7 +218,7 @@ Spotify Premium | 25k | 1`;
     if (sub === 'list') {
       const products = getAllProducts(interaction.guildId);
       if (!products.length) {
-        return interaction.editReply('📦 Chưa có sản phẩm nào. Dùng `/product add` để thêm.');
+        return interaction.editReply(`${E('order_product', '📦')} Chưa có sản phẩm nào. Dùng \`/product add\` để thêm.`);
       }
 
       const lines = products.map((p, i) => {
@@ -236,6 +238,6 @@ Spotify Premium | 25k | 1`;
     }
   } catch (error) {
     console.error('[PRODUCT] Error:', error);
-    return interaction.editReply(`❌ Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
   }
 }

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
-const envPath = path.resolve(projectRoot, '.env');
+const envFileName = process.env.ENV_FILE || '.env';
+const envPath = path.resolve(projectRoot, envFileName);
 const envExamplePath = path.resolve(projectRoot, '.env.example');
 const envFileExists = fs.existsSync(envPath);
 

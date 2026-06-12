@@ -15,6 +15,7 @@ import {
   buildTranscriptSummaryEmbed,
   buildTranscriptLinkComponents,
   buildWarrantyActionComponents,
+  buildPublicOrderLogEmbed,
 } from '../utils/embeds.js';
 import { formatCurrency, buildOrderLogContent } from '../utils/formatters.js';
 
@@ -86,6 +87,15 @@ export async function sendCompletedFlow({ guild, order, actorId, supportId }) {
   const customer = await guild.client.users.fetch(order.customer_id).catch(() => null);
   const dmMessage = customer ? await customer.send({ embeds: [buildCompletionDmEmbed(order)] }).catch(() => null) : null;
   await applyCustomerRoles(guild, order.customer_id);
+
+  // Bắn log công khai nếu được cấu hình
+  const guildConfig = getGuildConfig(guild.id);
+  if (guildConfig?.public_order_log_channel_id) {
+    const publicLogChannel = await guild.channels.fetch(guildConfig.public_order_log_channel_id).catch(() => null);
+    if (publicLogChannel?.isTextBased()) {
+      await publicLogChannel.send({ embeds: [buildPublicOrderLogEmbed(order)] }).catch(() => null);
+    }
+  }
 
   return {
     dmSent: Boolean(dmMessage),

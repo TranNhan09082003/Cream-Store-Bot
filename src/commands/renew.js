@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { buildOrderLogContent } from '../utils/formatters.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
@@ -18,19 +19,20 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption((o) => o.setName('gia_tien').setDescription('Giá gia hạn').setRequired(false).setMinValue(0));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   const oldOrderCode = interaction.options.getString('ma_don_cu', true).trim().toUpperCase();
   const oldOrder = getOrderByCodeRaw(oldOrderCode);
 
   if (!oldOrder) {
-    await interaction.editReply('⚠️ Không tìm thấy mã đơn cũ.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn cũ.`);
     return;
   }
 
   const ticket = getTicketByChannelIdRaw(interaction.channelId);
   if (!ticket) {
-    await interaction.editReply('⚠️ Hãy chạy lệnh này trong ticket gia hạn hoặc ticket hiện tại của khách.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Hãy chạy lệnh này trong ticket gia hạn hoặc ticket hiện tại của khách.`);
     return;
   }
 
@@ -76,6 +78,6 @@ export async function execute(interaction) {
   });
 
   await interaction.editReply(
-    `✅ Đã tạo đơn gia hạn mới \`${newOrder.order_code}\` từ đơn cũ \`${oldOrder.order_code}\` với thời hạn **${months} tháng**.`,
+    `${E('status_check', '✅')} Đã tạo đơn gia hạn mới \`${newOrder.order_code}\` từ đơn cũ \`${oldOrder.order_code}\` với thời hạn **${months} tháng**.`,
   );
 }

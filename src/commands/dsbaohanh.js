@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import Database from 'better-sqlite3';
 import { config } from '../config.js';
@@ -9,6 +10,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(STAFF_DEFAULT_PERMISSIONS);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   if (!interaction.member.permissions.has(STAFF_DEFAULT_PERMISSIONS)) {
     return interaction.reply({ content: 'Bạn không có quyền sử dụng lệnh này.', ephemeral: true });
   }
@@ -30,7 +32,7 @@ export async function execute(interaction) {
     db.close();
 
     if (!warranties || warranties.length === 0) {
-      return interaction.editReply('🎉 Tuyệt vời! Hiện tại không có yêu cầu bảo hành nào đang chờ xử lý.');
+      return interaction.editReply(`${E('order_complete', '🎉')} Tuyệt vời! Hiện tại không có yêu cầu bảo hành nào đang chờ xử lý.`);
     }
 
     const embed = new EmbedBuilder()
@@ -48,7 +50,7 @@ export async function execute(interaction) {
       
       embed.addFields({
         name: `#${count} - Đơn: ${orderInfo}`,
-        value: `👤 Khách hàng: ${customerInfo}\n📦 Sản phẩm: ${productName}\n🔗 Kênh: <#${w.channel_id}>`,
+        value: `${E('ticket_user', '👤')} Khách hàng: ${customerInfo}\n${E('order_product', '📦')} Sản phẩm: ${productName}\n${E('icon_link', '🔗')} Kênh: <#${w.channel_id}>`,
         inline: false
       });
       count++;
@@ -61,6 +63,6 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[dsbaohanh] Error:', error);
-    await interaction.editReply('❌ Đã xảy ra lỗi khi tải danh sách bảo hành.');
+    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi khi tải danh sách bảo hành.`);
   }
 }

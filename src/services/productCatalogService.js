@@ -5,15 +5,27 @@ import { db, nowIso } from '../database/db.js';
 // ═══════════════════════════════════════════════
 
 export function getActiveProducts(guildId) {
-  return db.prepare(
+  let products = db.prepare(
     'SELECT * FROM product_catalog WHERE guild_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC'
   ).all(guildId);
+  if (!products || products.length === 0) {
+    products = db.prepare(
+      'SELECT * FROM product_catalog WHERE guild_id = \'WEB\' AND is_active = 1 ORDER BY sort_order ASC, id ASC'
+    ).all();
+  }
+  return products;
 }
 
 export function getAllProducts(guildId) {
-  return db.prepare(
+  let products = db.prepare(
     'SELECT * FROM product_catalog WHERE guild_id = ? ORDER BY sort_order ASC, id ASC'
   ).all(guildId);
+  if (!products || products.length === 0) {
+    products = db.prepare(
+      'SELECT * FROM product_catalog WHERE guild_id = \'WEB\' ORDER BY sort_order ASC, id ASC'
+    ).all();
+  }
+  return products;
 }
 
 export function getProductById(productId) {
@@ -21,9 +33,15 @@ export function getProductById(productId) {
 }
 
 export function getProductByName(guildId, name) {
-  return db.prepare(
+  let product = db.prepare(
     'SELECT * FROM product_catalog WHERE guild_id = ? AND LOWER(name) = LOWER(?) LIMIT 1'
   ).get(guildId, name) ?? null;
+  if (!product) {
+    product = db.prepare(
+      'SELECT * FROM product_catalog WHERE guild_id = \'WEB\' AND LOWER(name) = LOWER(?) LIMIT 1'
+    ).get(name) ?? null;
+  }
+  return product;
 }
 
 export function addProduct({ guildId, name, description, price, durationMonths = 1, serviceType = 'other', emoji = '📦' }) {

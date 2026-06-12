@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { upsertGuildConfig } from '../services/guildConfigService.js';
 
@@ -16,6 +17,7 @@ export const data = new SlashCommandBuilder()
   .addChannelOption((o) => o.setName('kenh_reminder').setDescription('Kênh nhắc việc tự động').setRequired(false));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const cfg = upsertGuildConfig({
     guild_id: interaction.guildId,
     customer_role_id: interaction.options.getRole('role_khach')?.id ?? null,
@@ -32,7 +34,7 @@ export async function execute(interaction) {
 
   await interaction.reply({
     content: [
-      '✅ Đã cập nhật role/channels tự động.',
+      `${E('status_check', '✅')} Đã cập nhật role/channels tự động.`,
       cfg.customer_role_id ? `• Role khách: <@&${cfg.customer_role_id}>` : '• Role khách: chưa cấu hình',
       cfg.loyal_role_id ? `• Role khách quen: <@&${cfg.loyal_role_id}>` : '• Role khách quen: chưa cấu hình',
       cfg.vip_role_id ? `• Role VIP: <@&${cfg.vip_role_id}>` : '• Role VIP: chưa cấu hình',

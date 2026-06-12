@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { runDeepNotifications, runSubscriptionNotifications } from '../services/deepNotificationService.js';
 import { getExpiringOrdersRaw } from '../services/v11DbHelpers.js';
@@ -28,6 +29,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const subcommand = interaction.options.getSubcommand();
   await interaction.deferReply({ ephemeral: false });
 
@@ -43,7 +45,7 @@ export async function execute(interaction) {
         .setColor(0x3498DB)
         .setDescription('Kết quả quét và gửi tin nhắn:')
         .addFields(
-          { name: '📦 Đơn hàng', value: `3 ngày: ${orderResult?.sent3d || 0}\n2 ngày: ${orderResult?.sent2d || 0}\n1 ngày: ${orderResult?.sent1d || 0}`, inline: true },
+          { name: `${E('order_product', '📦')} Đơn hàng`, value: `3 ngày: ${orderResult?.sent3d || 0}\n2 ngày: ${orderResult?.sent2d || 0}\n1 ngày: ${orderResult?.sent1d || 0}`, inline: true },
           { name: '🔄 Subscriptions', value: `Chủ shop: ${subResult?.sentOwner || 0}\nKhách hàng: ${subResult?.sentCustomer || 0}`, inline: true },
         )
         .setTimestamp();
@@ -96,13 +98,13 @@ export async function execute(interaction) {
       } else {
         let desc = `Tìm thấy **${subs.length}** subscription cần xử lý:\n\n`;
         for (const s of subs.slice(0, 20)) {
-          const emoji = SERVICE_EMOJI[s.service_type] || '📦';
+          const emoji = SERVICE_EMOJI[s.service_type] || `${E('order_product', '📦')}`;
           const mode = MODE_LABEL[s.renewal_mode] || s.renewal_mode;
           const dateField = s.renewal_mode === 'auto_cycle' ? s.next_renewal_at : s.expiry_at;
           const ts = Math.floor(new Date(dateField).getTime() / 1000);
           const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '—');
           const extra = s.spotify_family_name ? ` · 🏠 ${s.spotify_family_name}` : '';
-          desc += `${emoji} **ID ${s.id}** · \`${s.gmail_email}\`${extra}\n> 👤 ${customer} · ${mode} · <t:${ts}:R>\n\n`;
+          desc += `${emoji} **ID ${s.id}** · \`${s.gmail_email}\`${extra}\n> ${E('ticket_user', '👤')} ${customer} · ${mode} · <t:${ts}:R>\n\n`;
         }
         embed.setDescription(desc.slice(0, 4000));
         if (subs.length > 20) embed.setFooter({ text: `Và ${subs.length - 20} mục khác...` });
@@ -112,6 +114,6 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error('[AUTO-RENEW] Error:', error);
-    await interaction.editReply('❌ Đã xảy ra lỗi hệ thống.');
+    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi hệ thống.`);
   }
 }

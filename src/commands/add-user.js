@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import {
   ChannelType,
   PermissionFlagsBits,
@@ -19,11 +20,12 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   const channel = interaction.channel;
   if (!isTicketChannel(channel)) {
-    await interaction.editReply('⚠️ Lệnh này chỉ dùng trong ticket.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Lệnh này chỉ dùng trong ticket.`);
     return;
   }
 
@@ -38,10 +40,10 @@ export async function execute(interaction) {
       EmbedLinks: true,
     });
 
-    await channel.send(`✅ Đã thêm <@${user.id}> vào ticket.`);
-    await interaction.editReply(`✅ Đã cấp quyền cho <@${user.id}>.`);
+    await channel.send(`${E('status_check', '✅')} Đã thêm <@${user.id}> vào ticket.`);
+    await interaction.editReply(`${E('status_check', '✅')} Đã cấp quyền cho <@${user.id}>.`);
   } catch (error) {
     console.error('[TICKET/ADD-USER] Lỗi:', error);
-    await interaction.editReply(`❌ Không thể thêm user: ${error.message ?? 'Lỗi không xác định'}`);
+    await interaction.editReply(`${E('status_cross', '❌')} Không thể thêm user: ${error.message ?? 'Lỗi không xác định'}`);
   }
 }

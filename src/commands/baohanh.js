@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { getOrderByCode } from '../services/orderService.js';
@@ -17,12 +18,13 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
   const reason = interaction.options.getString('ly_do');
   const order = getOrderByCode(orderCode);
 
   if (!order) {
-    await interaction.reply({ content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn', '⚠️')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
@@ -32,7 +34,7 @@ export async function execute(interaction) {
   const isStaff = isStaffMember(member, guildConfig);
 
   if (!isOwner && !isStaff) {
-    await interaction.reply({ content: '⚠️ Bạn không có quyền mở bảo hành cho đơn này.', ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn', '⚠️')} Bạn không có quyền mở bảo hành cho đơn này.`, ephemeral: true });
     return;
   }
 
@@ -48,8 +50,8 @@ export async function execute(interaction) {
 
   await interaction.reply({
     content: result.reused
-      ? `ℹ️ Đơn ${orderCode} đã có ticket bảo hành đang mở tại ${result.channel}.`
-      : `✅ Đã mở ticket bảo hành cho đơn ${orderCode}: ${result.channel}`,
+      ? `${E('status_info', 'ℹ️')} Đơn ${orderCode} đã có ticket bảo hành đang mở tại ${result.channel}.`
+      : `${E('status_check', '✅')} Đã mở ticket bảo hành cho đơn ${orderCode}: ${result.channel}`,
     ephemeral: true,
   });
 }

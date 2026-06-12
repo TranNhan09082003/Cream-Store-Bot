@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { getWalletBalance, addWalletBalance, getWalletTransactions } from '../services/walletService.js';
 import { formatCurrency } from '../utils/formatters.js';
@@ -29,6 +30,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const subcommand = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
 
@@ -58,7 +60,7 @@ export async function execute(interaction) {
   if (subcommand === 'add') {
     // Permission check - require ManageGuild
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return interaction.reply({ content: '❌ Bạn không có quyền cộng trừ tiền.', ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross', '❌')} Bạn không có quyền cộng trừ tiền.`, ephemeral: true });
     }
 
     const targetUser = interaction.options.getUser('user');
@@ -66,7 +68,7 @@ export async function execute(interaction) {
     const reason = interaction.options.getString('reason') || 'Admin thay đổi số dư';
 
     if (amount === 0) {
-      return interaction.reply({ content: '❌ Số tiền không hợp lệ.', ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross', '❌')} Số tiền không hợp lệ.`, ephemeral: true });
     }
 
     const type = amount >= 0 ? 'ADMIN_ADD' : 'ADMIN_SUB';

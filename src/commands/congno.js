@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { getOutstandingOrders, getOutstandingSummary } from '../services/orderService.js';
 import { config } from '../config.js';
@@ -19,7 +20,7 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   const orders = getOutstandingOrders(guildId, customerId, PAGE_SIZE, offset);
   
   if (summary.total_orders === 0) {
-    return { content: '✅ Không có đơn hàng nào còn nợ xử lý.' };
+    return { content: `${E('status_check', '✅')} Không có đơn hàng nào còn nợ xử lý.` };
   }
 
   const container = new ContainerBuilder()
@@ -29,7 +30,7 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `# 📚 Đơn Hàng Còn Xử Lý${customerText}\n` +
-      `> 📦 **Tổng**: ${summary.total_orders} | ⏳ **Chờ TT**: ${summary.waiting_payment} | 🔄 **Đang xử lý**: ${summary.processing} | 🛠️ **Bảo hành**: ${summary.warranty_open}`
+      `> ${E('order_product', '📦')} **Tổng**: ${summary.total_orders} | ${E('order_pending', '⏳')} **Chờ TT**: ${summary.waiting_payment} | 🔄 **Đang xử lý**: ${summary.processing} | ${E('panel_warranty', '🛠️')} **Bảo hành**: ${summary.warranty_open}`
     )
   );
 
@@ -40,9 +41,9 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
     const ticketLink = o.ticket_channel_id ? `(<#${o.ticket_channel_id}>)` : '';
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `### 🆔 \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
-        `> 👤 Khách: <@${o.customer_id}> ${ticketLink}\n` +
-        `> 🛍️ **${o.quantity}x** ${o.product_name}`
+        `### ${E('order_id', '🆔')} \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
+        `> ${E('ticket_user', '👤')} Khách: <@${o.customer_id}> ${ticketLink}\n` +
+        `> ${E('panel_order', '🛍️')} **${o.quantity}x** ${o.product_name}`
       )
     );
 
@@ -77,6 +78,7 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
 }
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const customer = interaction.options.getUser('khach_hang');
   const payload = buildCongnoPanel(interaction.guildId, customer?.id ?? null, 1);
   // Merge IsComponentsV2 (32768) with Ephemeral (64)

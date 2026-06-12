@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { getOrderByCodeRaw, insertStaffLogRaw, releaseOrderClaimRaw } from '../services/v11DbHelpers.js';
 
@@ -8,25 +9,26 @@ export const data = new SlashCommandBuilder()
   .addStringOption((o) => o.setName('ma_don').setDescription('Mã đơn hàng').setRequired(true));
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
   const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
   const before = getOrderByCodeRaw(orderCode);
 
   if (!before) {
-    await interaction.editReply('⚠️ Không tìm thấy mã đơn.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn.`);
     return;
   }
 
   const activeClaim = before.claimed_by_id ?? before.claim_staff_id;
   const activeClaimAt = before.claimed_at ?? before.claim_at;
   if (!activeClaim) {
-    await interaction.editReply('⚠️ Đơn này chưa được claim.');
+    await interaction.editReply(`${E('status_warn', '⚠️')} Đơn này chưa được claim.`);
     return;
   }
 
   if (activeClaim !== interaction.user.id) {
-    await interaction.editReply(`⚠️ Đơn này đang do <@${activeClaim}> xử lý.`);
+    await interaction.editReply(`${E('status_warn', '⚠️')} Đơn này đang do <@${activeClaim}> xử lý.`);
     return;
   }
 
@@ -45,5 +47,5 @@ export async function execute(interaction) {
     afterJson: JSON.stringify({ claimed_by_id: nextClaim, claimed_at: nextClaimAt }),
   });
 
-  await interaction.editReply(`✅ Đã release đơn \`${orderCode}\`.`);
+  await interaction.editReply(`${E('status_check', '✅')} Đã release đơn \`${orderCode}\`.`);
 }

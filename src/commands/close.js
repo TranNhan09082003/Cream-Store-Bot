@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { buildCloseConfirmComponents, buildCloseConfirmEmbed } from '../utils/embeds.js';
@@ -10,10 +11,11 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ ephemeral: true });
 
   if (!interaction.inGuild()) {
-    await interaction.editReply({ content: '⚠️ Lệnh này chỉ dùng được trong server.' });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Lệnh này chỉ dùng được trong server.` });
     return;
   }
 
@@ -27,7 +29,7 @@ export async function execute(interaction) {
 
   const ticket = getTicketByChannelId(interaction.channelId);
   if (!ticket || ticket.status !== 'OPEN') {
-    await interaction.editReply({ content: '⚠️ Kênh này không phải ticket đang mở.' });
+    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Kênh này không phải ticket đang mở.` });
     return;
   }
 

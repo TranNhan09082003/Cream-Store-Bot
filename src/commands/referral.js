@@ -1,3 +1,4 @@
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { getOrCreateReferralCode, getReferralStats, getReferralLeaderboard } from '../services/referralService.js';
 
@@ -18,6 +19,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
+  const E = createEmojiResolver(interaction?.guildId);
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'code') {
@@ -45,9 +47,9 @@ export async function execute(interaction) {
       .setColor(0xa855f7)
       .setTitle('📊 Thống Kê Giới Thiệu')
       .addFields(
-        { name: '🔗 Mã của bạn', value: stats.code ? `\`${stats.code}\`` : 'Chưa có', inline: true },
+        { name: `${E('icon_link', '🔗')} Mã của bạn`, value: stats.code ? `\`${stats.code}\`` : 'Chưa có', inline: true },
         { name: '👥 Đã giới thiệu', value: `${stats.totalReferrals} người`, inline: true },
-        { name: '💰 Tổng thưởng', value: `${stats.totalEarned.toLocaleString('vi-VN')}đ`, inline: true },
+        { name: `${E('payment_money', '💰')} Tổng thưởng`, value: `${stats.totalEarned.toLocaleString('vi-VN')}đ`, inline: true },
       )
       .setThumbnail(interaction.user.displayAvatarURL())
       .setTimestamp();
