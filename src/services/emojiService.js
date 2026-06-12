@@ -356,12 +356,20 @@ export function parseDiscordEmoji(str) {
 /**
  * Resolve an emoji string (standard or custom) for Discord.js Select Menu option emoji field
  * @param {string} emojiStr 
+ * @param {string} fallback 
  * @returns {string|{id: string, name: string, animated: boolean}|null}
  */
-export function resolveSelectMenuEmoji(emojiStr) {
-  if (!emojiStr) return null;
+export function resolveSelectMenuEmoji(emojiStr, fallback = null) {
+  if (!emojiStr) {
+    return fallback ? resolveSelectMenuEmoji(fallback, null) : null;
+  }
   const parsed = parseDiscordEmoji(emojiStr);
   if (parsed) {
+    // If the custom emoji ID is not in the bot's cache, it's invalid/deleted/external.
+    // We must reject it and resolve the fallback to prevent COMPONENT_INVALID_EMOJI API crash.
+    if (global.discordClient && !global.discordClient.emojis.cache.has(parsed.id)) {
+      return fallback ? resolveSelectMenuEmoji(fallback, null) : null;
+    }
     return {
       id: parsed.id,
       name: parsed.name,
@@ -370,6 +378,7 @@ export function resolveSelectMenuEmoji(emojiStr) {
   }
   return emojiStr;
 }
+
 
 
 /**

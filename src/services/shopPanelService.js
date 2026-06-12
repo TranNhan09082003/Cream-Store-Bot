@@ -137,7 +137,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${formatCurrency(p.price)} | ${p.duration_months} tháng`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(p.emoji || '🛒'),
+      emoji: resolveSelectMenuEmoji(p.emoji, '🛒'),
     }));
 
     selectRow = new ActionRowBuilder().addComponents(

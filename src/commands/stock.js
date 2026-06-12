@@ -77,7 +77,7 @@ export function buildStockPanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(p.emoji || E('order_product', '📦')),
+    emoji: resolveSelectMenuEmoji(p.emoji, E('order_product', '📦')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(

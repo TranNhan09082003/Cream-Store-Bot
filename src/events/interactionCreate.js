@@ -618,7 +618,7 @@ async function handlePriceListSelect(interaction) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(p.emoji || '🛒')
+      emoji: resolveSelectMenuEmoji(p.emoji, '🛒')
     }));
 
     const purchaseRow = new ActionRowBuilder().addComponents(
@@ -1175,7 +1175,7 @@ async function handlePriceListAdminEditButton(interaction, category) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T | Trạng thái: ${statusText}`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(p.emoji || '📦')
+      emoji: resolveSelectMenuEmoji(p.emoji, '📦')
     };
   });
 

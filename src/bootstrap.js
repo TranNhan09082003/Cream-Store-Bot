@@ -13,6 +13,7 @@ export async function buildClient() {
 
   const commands = await loadCommands();
   const client = new Client(getClientOptions());
+  global.discordClient = client;
 
   initErrorLogger(client);
   registerInteractionHandler(client, commands);
