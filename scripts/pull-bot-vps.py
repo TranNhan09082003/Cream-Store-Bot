@@ -42,8 +42,10 @@ try:
     run_cmd("fuser -k 2753/tcp || kill -9 $(lsof -t -i:2753) || true")
     run_cmd("fuser -k 8080/tcp || kill -9 $(lsof -t -i:8080) || true")
 
-    # 2. Pull code mới từ Github (xóa thay đổi local trên VPS trước để tránh conflict)
-    run_cmd("cd /opt/cenar-store && git checkout . && git pull origin main")
+    # 2. Pull code mới từ Github (xóa thay đổi local và các file untracked bị trùng trên VPS trước để tránh conflict)
+    run_cmd("cd /opt/cenar-store && git checkout .")
+    run_cmd("cd /opt/cenar-store && rm -rf src/commands/dac-quyen.js src/commands/order.js src/commands/sale.js src/commands/setup-permissions.js src/commands/vinh-danh.js src/events/guildMemberAdd.js src/events/guildMemberRemove.js src/services/oauthBackupRoutes.js src/services/saleService.js src/services/vinhDanhService.js src/utils/antiScam.js src/utils/emojiHelper.js scripts/setup-sale-channels.js")
+    run_cmd("cd /opt/cenar-store && git pull origin main")
     
     # 3. Cập nhật các dependency nếu cần
     run_cmd("cd /opt/cenar-store && npm install --omit=dev")
