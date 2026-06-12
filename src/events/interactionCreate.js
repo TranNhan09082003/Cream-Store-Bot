@@ -156,6 +156,7 @@ function resolvePayloadEmojis(payload, E) {
 const announcementCache = new Map();
 const ANNOUNCEMENT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
 const activeTicketCreations = new Set();
+const activeTicketCloses = new Set();
 
 function announcementCacheSet(key, value) {
   announcementCache.set(key, value);
@@ -1505,69 +1506,84 @@ async function handleTicketClose(interaction, ticketId) {
     return;
   }
 
-  // Ack confirm button
-  if (interaction.isButton()) {
-    await interaction.update({ content: '🗃️ Đang xuất transcript và đóng ticket...', embeds: [], components: [] }).catch(() => null);
+  const lockKey = `${ticket.id}`;
+  if (activeTicketCloses.has(lockKey)) {
+    return;
   }
-
-  const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
+  activeTicketCloses.add(lockKey);
 
   try {
-    const everyone = interaction.guild.roles.everyone;
-    const guildConfig = getGuildConfig(interaction.guildId);
+    // Cập nhật trạng thái database ngay lập tức để tránh race condition khi click nhanh
+    closeTicket(ticket.id, interaction.user.id);
 
-    // Khóa tất cả, chỉ để bot + manager chat được
-    const newOverwrites = [
-      { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] },
-      { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
-    ];
-    if (ticket.customer_id) {
-      newOverwrites.push({ id: ticket.customer_id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] });
+    // Ack confirm button
+    if (interaction.isButton()) {
+      await interaction.update({ content: '🗃️ Đang xuất transcript và đóng ticket...', embeds: [], components: [] }).catch(() => null);
     }
-    if (guildConfig?.manager_role_id) {
-      newOverwrites.push({ id: guildConfig.manager_role_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
-    }
-    await interaction.channel.permissionOverwrites.set(newOverwrites).catch(() => null);
 
-    if (!interaction.channel.name.startsWith('closed-')) {
-      const newName = `closed-${interaction.channel.name}`.slice(0, 95);
-      await interaction.channel.setName(newName).catch(() => null);
-    }
-  } catch (err) {}
+    const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
 
-  closeTicket(ticket.id, interaction.user.id);
-  await emitStaffLog(interaction.client, {
-    guildId: interaction.guildId, actorId: interaction.user.id, targetId: ticket.customer_id, action: 'TICKET_CLOSE',
-    detail: `Đóng ticket ${ticket.ticket_type}`, relatedTicketCode: ticket.ticket_code, relatedOrderCode: ticket.related_order_code ?? null,
-  });
-
-  if (ticket.ticket_type === 'WARRANTY' && ticket.related_order_code) {
-    const order = setOrderStatus(ticket.related_order_code, 'COMPLETED');
-    if (order) await updateOrderLogMessage(interaction.guild, order);
-  }
-
-  if (transcriptResult) {
-    await deliverTranscript({ guild: interaction.guild, ticket, transcriptResult, closedById: interaction.user.id });
-  }
-
-  const embed = new EmbedBuilder()
-    .setTitle('🔒  Ticket Đã Đóng')
-    .setDescription([
-      `> **Đóng bởi:** <@${interaction.user.id}>`,
-      '> ⏳ Channel sẽ **tự xóa sau 2 phút**.',
-      '> 📄 Transcript đã được lưu và gửi cho khách.',
-    ].join('\n'))
-    .setColor(0xED4245)
-    .setTimestamp();
-
-  await interaction.channel.send({ embeds: [embed] }).catch(() => null);
-
-  setTimeout(async () => {
     try {
-      const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
-      if (channel) await channel.delete(`Ticket ${ticket.ticket_code} đóng bởi ${interaction.user.tag}`).catch(() => null);
-    } catch {}
-  }, 2 * 60 * 1000);
+      const everyone = interaction.guild.roles.everyone;
+      const guildConfig = getGuildConfig(interaction.guildId);
+
+      // Khóa tất cả, chỉ để bot + manager chat được
+      const newOverwrites = [
+        { id: everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] },
+        { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] },
+      ];
+      if (ticket.customer_id) {
+        newOverwrites.push({ id: ticket.customer_id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions] });
+      }
+      if (guildConfig?.manager_role_id) {
+        newOverwrites.push({ id: guildConfig.manager_role_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
+      }
+      await interaction.channel.permissionOverwrites.set(newOverwrites).catch(() => null);
+
+      if (!interaction.channel.name.startsWith('closed-')) {
+        const newName = `closed-${interaction.channel.name}`.slice(0, 95);
+        await interaction.channel.setName(newName).catch(() => null);
+      }
+    } catch (err) {}
+
+    await emitStaffLog(interaction.client, {
+      guildId: interaction.guildId, actorId: interaction.user.id, targetId: ticket.customer_id, action: 'TICKET_CLOSE',
+      detail: `Đóng ticket ${ticket.ticket_type}`, relatedTicketCode: ticket.ticket_code, relatedOrderCode: ticket.related_order_code ?? null,
+    });
+
+    if (ticket.ticket_type === 'WARRANTY' && ticket.related_order_code) {
+      const order = setOrderStatus(ticket.related_order_code, 'COMPLETED');
+      if (order) await updateOrderLogMessage(interaction.guild, order);
+    }
+
+    if (transcriptResult) {
+      await deliverTranscript({ guild: interaction.guild, ticket, transcriptResult, closedById: interaction.user.id });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('🔒  Ticket Đã Đóng')
+      .setDescription([
+        `> **Đóng bởi:** <@${interaction.user.id}>`,
+        '> ⏳ Channel sẽ **tự xóa sau 2 phút**.',
+        '> 📄 Transcript đã được lưu và gửi cho khách.',
+      ].join('\n'))
+      .setColor(0xED4245)
+      .setTimestamp();
+
+    await interaction.channel.send({ embeds: [embed] }).catch(() => null);
+
+    setTimeout(async () => {
+      try {
+        const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
+        if (channel) await channel.delete(`Ticket ${ticket.ticket_code} đóng bởi ${interaction.user.tag}`).catch(() => null);
+      } catch {}
+    }, 2 * 60 * 1000);
+
+  } catch (error) {
+    console.error('[TICKET_CLOSE] Lỗi khi đóng ticket:', error);
+  } finally {
+    activeTicketCloses.delete(lockKey);
+  }
 }
 
 
