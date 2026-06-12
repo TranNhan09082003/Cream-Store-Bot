@@ -16,7 +16,7 @@ import {
 import { getActiveProducts } from '../services/productCatalogService.js';
 import { config } from '../config.js';
 import { formatCurrency } from '../utils/formatters.js';
-import { getEmojiMap } from '../services/emojiService.js';
+import { getEmojiMap, resolveSelectMenuEmoji } from '../services/emojiService.js';
 import { fmt, h2, subtext } from '../utils/embedHelpers.js';
 
 export const data = new SlashCommandBuilder()
@@ -77,7 +77,7 @@ export function buildStockPanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
-    emoji: p.emoji || `${E('order_product', '📦')}`,
+    emoji: resolveSelectMenuEmoji(p.emoji || E('order_product', '📦')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(

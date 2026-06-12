@@ -354,6 +354,25 @@ export function parseDiscordEmoji(str) {
 }
 
 /**
+ * Resolve an emoji string (standard or custom) for Discord.js Select Menu option emoji field
+ * @param {string} emojiStr 
+ * @returns {string|{id: string, name: string, animated: boolean}|null}
+ */
+export function resolveSelectMenuEmoji(emojiStr) {
+  if (!emojiStr) return null;
+  const parsed = parseDiscordEmoji(emojiStr);
+  if (parsed) {
+    return {
+      id: parsed.id,
+      name: parsed.name,
+      animated: parsed.animated,
+    };
+  }
+  return emojiStr;
+}
+
+
+/**
  * Tìm custom emoji trong guild theo tên (partial match)
  * @param {import('discord.js').Guild} guild
  * @param {string} query

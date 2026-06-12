@@ -14,7 +14,7 @@ import {
 } from 'discord.js';
 import { getActiveProducts } from './productCatalogService.js';
 import { formatCurrency } from '../utils/formatters.js';
-import { getEmojiMap } from './emojiService.js';
+import { getEmojiMap, resolveSelectMenuEmoji } from './emojiService.js';
 import { fmt, h2, subtext } from '../utils/embedHelpers.js';
 import { config } from '../config.js';
 
@@ -137,7 +137,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${formatCurrency(p.price)} | ${p.duration_months} tháng`.slice(0, 100),
       value: `${p.id}`,
-      emoji: p.emoji || '🛒',
+      emoji: resolveSelectMenuEmoji(p.emoji || '🛒'),
     }));
 
     selectRow = new ActionRowBuilder().addComponents(

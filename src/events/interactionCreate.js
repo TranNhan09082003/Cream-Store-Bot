@@ -41,6 +41,7 @@ import { deliverTranscript, sendCompletedFlow, updateOrderLogMessage } from '../
 import { closeTicket, createTicket, getOpenTicketByCustomer, getTicketByChannelId, getTicketById } from '../services/ticketService.js';
 import { exportTicketTranscript } from '../services/transcriptService.js';
 import { openWarrantyTicket } from '../services/warrantyService.js';
+import { resolveSelectMenuEmoji } from '../services/emojiService.js';
 import {
   buildCloseConfirmComponents,
   buildCloseConfirmEmbed,
@@ -617,7 +618,7 @@ async function handlePriceListSelect(interaction) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
       value: `${p.id}`,
-      emoji: p.emoji || '🛒'
+      emoji: resolveSelectMenuEmoji(p.emoji || '🛒')
     }));
 
     const purchaseRow = new ActionRowBuilder().addComponents(
@@ -1174,7 +1175,7 @@ async function handlePriceListAdminEditButton(interaction, category) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T | Trạng thái: ${statusText}`.slice(0, 100),
       value: `${p.id}`,
-      emoji: p.emoji || '📦'
+      emoji: resolveSelectMenuEmoji(p.emoji || '📦')
     };
   });
 
