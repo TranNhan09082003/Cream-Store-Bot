@@ -35,6 +35,7 @@ scripts/*
 !scripts/check-env.js
 !scripts/confirm-payos-webhook.js
 !scripts/deploy-cloudfly.sh
+!scripts/encrypt-existing-credentials.js
 !scripts/reorganize-roles.js
 !scripts/resyncCustomerStats.js
 !scripts/send-announcement.js
