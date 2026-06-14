@@ -85,7 +85,26 @@ const stockTx = db.transaction(() => {
 });
 stockTx();
 
+// ── subscription_accounts: gmail_password (email giữ plaintext để search/hiển thị) ──
+let subsUpdated = 0;
+const hasSubs = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='subscription_accounts'"
+).get();
+if (hasSubs) {
+  const subs = db.prepare('SELECT id, gmail_password FROM subscription_accounts').all();
+  const updateSub = db.prepare('UPDATE subscription_accounts SET gmail_password=? WHERE id=?');
+  const subTx = db.transaction(() => {
+    for (const s of subs) {
+      if (s.gmail_password != null && s.gmail_password !== '' && !isEncrypted(s.gmail_password)) {
+        updateSub.run(encrypt(s.gmail_password), s.id);
+        subsUpdated++;
+      }
+    }
+  });
+  subTx();
+}
+
 db.close();
 
-console.log(`✅ Đã mã hoá ${ordersUpdated} đơn (orders) và ${stockUpdated} tài khoản kho (account_stock).`);
+console.log(`✅ Đã mã hoá ${ordersUpdated} đơn (orders), ${stockUpdated} tài khoản kho (account_stock), ${subsUpdated} subscription (gmail_password).`);
 console.log('   (Các giá trị đã mã hoá từ trước được bỏ qua.)');

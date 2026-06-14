@@ -457,10 +457,22 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
 
     const serviceType = updated.service_type || 'netflix';
     
-    // Tìm kiếm trong kho: ưu tiên khớp chính xác tên sản phẩm, fallback khớp service_type
-    let stockItem = db.prepare("SELECT * FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ? ORDER BY id ASC LIMIT 1").get(cleanProductName);
+    // Claim kho ATOMIC: gộp SELECT + UPDATE vào một câu lệnh để hai webhook
+    // đồng thời không thể grab cùng một tài khoản (chống giao trùng).
+    const claimStock = (type) => db.prepare(
+      `UPDATE account_stock SET status = 'SOLD', order_code = ?, sold_at = ?
+       WHERE id = (
+         SELECT id FROM account_stock
+         WHERE status = 'AVAILABLE' AND LOWER(service_type) = ?
+         ORDER BY id ASC LIMIT 1
+       )
+       RETURNING *`
+    ).get(updated.order_code, nowIso(), type);
+
+    // Ưu tiên khớp chính xác tên sản phẩm, fallback khớp service_type
+    let stockItem = claimStock(cleanProductName);
     if (!stockItem) {
-      stockItem = db.prepare("SELECT * FROM account_stock WHERE status = 'AVAILABLE' AND LOWER(service_type) = ? ORDER BY id ASC LIMIT 1").get(serviceType.toLowerCase());
+      stockItem = claimStock(serviceType.toLowerCase());
     }
 
     if (stockItem) {
@@ -469,10 +481,6 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
       const password = parts[1] || '';
       const profile = parts[2] || '';
       const pin = parts[3] || '';
-
-      // Đánh dấu tài khoản đã bán
-      db.prepare("UPDATE account_stock SET status = 'SOLD', order_code = ?, sold_at = ? WHERE id = ?")
-        .run(updated.order_code, nowIso(), stockItem.id);
 
       // Cập nhật thông tin giao hàng trong order và đổi trạng thái thành COMPLETED
       markOrderCompleted(updated.order_code, 'SYSTEM_AUTO', config.feedbackTimeoutHours);

@@ -67,7 +67,7 @@ export function registerAdminRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -102,7 +102,7 @@ export function registerAdminRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -112,7 +112,7 @@ export function registerAdminRoutes(app) {
       const products = db.prepare('SELECT * FROM product_catalog ORDER BY sort_order ASC, id DESC').all();
       res.json({ ok: true, data: products });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -126,7 +126,7 @@ export function registerAdminRoutes(app) {
       
       res.json({ ok: true, id: result.lastInsertRowid });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -141,7 +141,7 @@ export function registerAdminRoutes(app) {
       
       res.json({ ok: true });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -152,7 +152,7 @@ export function registerAdminRoutes(app) {
       const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT ?').all(limit);
       res.json({ ok: true, data: orders });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -162,7 +162,7 @@ export function registerAdminRoutes(app) {
       db.prepare('UPDATE orders SET status = ?, status_changed_at = CURRENT_TIMESTAMP WHERE order_code = ?').run(status, req.params.code);
       res.json({ ok: true });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -181,7 +181,7 @@ export function registerAdminRoutes(app) {
       `).all();
       res.json({ ok: true, data: users });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -322,7 +322,7 @@ export function registerAdminRoutes(app) {
       const coupons = listCoupons('WEB', true); // get all, including inactive
       res.json({ ok: true, data: coupons });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -345,7 +345,7 @@ export function registerAdminRoutes(app) {
 
       res.json({ ok: true, data: newCoupon });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -355,7 +355,7 @@ export function registerAdminRoutes(app) {
       deactivateCoupon('WEB', code);
       res.json({ ok: true });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -413,7 +413,7 @@ export function registerAdminRoutes(app) {
       });
       res.json({ ok: true, data: settings });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -434,7 +434,7 @@ export function registerAdminRoutes(app) {
 
       res.json({ ok: true, message: 'Đã cập nhật cấu hình hệ thống thành công!' });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -453,10 +453,10 @@ export function registerAdminRoutes(app) {
           res.download(filePath, filename);
         })
         .catch((err) => {
-          res.status(500).json({ ok: false, error: err.message });
+          console.error('[ADMIN]', err); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -480,7 +480,7 @@ export function registerAdminRoutes(app) {
 
       res.json({ ok: true, data: files });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -514,10 +514,10 @@ export function registerAdminRoutes(app) {
         })
         .catch(e => {
           srcDb.close();
-          res.status(500).json({ ok: false, error: e.message });
+          console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -527,7 +527,7 @@ export function registerAdminRoutes(app) {
       db.exec('ANALYZE');
       res.json({ ok: true, message: 'Tối ưu hóa dung lượng database (VACUUM/ANALYZE) thành công!' });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -548,7 +548,7 @@ export function registerAdminRoutes(app) {
         message: `Dọn dẹp hoàn tất. Đã xóa: ${resultLogs.changes} audit logs, ${resultTrans.changes} transactions, ${resultEvents.changes} payment events.`
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -559,7 +559,7 @@ export function registerAdminRoutes(app) {
       const transactions = db.prepare('SELECT * FROM wallet_transactions WHERE customer_id = ? ORDER BY created_at DESC').all(targetUserId);
       res.json({ ok: true, data: transactions });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -627,7 +627,7 @@ const fetchWithTimeout = (promise, ms) => {
       res.json({ ok: true, data: mapped });
     } catch (e) {
       console.error('[ADMIN TICKETS GET ERROR]', e);
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -659,7 +659,7 @@ const fetchWithTimeout = (promise, ms) => {
 
       res.json({ ok: true, message: 'Đã đóng ticket thành công!' });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -678,7 +678,7 @@ const fetchWithTimeout = (promise, ms) => {
         .map(s => ({ ...s, credentials: decrypt(s.credentials) }));
       res.json({ ok: true, data: { counts, stock } });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -701,7 +701,7 @@ const fetchWithTimeout = (promise, ms) => {
 
       res.json({ ok: true, message: `Đã nhập thành công ${lines.length} tài khoản vào kho ${serviceType}.` });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -710,7 +710,7 @@ const fetchWithTimeout = (promise, ms) => {
       db.prepare('DELETE FROM account_stock WHERE id = ?').run(req.params.id);
       res.json({ ok: true, message: 'Đã xóa tài khoản khỏi kho thành công!' });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -736,10 +736,11 @@ const fetchWithTimeout = (promise, ms) => {
       }
       
       query += ' ORDER BY status ASC, next_renewal_at ASC, id DESC';
-      const rows = db.prepare(query).all(...params);
+      const rows = db.prepare(query).all(...params)
+        .map(r => ({ ...r, gmail_password: decrypt(r.gmail_password) }));
       res.json({ ok: true, data: rows });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -784,7 +785,7 @@ const fetchWithTimeout = (promise, ms) => {
 
       res.json({ ok: true, data: newSub });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -841,7 +842,7 @@ const fetchWithTimeout = (promise, ms) => {
         serviceType || 'nitro',
         renewalMode || 'auto_cycle',
         gmailEmail,
-        gmailPassword,
+        gmailPassword != null ? encrypt(gmailPassword) : null,
         customerId || null,
         customerDiscordName || null,
         relatedOrderCode || null,
@@ -861,7 +862,7 @@ const fetchWithTimeout = (promise, ms) => {
       const updated = subService.getSubscriptionById(id);
       res.json({ ok: true, data: updated });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -874,7 +875,7 @@ const fetchWithTimeout = (promise, ms) => {
       }
       res.json({ ok: true, data: renewed });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -884,7 +885,7 @@ const fetchWithTimeout = (promise, ms) => {
       subService.deleteSubscription(Number(id));
       res.json({ ok: true, message: 'Đã xóa bản ghi gia hạn thành công!' });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -894,7 +895,7 @@ const fetchWithTimeout = (promise, ms) => {
       const content = getAiKnowledge('WEB');
       res.json({ ok: true, data: { content } });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -909,7 +910,7 @@ const fetchWithTimeout = (promise, ms) => {
         res.status(500).json({ ok: false, error: 'Không thể cập nhật tài liệu huấn luyện AI' });
       }
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[ADMIN]', e); res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 }

@@ -1,4 +1,5 @@
 import { db, nowIso } from '../database/db.js';
+import { encrypt } from '../utils/crypto.js';
 
 // ═══════════════════════════════════════════════
 //  Prepared statement factories
@@ -232,7 +233,7 @@ export function addSubscription({
     serviceType,
     renewalMode,
     gmailEmail,
-    gmailPassword,
+    gmailPassword != null ? encrypt(gmailPassword) : null,
     customerId,
     customerDiscordName,
     relatedOrderCode,
@@ -376,7 +377,7 @@ export function updateSubscription(id, data) {
 
   updateFieldsStmt().run(
     data.gmailEmail ?? sub.gmail_email,
-    data.gmailPassword ?? sub.gmail_password,
+    encrypt(data.gmailPassword ?? sub.gmail_password),
     data.customerId ?? sub.customer_id,
     data.customerDiscordName ?? sub.customer_discord_name,
     data.totalDurationMonths ?? sub.total_duration_months,

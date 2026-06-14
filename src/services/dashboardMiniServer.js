@@ -5,6 +5,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { encrypt, decrypt } from '../utils/crypto.js';
+import { applyCors } from '../utils/cors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,17 +143,14 @@ export function registerDashboardRoutes(app) {
     });
   });
 
-  // --- Account API cho Website (CORS enabled) ---
+  // --- Account API cho Website (CORS allowlist) ---
   app.use('/dashboard/api', (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-dashboard-token');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    
+    if (applyCors(req, res, { headers: 'Origin, X-Requested-With, Content-Type, Accept, x-dashboard-token' })) return;
+
     if (req.path === '/login') {
       return next();
     }
-    
+
     if (!isDashboardAuthorized(req)) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
@@ -219,7 +217,8 @@ export function registerDashboardRoutes(app) {
       });
       res.json({ ok: true, accounts: mapped });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -288,7 +287,7 @@ export function registerDashboardRoutes(app) {
       res.json({ ok: true, data: results, pagination: { page, limit, totalCount, totalPages } });
     } catch (e) {
       console.error('[API Customers] Error:', e);
-      res.status(500).json({ ok: false, error: e.message });
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -361,7 +360,7 @@ export function registerDashboardRoutes(app) {
       return res.json({ ok: true });
     } catch(e) {
       console.error(e);
-      res.status(500).json({ ok: false, error: e.message });
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -414,7 +413,8 @@ export function registerDashboardRoutes(app) {
         if (firstGuild) sendStaffLog(cl, firstGuild.id, `➕ **Web Admin** vừa **THÊM** tài khoản \`${data.email}\` cho KH **${data.customerName}**`);
       }
     } catch(e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -448,7 +448,8 @@ export function registerDashboardRoutes(app) {
         if (firstGuild) sendStaffLog(cl, firstGuild.id, `✏️ **Web Admin** vừa **SỬA** tài khoản \`${id}\` (${data.email}) cho KH **${data.customerName}**`);
       }
     } catch(e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -464,7 +465,8 @@ export function registerDashboardRoutes(app) {
         if (firstGuild) sendStaffLog(cl, firstGuild.id, `🗑️ **Web Admin** vừa **XÓA** order \`${req.params.id}\` trên hệ thống.`);
       }
     } catch(e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -478,7 +480,7 @@ export function registerDashboardRoutes(app) {
         serviceType: s.service_type,
         renewalMode: s.renewal_mode,
         gmail: s.gmail_email,
-        password: s.gmail_password,
+        password: decrypt(s.gmail_password),
         customerId: s.customer_id,
         customerName: s.customer_discord_name,
         relatedOrderCode: s.related_order_code,
@@ -498,7 +500,8 @@ export function registerDashboardRoutes(app) {
       }));
       res.json({ ok: true, subscriptions: mapped });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -532,7 +535,8 @@ export function registerDashboardRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
   // ═══════ Revenue Chart API ═══════
@@ -585,7 +589,8 @@ export function registerDashboardRoutes(app) {
         })),
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -619,7 +624,8 @@ export function registerDashboardRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -644,7 +650,8 @@ export function registerDashboardRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -678,7 +685,8 @@ export function registerDashboardRoutes(app) {
         }
       });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 
@@ -726,7 +734,8 @@ export function registerDashboardRoutes(app) {
 
       res.json({ ok: true, expiryDate: newExpiry.toISOString() });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message });
+      console.error('[DASHBOARD]', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
     }
   });
 

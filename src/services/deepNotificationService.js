@@ -7,6 +7,7 @@ import {
   markCustomerResponse,
 } from './subscriptionService.js';
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { decrypt } from '../utils/crypto.js';
 
 // ═══════════════ Helpers ═══════════════
 
@@ -58,7 +59,7 @@ function buildRenewalEmbed(sub) {
     .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━━━')
     .addFields(
       { name: '📧 Gmail', value: `\`${sub.gmail_email}\``, inline: true },
-      { name: '🔑 Mật khẩu', value: `\`${sub.gmail_password}\``, inline: true },
+      { name: '🔑 Mật khẩu', value: `\`${decrypt(sub.gmail_password)}\``, inline: true },
       { name: '👤 Khách hàng', value: customer, inline: true },
       { name: '⏰ Hạn gia hạn', value: `<t:${renewalTs}:F>\n(<t:${renewalTs}:R>)`, inline: true },
       { name: '🔢 Lần gia hạn', value: `${sub.times_renewed + 1}/${totalRenewals + 1}`, inline: true },
@@ -120,7 +121,7 @@ function buildOwnerCustomerWantsRenewalEmbed(sub, customerUser) {
     .addFields(
       { name: '👤 Khách hàng', value: customerUser ? `<@${customerUser.id}> (${customerUser.tag})` : (sub.customer_discord_name || '_Không rõ_'), inline: false },
       { name: '📧 Gmail', value: `\`${sub.gmail_email}\``, inline: true },
-      { name: '🔑 Mật khẩu', value: `\`${sub.gmail_password}\``, inline: true },
+      { name: '🔑 Mật khẩu', value: `\`${decrypt(sub.gmail_password)}\``, inline: true },
     )
     .setFooter({ text: `ID: ${sub.id}` })
     .setTimestamp();

@@ -15,6 +15,7 @@
 import { db, nowIso } from '../database/db.js';
 import { config } from '../config.js';
 import { getAiKnowledge } from './aiKnowledgeService.js';
+import { applyCors } from '../utils/cors.js';
 
 /**
  * Middleware xác thực API key
@@ -45,7 +46,7 @@ function safeQuery(fn) {
         return { ok: true, data };
     } catch (e) {
         console.error('[BOT_API] DB error:', e);
-        return { ok: false, error: e.message };
+        return { ok: false, error: 'Lỗi máy chủ nội bộ.' };
     }
 }
 
@@ -53,12 +54,9 @@ function safeQuery(fn) {
  * Register all /api/bot/* routes lên app Express
  */
 export function registerBotApiRoutes(app) {
-    // CORS — cho web cùng domain gọi
+    // CORS — allowlist (server-to-server callers không gửi Origin nên không bị chặn)
     const corsHandler = (req, res, next) => {
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.set('Access-Control-Allow-Headers', 'Content-Type, X-Bot-Api-Key, x-bot-api-key');
-        if (req.method === 'OPTIONS') return res.sendStatus(204);
+        if (applyCors(req, res, { methods: 'GET, POST, OPTIONS', headers: 'Content-Type, X-Bot-Api-Key, x-bot-api-key' })) return;
         next();
     };
 
@@ -442,7 +440,7 @@ export function registerBotApiRoutes(app) {
             res.json({ ok: true, data: { balance, transactions } });
         } catch (e) {
             console.error('[WALLET GET]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -695,7 +693,7 @@ export function registerBotApiRoutes(app) {
             
         } catch (e) {
             console.error('[WEB ORDERS API]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -797,7 +795,7 @@ export function registerBotApiRoutes(app) {
             res.json({ ok: true, messages: formatted });
         } catch (e) {
             console.error('[CHAT GET API ERROR]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -901,7 +899,7 @@ export function registerBotApiRoutes(app) {
             }
         } catch (e) {
             console.error('[CHAT POST API ERROR]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -1002,7 +1000,7 @@ export function registerBotApiRoutes(app) {
             res.json({ ok: true, data: { ticket_code: ticket.ticket_code } });
         } catch (e) {
             console.error('[LIVE CHAT START API ERROR]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -1093,7 +1091,7 @@ export function registerBotApiRoutes(app) {
             res.json({ ok: true, messages: formatted, status: ticketStatus });
         } catch (e) {
             console.error('[TICKET CHAT GET API ERROR]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 
@@ -1189,7 +1187,7 @@ export function registerBotApiRoutes(app) {
             }
         } catch (e) {
             console.error('[TICKET CHAT POST API ERROR]', e);
-            res.status(500).json({ ok: false, error: e.message });
+            res.status(500).json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
     });
 

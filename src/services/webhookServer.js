@@ -7,6 +7,7 @@ import { registerAuthRoutes } from './authApiRoutes.js';
 import { registerAdminRoutes } from './adminApiRoutes.js';
 import { registerOauthRoutes } from './oauthBackupRoutes.js';
 import { securityHeaders, generalLimiter, webhookLimiter } from './rateLimitMiddleware.js';
+import { applyCors } from '../utils/cors.js';
 
 let httpServer = null;
 let appInstance = null;
@@ -98,12 +99,9 @@ export async function startWebhookServer(client = null) {
   appInstance = app;
   app.locals.discordClient = client;
 
-  // Global CORS Middleware
+  // Global CORS Middleware (allowlist-based)
   app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-Bot-Api-Key, x-bot-api-key, x-dashboard-token');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (applyCors(req, res)) return;
     next();
   });
 
