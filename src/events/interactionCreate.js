@@ -13,6 +13,7 @@ import {
   EmbedBuilder,
   RoleSelectMenuBuilder,
   StringSelectMenuBuilder,
+  MessageFlags,
 } from 'discord.js';
 
 import fs from 'node:fs';
@@ -50,13 +51,13 @@ import {
   buildDeliveryLoginComponents,
   buildFeedbackModalPrompt,
   buildMuteTicketEmbed,
-  buildQuickFeedbackAckEmbed,
+  buildQuickFeedbackAckV2,
   buildQueueStatusText,
   buildTicketControlComponents,
   buildTicketWelcomeEmbed,
   buildWarrantyPanelModalPrompt,
   buildWarrantyProductSelectComponents,
-  buildWarrantySelectEmbed,
+  buildWarrantySelectV2,
 } from '../utils/embeds.js';
 import { buildTicketWelcomeV2, buildPaymentMethodSelector } from '../utils/embeds.js';
 import { buildTicketChannelName, parseMoneyInput, buildOrderLogContent } from '../utils/formatters.js';
@@ -1906,10 +1907,13 @@ async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
         }).catch(() => null);
       }
     }
-    await interaction.reply({
-      embeds: [buildQuickFeedbackAckEmbed(result.order, stars)],
-      ephemeral: true,
-    });
+    {
+      const { container, flags } = buildQuickFeedbackAckV2(result.order, stars);
+      await interaction.reply({
+        components: [container],
+        flags: flags | MessageFlags.Ephemeral,
+      });
+    }
   } catch (error) {
     await interaction.reply({ content: `⚠️ ${error.message}`, ephemeral: true }).catch(() => null);
   }
@@ -3235,11 +3239,13 @@ export function registerInteractionHandler(client, commands) {
           });
           return;
         }
-        await safeReply(interaction, {
-          embeds: [buildWarrantySelectEmbed()],
-          components: buildWarrantyProductSelectComponents(completedOrders),
-          ephemeral: true,
-        });
+        {
+          const { container, flags } = buildWarrantySelectV2(interaction.guildId);
+          await safeReply(interaction, {
+            components: [container, ...buildWarrantyProductSelectComponents(completedOrders)],
+            flags: flags | MessageFlags.Ephemeral,
+          });
+        }
         return;
       }
 

@@ -81,7 +81,7 @@ export async function execute(interaction) {
     return interaction.editReply({
       embeds: [new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('✅ Không có kênh orphan!')
+        .setTitle(`${E('status_check', '✅')} Không có kênh orphan!`)
         .setDescription('Tất cả kênh ticket đều có dữ liệu trong database. Không cần xóa gì.')
       ],
     });
@@ -164,7 +164,7 @@ export async function execute(interaction) {
     // ─── Kết quả ───
     const resultEmbed = new EmbedBuilder()
       .setColor(0x00FF00)
-      .setTitle('✅ Xóa Kênh Orphan Hoàn Tất!')
+      .setTitle(`${E('status_check', '✅')} Xóa Kênh Orphan Hoàn Tất!`)
       .setDescription([
         '**Kết quả:**',
         '',

@@ -36,7 +36,7 @@ export async function execute(interaction) {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🛠️ DANH SÁCH BẢO HÀNH ĐANG XỬ LÝ')
+      .setTitle(`${E('panel_warranty', '🛠️')} DANH SÁCH BẢO HÀNH ĐANG XỬ LÝ`)
       .setColor(config.accentColorWarning)
       .setDescription(`Hiện có **${warranties.length}** yêu cầu bảo hành đang mở:`)
       .setTimestamp();

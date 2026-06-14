@@ -36,7 +36,7 @@ export async function execute(interaction) {
     updateAiKnowledge(guildId, newContent, interaction.user.id);
     
     const embed = new EmbedBuilder()
-      .setTitle('✅ AI Knowledge Updated')
+      .setTitle(`${E('status_check', '✅')} AI Knowledge Updated`)
       .setDescription(`Đã cập nhật kiến thức cho AI thành công:\n\`\`\`\n${newContent}\n\`\`\``)
       .setColor(config.accentColorSuccess);
 

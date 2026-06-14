@@ -108,8 +108,8 @@ export async function execute(interaction) {
     await ticketChannel.send({
       components: [orderContainer, orderActionRow, queueContainer, queueActionRow],
       flags: orderFlags,
+      allowedMentions: { users: [customer.id] },
     });
-    await ticketChannel.send({ content: `<@${customer.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
 
     // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
     if (order.total_amount > 0) {

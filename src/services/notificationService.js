@@ -5,9 +5,7 @@ import { applyCustomerRoles } from './roleService.js';
 import {
   buildCompletionDmEmbed,
   buildFeedbackLinkComponents,
-  buildFeedbackReminderText,
-  buildOrderCompletedInfoEmbed,
-  buildOrderCompletedMainEmbed,
+  buildOrderCompletedV2,
   buildPaymentSuccessDmEmbed,
   buildPaymentSuccessEmbed,
   buildQuickFeedbackComponents,
@@ -65,32 +63,24 @@ export async function sendCompletedTicketFlow({ guild, order, actorId, supportId
     return { posted: false };
   }
 
-  await ticketChannel.send({
-    content: `<@${order.customer_id}>`,
-    embeds: [
-      buildOrderCompletedMainEmbed(order),
-      buildOrderCompletedInfoEmbed(order, actorId, supportId),
-    ],
-  }).catch((err) => {
-    console.error('[sendCompletedTicketFlow] Error sending completion embed:', err);
-  });
-
   try {
-    const feedbackRem = buildFeedbackReminderText(order.order_code);
+    const { container, flags } = buildOrderCompletedV2(order, actorId, supportId);
     const quickFb = buildQuickFeedbackComponents(order.order_code);
     const warranty = buildWarrantyActionComponents(order.order_code);
     const links = buildFeedbackLinkComponents(guild.id, guildConfig?.feedback_channel_id);
 
     await ticketChannel.send({
-      content: feedbackRem,
       components: [
+        container,
         ...quickFb,
         ...warranty,
         ...links,
       ],
+      flags,
+      allowedMentions: { users: [order.customer_id] },
     });
   } catch (err) {
-    console.error('[sendCompletedTicketFlow] Error sending feedback stars components:', err);
+    console.error('[sendCompletedTicketFlow] Error sending completion V2 flow:', err);
   }
 
   return { posted: true };

@@ -23,9 +23,7 @@ import { applyCustomerRoles } from './roleService.js';
 import { emitStaffLog } from './staffLogService.js';
 import { sendPaymentConfirmedFlow, updateOrderLogMessage } from './notificationService.js';
 import {
-  buildPaymentPendingComponents,
-  buildPaymentRequestEmbed,
-  buildPaymentWaitingAckEmbed,
+  buildPaymentQrV2,
 } from '../utils/embeds.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { decrypt } from '../utils/crypto.js';
@@ -343,44 +341,19 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
   const imageBuffer = await renderPaymentQrImage(order);
   const files = imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [];
 
-  // ═══ PayOS Embed (hiển thị QR inline) ═══
-  const expireText = order.payment_expired_at
-    ? `<t:${Math.floor(new Date(order.payment_expired_at).getTime() / 1000)}:R>`
-    : '_30 phút_';
-
-  const embed = new EmbedBuilder()
-    .setColor(0x7c3aed)
-    .setTitle('💳 Thông Tin Thanh Toán Đơn Hàng :shop:')
-    .setDescription(
-      `Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động giải phóng key sau khi nhận giao dịch.`
-    )
-    .addFields(
-      { name: 'Nội dung', value: `\`${order.payment_code ?? order.order_code}\``, inline: false },
-      { name: 'Sản phẩm', value: `\`${order.quantity}x ${order.product_name}\``, inline: true },
-      { name: 'Số tiền', value: `\`${formatCurrency(order.total_amount)}\``, inline: true },
-      { name: 'Hết hạn', value: expireText, inline: false },
-    )
-    .setFooter({ text: '⚠️ Lưu ý: Giao dịch sẽ hết hạn sau 10p nếu chưa thanh toán. Bạn có thể tạo lại hóa đơn mới.' });
-
-  if (imageBuffer) {
-    embed.setImage(`attachment://${attachmentName}`);
-  }
-
-  const actionRow = new ActionRowBuilder();
-  if (order.payment_checkout_url && /^https?:\/\//i.test(order.payment_checkout_url)) {
-    actionRow.addComponents(
-      new ButtonBuilder().setLabel('💳 Thanh Toán Ngay').setStyle(ButtonStyle.Link).setURL(order.payment_checkout_url)
-    );
-  }
-  actionRow.addComponents(
-    new ButtonBuilder().setCustomId(`queue:view:${order.order_code}`).setLabel('📍 Xem Hàng Chờ').setStyle(ButtonStyle.Secondary)
-  );
+  // ═══ PayOS QR — Components V2 (QR inline qua MediaGallery attachment://) ═══
+  const { container, actionRow, flags } = buildPaymentQrV2({
+    order,
+    attachmentName,
+    checkoutUrl: order.payment_checkout_url,
+    hasImage: Boolean(imageBuffer),
+  });
 
   const messagePayload = {
-    content: `<@${order.customer_id}>`,
-    embeds: [embed],
-    files: imageBuffer ? [new AttachmentBuilder(imageBuffer, { name: attachmentName })] : [],
-    components: actionRow.components.length ? [actionRow] : [],
+    components: [container, actionRow],
+    flags,
+    files,
+    allowedMentions: { users: [order.customer_id] },
   };
 
   let sentMessage = null;

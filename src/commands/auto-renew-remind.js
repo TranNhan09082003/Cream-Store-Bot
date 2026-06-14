@@ -41,7 +41,7 @@ export async function execute(interaction) {
       ]);
 
       const embed = new EmbedBuilder()
-        .setTitle('✅ Đã Quét Hệ Thống Nhắc Gia Hạn')
+        .setTitle(`${E('status_check', '✅')} Đã Quét Hệ Thống Nhắc Gia Hạn`)
         .setColor(0x3498DB)
         .setDescription('Kết quả quét và gửi tin nhắn:')
         .addFields(
@@ -89,12 +89,12 @@ export async function execute(interaction) {
       const subs = getSubscriptionsDueInDays(interaction.guildId, days);
 
       const embed = new EmbedBuilder()
-        .setTitle(`⏰ Subscriptions Cần Gia Hạn Trong ${days} Ngày`)
+        .setTitle(`${E('icon_clock', '⏰')} Subscriptions Cần Gia Hạn Trong ${days} Ngày`)
         .setColor(0xF39C12)
         .setTimestamp();
 
       if (!subs.length) {
-        embed.setDescription('🎉 Không có subscription nào cần gia hạn!');
+        embed.setDescription(`${E('order_complete', '🎉')} Không có subscription nào cần gia hạn!`);
       } else {
         let desc = `Tìm thấy **${subs.length}** subscription cần xử lý:\n\n`;
         for (const s of subs.slice(0, 20)) {

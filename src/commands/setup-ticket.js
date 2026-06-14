@@ -76,7 +76,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle('✅  Cenar Store — Setup Thành Công')
+      .setTitle(`${E('status_check', '✅')}  Cenar Store — Setup Thành Công`)
       .setDescription('> Hệ thống ticket và bán hàng đã được cấu hình. Panel đã gửi vào kênh tương ứng.')
       .addFields(
         { name: '📋 Panel Ticket', value: `${panelChannel}`, inline: true },

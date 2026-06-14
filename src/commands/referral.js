@@ -27,7 +27,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0xa855f7)
-      .setTitle('🔗 Mã Giới Thiệu Của Bạn')
+      .setTitle(`${E('icon_link', '🔗')} Mã Giới Thiệu Của Bạn`)
       .setDescription([
         `\`${ref.code}\``,
         '',
@@ -45,7 +45,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0xa855f7)
-      .setTitle('📊 Thống Kê Giới Thiệu')
+      .setTitle(`${E('icon_chart', '📊')} Thống Kê Giới Thiệu`)
       .addFields(
         { name: `${E('icon_link', '🔗')} Mã của bạn`, value: stats.code ? `\`${stats.code}\`` : 'Chưa có', inline: true },
         { name: '👥 Đã giới thiệu', value: `${stats.totalReferrals} người`, inline: true },

@@ -32,7 +32,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
-      .setTitle('⭐ Điểm Tích Luỹ')
+      .setTitle(`${E('icon_star', '⭐')} Điểm Tích Luỹ`)
       .setDescription([
         `> 🎯 **Điểm hiện có:** \`${pts.points}\``,
         `> ${E('icon_chart', '📊')} **Tổng điểm tích luỹ:** \`${pts.lifetime_points}\``,
@@ -55,7 +55,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0x22c55e)
-      .setTitle('🎁 Đổi Điểm Thành Công!')
+      .setTitle(`${E('icon_gift', '🎁')} Đổi Điểm Thành Công!`)
       .setDescription([
         `> ${E('icon_star', '⭐')} **Đã đổi:** ${points} điểm`,
         `> ${E('payment_money', '💰')} **Nhận:** ${result.creditAmount.toLocaleString('vi-VN')}đ vào ví`,

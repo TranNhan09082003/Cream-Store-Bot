@@ -47,7 +47,7 @@ export async function execute(interaction) {
     const stats = getRevenueStatsRaw(startDateIso, endDateIso);
 
     const embed = new EmbedBuilder()
-      .setTitle('📊 Báo Cáo Doanh Thu & Đơn Hàng')
+      .setTitle(`${E('icon_chart', '📊')} Báo Cáo Doanh Thu & Đơn Hàng`)
       .setColor(0x00ff00)
       .setTimestamp();
 

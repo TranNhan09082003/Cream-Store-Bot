@@ -106,7 +106,7 @@ export async function execute(interaction) {
     const stats = getCouponStats(interaction.guildId);
     const embed = new EmbedBuilder()
       .setColor(0xf59e0b)
-      .setTitle('📊 Thống Kê Coupon')
+      .setTitle(`${E('icon_chart', '📊')} Thống Kê Coupon`)
       .addFields(
         { name: `${E('status_check', '✅')} Đang hoạt động`, value: `${stats.activeCoupons}`, inline: true },
         { name: '🔢 Tổng lần dùng', value: `${stats.totalTimesUsed}`, inline: true },

@@ -1,7 +1,7 @@
 import { getGuildConfig } from './guildConfigService.js';
 import { getOrderByCode, submitFeedback } from './orderService.js';
 import { syncCustomerStats } from './customerService.js';
-import { buildFeedbackEmbed } from '../utils/embeds.js';
+import { buildFeedbackV2 } from '../utils/embeds.js';
 
 export async function publishFeedback({ guild, userId, orderCode, stars, content }) {
   const guildConfig = getGuildConfig(guild.id);
@@ -40,8 +40,10 @@ export async function publishFeedback({ guild, userId, orderCode, stars, content
     throw new Error('Không lấy được thông tin thành viên.');
   }
 
+  const { container, flags } = buildFeedbackV2({ member, order, stars, content });
   const feedbackMessage = await feedbackChannel.send({
-    embeds: [buildFeedbackEmbed({ member, order, stars, content })],
+    components: [container],
+    flags,
   });
 
   const updatedOrder = submitFeedback({

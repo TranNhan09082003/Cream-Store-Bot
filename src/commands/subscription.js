@@ -157,7 +157,7 @@ function buildCheckEmbed(subs, days, guildId = null) {
     .setTimestamp();
 
   if (!subs.length) {
-    embed.setDescription('🎉 Không có subscription nào cần gia hạn trong khoảng thời gian này.');
+    embed.setDescription(`${E('order_complete', '🎉')} Không có subscription nào cần gia hạn trong khoảng thời gian này.`);
     return embed;
   }
 
@@ -300,7 +300,7 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error('[SUBSCRIPTION] Error:', error);
-    return interaction.editReply(`❌ Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
   }
 }
 

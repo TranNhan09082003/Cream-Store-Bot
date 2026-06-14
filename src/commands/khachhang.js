@@ -1,7 +1,7 @@
 import { createEmojiResolver } from '../utils/emojiHelper.js';
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { getCustomerRecentOrders, syncCustomerStats } from '../services/customerService.js';
-import { buildCustomerProfileEmbed } from '../utils/embeds.js';
+import { buildCustomerProfileV2 } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('khachhang')
@@ -16,8 +16,9 @@ export async function execute(interaction) {
   const profile = syncCustomerStats(interaction.guildId, user.id);
   const orders = getCustomerRecentOrders(interaction.guildId, user.id, 5);
 
+  const { container, flags } = buildCustomerProfileV2(user, profile, orders, interaction.guildId);
   await interaction.reply({
-    embeds: [buildCustomerProfileEmbed(user, profile, orders)],
-    ephemeral: true,
+    components: [container],
+    flags: flags | MessageFlags.Ephemeral,
   });
 }

@@ -8,12 +8,11 @@ import { applyCustomerRoles } from '../services/roleService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
 import { assertStaffCapability } from '../utils/permissions.js';
 import {
-  buildCredentialEmbeds,
   buildDeliveryClaimComponents,
   buildDeliveryCredentialEmbeds,
   buildDeliveryLogText,
   buildDeliveryLoginComponents,
-  buildDeliveryNoticeEmbed,
+  buildDeliveryNoticeV2,
 } from '../utils/embeds.js';
 import { getCenarHub } from '../services/cenarHub.js';
 
@@ -96,15 +95,16 @@ export async function execute(interaction) {
     }
     persist(dmMessage.id);
   } else {
-    dmMessage = await dmChannel.send({ embeds: [buildDeliveryNoticeEmbed(storedOrder)], components: shouldShowClaimButton ? buildDeliveryClaimComponents(order.order_code) : [] }).catch(() => null);
+    const { container, flags } = buildDeliveryNoticeV2(storedOrder);
+    dmMessage = await dmChannel.send({
+      components: shouldShowClaimButton ? [container, ...buildDeliveryClaimComponents(order.order_code)] : [container],
+      flags,
+    }).catch(() => null);
     if (!dmMessage) {
       await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không gửi được DM cho khách hàng.`, ephemeral: true });
       return;
     }
     persist(dmMessage.id);
-    if (!shouldShowClaimButton && credentialEmail && credentialPassword) {
-      await dmChannel.send({ embeds: buildCredentialEmbeds({ ...storedOrder, credential_email: credentialEmail, credential_password: credentialPassword, claim_notes: claimNotes }) }).catch(() => null);
-    }
   }
   
   const hub = getCenarHub();

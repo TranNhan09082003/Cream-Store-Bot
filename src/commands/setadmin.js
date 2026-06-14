@@ -38,7 +38,7 @@ export async function execute(interaction) {
     if (!user) {
       const embed = new EmbedBuilder()
         .setColor('#ef4444')
-        .setTitle('❌ Lỗi: Không tìm thấy người dùng')
+        .setTitle(`${E('status_cross', '❌')} Lỗi: Không tìm thấy người dùng`)
         .setDescription(`Không có tài khoản website nào đăng ký với email: **${email}**\nVui lòng bảo người đó đăng nhập website ít nhất 1 lần để tạo tài khoản.`);
       return interaction.editReply({ embeds: [embed] });
     }
@@ -48,7 +48,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor('#22c55e')
-      .setTitle('✅ Cập nhật quyền thành công')
+      .setTitle(`${E('status_check', '✅')} Cập nhật quyền thành công`)
       .setDescription(`Tài khoản **${email}** đã được cập nhật thành **${role.toUpperCase()}**.\nNgười dùng có thể tải lại trang web để nhận quyền.`);
       
     return interaction.editReply({ embeds: [embed] });

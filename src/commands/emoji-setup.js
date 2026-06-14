@@ -110,7 +110,7 @@ export async function execute(interaction) {
       .setTitle(`${E('status_check', '🔄')} Tự Động Đồng Bộ Emoji`)
       .setDescription(
         `Đã quét toàn bộ custom emoji của máy chủ **${interaction.guild.name}**.\n\n` +
-        `✅ Đồng bộ thành công: **${syncResult.syncedCount}** slot(s) mới.\n` +
+        `${E('status_check', '✅')} Đồng bộ thành công: **${syncResult.syncedCount}** slot(s) mới.\n` +
         (syncResult.updatedSlots.length > 0 
           ? `Các slot được cập nhật: ${syncResult.updatedSlots.map(s => `\`${s}\``).join(', ')}` 
           : 'Không có slot nào cần cập nhật mới.') +

@@ -26,6 +26,7 @@ import {
 } from './formatters.js';
 import { getEmojiMap } from '../services/emojiService.js';
 import { T, fmt, h2, h3, subtext, fieldQ, fields, vnd, lines as joinLines, statusPill, SP } from './embedHelpers.js';
+import { accentFor, brandName } from './uiKit.js';
 
 // ═══════════════════════════════════════════════
 // Brand helpers
@@ -101,7 +102,7 @@ export function buildTicketPanelV2(customConfig = {}) {
   const em = guildId ? getEmojiMap(guildId) : {};
   const E = (slot, fallback) => em[slot] || fallback;
 
-  const container = new ContainerBuilder().setAccentColor(0x6366f1);
+  const container = new ContainerBuilder().setAccentColor(accentFor('primary'));
 
   if (hasCustomDesc) {
     // Chế độ tuỳ chỉnh: chỉ hiện tiêu đề + nội dung user nhập (không kèm services mặc định)
@@ -257,11 +258,11 @@ export function buildTicketWelcomeEmbed(ticketCode, customerId, ticketType = 'OR
 // Ticket Welcome V2 (Components V2)
 // ═══════════════════════════════════════════════
 const TICKET_V2_ACCENT = {
-  ORDER:       0x6366f1, // indigo
-  SUPPORT:     0x0ea5e9, // sky blue
-  COMPLAINT:   0xef4444, // red
-  PARTNERSHIP: 0x22c55e, // green
-  WARRANTY:    0xf59e0b, // amber
+  ORDER:       accentFor('primary'),
+  SUPPORT:     accentFor('info'),
+  COMPLAINT:   accentFor('danger'),
+  PARTNERSHIP: accentFor('success'),
+  WARRANTY:    accentFor('warning'),
 };
 
 const TICKET_V2_STEPS = {
@@ -294,7 +295,7 @@ const TICKET_V2_STEPS = {
 
 export function buildTicketWelcomeV2(ticketCode, customerId, ticketType = 'ORDER', relatedOrderCode = null, productName = null, guildId = null) {
   const meta = TICKET_TYPE_META[ticketType] ?? TICKET_TYPE_META.ORDER;
-  const accentColor = TICKET_V2_ACCENT[ticketType] ?? 0x6366f1;
+  const accentColor = TICKET_V2_ACCENT[ticketType] ?? accentFor('primary');
   const steps = TICKET_V2_STEPS[ticketType] ?? TICKET_V2_STEPS.ORDER;
   const brand = brandConfig('store');
   const em = guildId ? getEmojiMap(guildId) : {};
@@ -348,7 +349,7 @@ export function buildPaymentMethodSelector(order) {
   const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
   const E = (slot, fallback) => em[slot] || fallback;
 
-  const container = new ContainerBuilder().setAccentColor(0xf59e0b); // Amber
+  const container = new ContainerBuilder().setAccentColor(accentFor('warning'));
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
@@ -480,6 +481,26 @@ export function buildWarrantySelectEmbed() {
     .setTimestamp();
 }
 
+export function buildWarrantySelectV2(guildId = null) {
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+  const container = new ContainerBuilder().setAccentColor(accentFor('warning'));
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('panel_warranty', '🛠️')}  Chọn Sản Phẩm Cần Bảo Hành`),
+      `> Dưới đây là danh sách ${fmt.b('đơn hàng đã hoàn thành')} của bạn.`,
+      '> Chọn sản phẩm cần bảo hành từ menu bên dưới.',
+    ))
+  );
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(subtext('Nếu không thấy đơn, hãy liên hệ staff để được hỗ trợ.'))
+  );
+  return { container, flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildWarrantyProductSelectComponents(orders) {
   const options = orders.slice(0, 25).map(order => ({
     label: `${order.order_code} — ${String(order.product_name ?? '').slice(0, 50)}`,
@@ -524,12 +545,13 @@ export function buildOrderCreatedV2(order, orderChannelId) {
   const hasPay = order.total_amount > 0;
   const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
   const E = (slot, fallback) => em[slot] || fallback;
-  const container = new ContainerBuilder().setAccentColor(hasPay ? 0x6366f1 : 0x22c55e);
+  const container = new ContainerBuilder().setAccentColor(accentFor(hasPay ? 'primary' : 'success'));
 
-  // Header
+  // Header — mention khách ngay trong header (gộp tin thừa, chống spam)
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(joinLines(
       `## ${E('order_created', '✅')} Đơn Hàng ${fmt.code(order.order_code)} Đã Được Tạo`,
+      `> ${fmt.user(order.customer_id)} — đơn của bạn đã được tạo!`,
       hasPay
         ? `> ${E('payment_payos', '💳')} Vui lòng ${fmt.b('chọn phương thức thanh toán')} để đơn được xử lý`
         : `> ${E('icon_gift', '🎁')} Đơn không cần thanh toán — đưa vào hàng xử lý ngay!`,
@@ -593,7 +615,7 @@ export function buildQueuePositionEmbed(order, position, totalInQueue) {
 // ═══ Queue Position V2 (Components V2) ═══
 export function buildQueuePositionV2(order, position, totalInQueue) {
   const groupName = normalizeQueueGroup(order.product_name) || 'đơn hàng';
-  const container = new ContainerBuilder().setAccentColor(0x0ea5e9);
+  const container = new ContainerBuilder().setAccentColor(accentFor('info'));
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
@@ -696,6 +718,73 @@ export function buildPaymentPendingComponents(orderCode, checkoutUrl = null) {
   return row.components.length ? [row] : [];
 }
 
+// ═══ Payment QR V2 (Components V2 — QR inline qua MediaGallery attachment://) ═══
+export function buildPaymentQrV2({ order, attachmentName = null, checkoutUrl = null, hasImage = false }) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+
+  const expireText = order.payment_expired_at
+    ? `<t:${Math.floor(new Date(order.payment_expired_at).getTime() / 1000)}:R>`
+    : '_30 phút_';
+
+  const container = new ContainerBuilder().setAccentColor(accentFor('info'));
+
+  // Header — mention khách trong TextDisplay (V2 không dùng content/embeds)
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('payment_payos', '💳')}  Thanh Toán Đơn Hàng`),
+      `> ${fmt.user(order.customer_id)}`,
+      `> ${E('payment_qr', '📱')} Quét mã QR ${fmt.b('hoặc')} bấm ${fmt.b('Thanh Toán Ngay')} bên dưới`,
+      `> ${E('status_check', '✅')} Bot ${fmt.b('tự động xác nhận')} sau khi nhận được giao dịch`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Thông tin đơn
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('order_id', '🆔')} ${fmt.b('Nội dung:')} ${fmt.code(order.payment_code ?? order.order_code)}`,
+      `${E('order_product', '📦')} ${fmt.b('Sản phẩm:')} ${formatOrderProduct(order.quantity, order.product_name)}`,
+      `${E('payment_money', '💰')} ${fmt.b('Số tiền:')} ${fmt.b(formatCurrency(order.total_amount))}`,
+      `${E('icon_clock', '⏰')} ${fmt.b('Hết hạn:')} ${expireText}`,
+    ))
+  );
+
+  // QR inline qua MediaGallery (attachment://)
+  if (hasImage && attachmentName) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${attachmentName}`)
+      )
+    );
+  }
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      subtext(`${E('status_warn', '⚠️')} Giao dịch hết hạn sau ít phút nếu chưa thanh toán. Bạn có thể tạo lại hoá đơn mới.`)
+    )
+  );
+
+  const actionRow = new ActionRowBuilder();
+  if (checkoutUrl && /^https?:\/\//i.test(checkoutUrl)) {
+    actionRow.addComponents(
+      new ButtonBuilder().setLabel('Thanh Toán Ngay').setStyle(ButtonStyle.Link).setURL(checkoutUrl).setEmoji(E('payment_payos', '💳'))
+    );
+  }
+  actionRow.addComponents(
+    new ButtonBuilder().setCustomId(`queue:view:${order.order_code}`).setLabel('Xem Hàng Chờ').setStyle(ButtonStyle.Secondary).setEmoji(E('order_queue', '📍'))
+  );
+
+  return { container, actionRow, flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildPaymentSuccessEmbed(order, amountText = null, transactionContent = null) {
   const embed = new EmbedBuilder()
     .setColor(config.accentColorSuccess)
@@ -796,6 +885,64 @@ export function buildCompletionDmEmbed(order) {
       )
       .setTimestamp(),
   );
+}
+
+// ═══ Order Completed V2 (gộp completion + info + nhắc feedback vào 1 container) ═══
+export function buildOrderCompletedV2(order, staffId, supportId = null) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+  const store = brandName('store');
+
+  const container = new ContainerBuilder().setAccentColor(accentFor('primary'));
+
+  // Header — lời cảm ơn + mention khách (V2 mention trong TextDisplay)
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('order_complete', '🎉')}  Đơn Hàng Hoàn Thành`),
+      `> ❤️ ${fmt.user(order.customer_id)} — cảm ơn bạn đã ủng hộ ${fmt.b(store)}!`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Thông tin đơn + xử lý
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('order_id', '🆔')} ${fmt.b('Mã Đơn:')} ${fmt.code(order.order_code)}`,
+      `${E('order_product', '📦')} ${fmt.b('Sản Phẩm:')} ${formatOrderProduct(order.quantity, order.product_name)}`,
+      `${E('ticket_staff', '👨‍💼')} ${fmt.b('Nhân Viên:')} ${fmt.user(staffId)}`,
+      `${E('ticket_claim', '🛡️')} ${fmt.b('Hỗ Trợ:')} ${fmt.user(supportId || staffId)}`,
+      `${E('icon_clock', '⏰')} ${fmt.b('Hoàn thành:')} ${T.rel(order.completed_at || new Date())}`,
+      order.expiry_at
+        ? `${E('icon_calendar', '📅')} ${fmt.b('Hết hạn:')} ${T.full(order.expiry_at)} (${T.rel(order.expiry_at)})`
+        : null,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  // Nhắc feedback + bảo hành (gộp tin thừa, chống spam)
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('icon_star', '⭐')} ${fmt.b('Hãy đánh giá trải nghiệm mua hàng của bạn!')}`,
+      `> Feedback giúp shop cải thiện dịch vụ — và bạn được ${fmt.b('giảm giá đơn sau')}.`,
+      `> ${E('panel_warranty', '🛠️')} Cần ${fmt.b('bảo hành')}? Dùng nút bên dưới bất cứ lúc nào.`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(subtext(`💜 ${config.storeFooter || store}`))
+  );
+
+  return { container, flags: MessageFlags.IsComponentsV2 };
 }
 
 export function buildPublicOrderLogEmbed(order) {
@@ -912,6 +1059,53 @@ export function buildQuickFeedbackAckEmbed(order, stars) {
   );
 }
 
+export function buildQuickFeedbackAckV2(order, stars) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+  const starBar = (E('icon_star', '⭐')).repeat(stars);
+  const container = new ContainerBuilder().setAccentColor(accentFor('success'));
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('status_check', '🙏')}  Cảm Ơn Bạn Đã Feedback!`),
+      `> Bạn đã đánh giá đơn ${fmt.code(order.order_code)} với mức ${fmt.b(`${stars} ⭐`)}`,
+      `> ${starBar}`,
+      '',
+      subtext('Feedback của bạn rất quan trọng với chúng tôi! 💖'),
+    ))
+  );
+  return { container, flags: MessageFlags.IsComponentsV2 };
+}
+
+export function buildFeedbackV2({ member, order, stars, content }) {
+  const safeContent = content?.trim() || 'Không có ý kiến';
+  const safeOrderCode = String(order?.order_code ?? order?.payment_code ?? '').trim() || 'KHONG_RO_MA_DON';
+  const guildId = order?.guild_id ?? null;
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+  const starBar = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
+  const accent = stars >= 4 ? 'success' : stars >= 3 ? 'warning' : 'danger';
+
+  const container = new ContainerBuilder().setAccentColor(accentFor(accent));
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${starBar}  Đánh Giá ${stars}/5 Sao`),
+      `> ${E('ticket_user', '👤')} ${fmt.b('Khách:')} ${fmt.user(member.id)}`,
+      `> ${E('order_id', '🆔')} ${fmt.b('Mã Đơn:')} ${fmt.code(safeOrderCode)}`,
+      `> ${E('order_product', '📦')} ${fmt.b('Sản Phẩm:')} ${formatOrderProduct(order?.quantity ?? 1, order?.product_name ?? 'Không xác định')}`,
+    ))
+  );
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('icon_star', '📝')} ${fmt.b('Ý Kiến Khách Hàng:')}`,
+      `> ${safeContent}`,
+    ))
+  );
+  return { container, flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildFeedbackModalPrompt(stars) {
   const titles = ['', '😞 Không Hài Lòng', '😕 Cần Cải Thiện', '😐 Tạm Ổn', '😊 Khá Hài Lòng', '🤩 Rất Hài Lòng!'];
   return {
@@ -947,6 +1141,52 @@ export function buildDeliveryNoticeEmbed(order) {
     .setTimestamp();
   if (config.deliveryBannerUrl) embed.setImage(config.deliveryBannerUrl);
   return applyBranding(embed);
+}
+
+// ═══ Delivery Notice V2 (Components V2) ═══
+export function buildDeliveryNoticeV2(order) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+  const store = brandName('store');
+
+  const container = new ContainerBuilder().setAccentColor(accentFor('primary'));
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('order_product', '📦')}  Đơn Hàng Đã Được Giao!`),
+      `> ${fmt.user(order.customer_id)} — ${E('payment_qr', '📩')} Nếu đơn có tài khoản, bấm nút bên dưới để nhận thông tin đăng nhập.`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('order_id', '🆔')} ${fmt.b('Mã Đơn:')} ${fmt.code(order.order_code)}`,
+      `${E('order_product', '📦')} ${fmt.b('Sản Phẩm:')} ${formatOrderProduct(order.quantity, order.product_name)}`,
+      order.expiry_at ? `${E('icon_calendar', '📅')} ${fmt.b('Hết Hạn:')} ${T.date(order.expiry_at)}` : null,
+    ))
+  );
+
+  if (config.deliveryBannerUrl) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(config.deliveryBannerUrl)
+      )
+    );
+  }
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(subtext(`💜 ${config.shipperFooter || store}`))
+  );
+
+  return { container, flags: MessageFlags.IsComponentsV2 };
 }
 
 export function buildDeliveryClaimComponents(orderCode) {
@@ -1143,6 +1383,59 @@ export function buildCustomerProfileEmbed(user, profile, orders) {
     });
   }
   return embed;
+}
+
+// ═══ Customer Profile V2 (Components V2) ═══
+export function buildCustomerProfileV2(user, profile, orders, guildId = null) {
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback) => em[slot] || fallback;
+
+  const container = new ContainerBuilder().setAccentColor(accentFor('info'));
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      h2(`${E('ticket_user', '🧑‍💼')}  Hồ Sơ Khách Hàng`),
+      `> ${fmt.user(user.id)}`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `${E('icon_calendar', '📅')} ${fmt.b('Mua Từ:')} ${profile?.first_seen_at ? T.rel(profile.first_seen_at) : fmt.i('Chưa có')}`,
+      `${E('order_product', '📦')} ${fmt.b('Tổng Đơn:')} ${profile?.total_orders ?? 0}`,
+      `${E('order_complete', '✅')} ${fmt.b('Hoàn Thành:')} ${profile?.total_completed_orders ?? 0}`,
+      `${E('order_pending', '⏳')} ${fmt.b('Đang Nợ:')} ${profile?.total_open_orders ?? 0}`,
+      `${E('payment_money', '💰')} ${fmt.b('Tổng Chi:')} ${fmt.b(formatCurrency(profile?.total_spent ?? 0))}`,
+      `${E('payment_success', '✅')} ${fmt.b('Đã Thanh Toán:')} ${formatCurrency(profile?.total_paid_amount ?? 0)}`,
+    ))
+  );
+
+  if (orders?.length) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(joinLines(
+        `${E('icon_history', '📋')} ${fmt.b('5 Đơn Gần Nhất')}`,
+        ...orders.map(o =>
+          `> ${fmt.code(o.order_code)} — ${formatOrderProduct(o.quantity, o.product_name)} — ${fmt.b(getOrderStatusLabel(o.status))}`,
+        ),
+      ))
+    );
+  }
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(subtext(`💜 ${config.storeFooter || brandName('store')}`))
+  );
+
+  return { container, flags: MessageFlags.IsComponentsV2 };
 }
 
 // ═══════════════════════════════════════════════
