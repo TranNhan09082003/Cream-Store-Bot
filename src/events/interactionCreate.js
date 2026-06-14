@@ -41,7 +41,7 @@ import { deliverTranscript, sendCompletedFlow, updateOrderLogMessage } from '../
 import { closeTicket, createTicket, getOpenTicketByCustomer, getTicketByChannelId, getTicketById } from '../services/ticketService.js';
 import { exportTicketTranscript } from '../services/transcriptService.js';
 import { openWarrantyTicket } from '../services/warrantyService.js';
-import { resolveSelectMenuEmoji } from '../services/emojiService.js';
+import { resolveSelectMenuEmoji, resolveProductEmoji } from '../services/emojiService.js';
 import {
   buildCloseConfirmComponents,
   buildCloseConfirmEmbed,
@@ -95,15 +95,21 @@ const CHAR_TO_SLOT = {
   '📅': 'icon_calendar',
   '📜': 'icon_history',
   'ℹ️': 'status_info',
-  '🎬': 'brand_netflix',
+  '🎬': 'brand_capcut',
+  '🍿': 'brand_netflix',
   '🎵': 'brand_spotify',
   '📺': 'brand_youtube',
+  '▶️': 'brand_youtube',
   '🤖': 'brand_chatgpt',
   '💬': 'brand_discord',
+  '🚀': 'brand_boost',
+  '🔮': 'brand_boost',
+  '💎': 'brand_nitro',
+  '📈': 'brand_office',
+  '🎮': 'brand_gearup',
   '🏪': 'icon_store',
   '⭐': 'icon_star',
   '🔥': 'icon_fire',
-  '💎': 'icon_gem',
   '🎁': 'icon_gift',
   '✨': 'icon_sparkle',
   '👑': 'icon_crown',
@@ -123,7 +129,7 @@ const CHAR_TO_SLOT = {
   '🔇': 'status_cross'
 };
 
-const EMOJI_REGEX = new RegExp(Object.keys(CHAR_TO_SLOT).join('|'), 'g');
+const EMOJI_REGEX = new RegExp(Object.keys(CHAR_TO_SLOT).sort((a, b) => b.length - a.length).join('|'), 'g');
 
 function resolvePayloadEmojis(payload, E) {
   if (!payload) return payload;
@@ -536,28 +542,84 @@ async function handlePriceListSelect(interaction) {
   if (displayMode === 'compact') {
     let desc = '';
 
-    // Custom description or subtitle heading
-    if (catConfig.description) {
-      desc = catConfig.description + '\n\n';
-    } else if (subtitle) {
-      desc = `## ${subtitle}  ⭐\n\n`;
-    }
+    if (category.toLowerCase() === 'decor') {
+      const header = resolveDecorEmoji(interaction.guildId, 'header');
+      const bullet = resolveDecorEmoji(interaction.guildId, 'bullet');
+      const arrow = resolveDecorEmoji(interaction.guildId, 'arrow');
+      const check = resolveDecorEmoji(interaction.guildId, 'check');
+      const husky = resolveDecorEmoji(interaction.guildId, 'husky');
 
-    if (products.length === 0) {
-      desc += '*Hiện tại danh mục này chưa có sản phẩm nào hoạt động.*';
+      // Update the private embed title to have the custom emoji
+      title = `${header} Đề Co - Trang Trí`;
+      currentEmbed.setTitle(title);
+
+      desc = `**Giá Đít Cọt Bán** ${arrow} **Giá Sỉ To Bán**\n\n`;
+
+      desc += `${bullet} **Dành cho acc "CÓ" Nicho**\n`;
+      desc += `> • 66.000đ ${arrow} \`23.000đ\`\n`;
+      desc += `> • 72.000đ ${arrow} \`35.000đ\`\n`;
+      desc += `> • 92.000đ ${arrow} \`50.000đ\`\n`;
+      desc += `> • 105.000đ ${arrow} \`60.000đ\`\n`;
+      desc += `> • 111.000đ ${arrow} \`70.000đ\`\n`;
+      desc += `> • 131.000đ ${arrow} \`79.000đ\`\n`;
+      desc += `> • 141.000đ ${arrow} \`88.000đ\`\n`;
+      desc += `Vui lòng gửi tài khoản mật khẩu và 4-5 mã dự phòng khi mua\n\n`;
+
+      desc += `${bullet} **Dành cho acc "KHÔNG" Nicho**\n`;
+      desc += `> • 79.000đ ${arrow} \`35.000đ\`\n`;
+      desc += `> • 105.000đ ${arrow} \`60.000đ\`\n`;
+      desc += `> • 131.000đ ${arrow} \`80.000đ\`\n`;
+      desc += `> • 141.000đ ${arrow} \`90.000đ\`\n`;
+      desc += `> • 146.000đ ${arrow} \`95.000đ\`\n`;
+      desc += `> • 189.000đ ${arrow} \`110.000đ\`\n`;
+      desc += `Vui lòng gửi tài khoản mật khẩu và 4-5 mã dự phòng khi mua\n\n`;
+
+      desc += `${bullet} **Dạng gip(bấm là nhận)**\n`;
+      desc += `> • 66.000đ ${arrow} \`40.000đ\`\n`;
+      desc += `> • 79.000đ ${arrow} \`45.000đ\`\n`;
+      desc += `> • 92.000đ ${arrow} \`58.000đ\`\n`;
+      desc += `> • 105.000đ ${arrow} \`65.000đ\`\n`;
+      desc += `> • 131.000đ ${arrow} \`85.000đ\`\n`;
+      desc += `> • 141.000đ ${arrow} \`95.000đ\`\n`;
+      desc += `> • Combo 118.000đ ${arrow} \`80.000đ\`\n`;
+      desc += `> • Combo 146.000đ ${arrow} \`105.000đ\`\n`;
+      desc += `> • Combo 189.000đ ${arrow} \`130.000đ\`\n`;
+      desc += `> • Combo 220.000đ ${arrow} \`150.000đ\`\n\n`;
+
+      desc += `${check} Hoàn thành trong vòng 48h , nhanh nhất trong ngày\n`;
+      desc += `${check} Riêng loại gip hoàn thành trong ngày\n`;
+      desc += `${husky} Một số khung mới chưa có giá , bạn có thể chụp hình gửi Shop để được báo giá rẻ hơn nhiuuu\n\n`;
+
+      desc += '```ansi\n\u001b[1;33mTạo Ticket\u001b[0m\u001b[1;37m để mua hàng ngay nhé!!!\u001b[0m\n```';
     } else {
-      for (const p of products) {
-        const mainPrice = Number(p.price).toLocaleString('vi-VN') + ' VND';
-        // Description can contain a secondary price (e.g., "22000", "22k", or "22.000")
-        const secondaryPrice = parseCompactSecondaryPrice(p.description);
+      // Custom description or subtitle heading
+      if (catConfig.description) {
+        desc = catConfig.description + '\n\n';
+      } else if (subtitle) {
+        desc = `## ${subtitle}  ⭐\n\n`;
+      }
 
-        if (secondaryPrice) {
-          desc += `• **\`${mainPrice}\`** — **\`${secondaryPrice}\`**\n`;
-        } else {
-          const emoji = p.emoji || '📦';
-          desc += `• ${emoji} **\`${p.name}\`** — **\`${mainPrice}\`**\n`;
+      if (products.length === 0) {
+        desc += '*Hiện tại danh mục này chưa có sản phẩm nào hoạt động.*';
+      } else {
+        for (const p of products) {
+          const mainPrice = Number(p.price).toLocaleString('vi-VN') + ' VND';
+          // Description can contain a secondary price (e.g., "22000", "22k", or "22.000")
+          const secondaryPrice = parseCompactSecondaryPrice(p.description);
+
+          if (secondaryPrice) {
+            desc += `• **\`${mainPrice}\`** — **\`${secondaryPrice}\`**\n`;
+          } else {
+            const emoji = resolveProductEmoji(interaction.guildId, p.emoji) || '📦';
+            desc += `• ${emoji} **\`${p.name}\`** — **\`${mainPrice}\`**\n`;
+          }
         }
       }
+    }
+
+    if (category.toLowerCase() === 'ai') {
+      const ticketTag = guildConfig?.ticket_panel_channel_id ? `<#${guildConfig.ticket_panel_channel_id}>` : '**Ticket**';
+      desc += `\n**Các Sản Phẩm AI Khác Vui Lòng Liên Hệ ${ticketTag} trong server á!**\n`;
     }
 
     currentEmbed.setDescription(desc);
@@ -586,7 +648,8 @@ async function handlePriceListSelect(interaction) {
         else if (p.description && p.description.includes('Mới')) statusText = '`Mới 🌟`';
         else if (p.description && p.description.includes('Ưu đãi')) statusText = '`Ưu đãi 💥`';
 
-        let productDesc = `### ${p.emoji || '📦'} ${p.name}\n`;
+        const emoji = resolveProductEmoji(interaction.guildId, p.emoji) || '📦';
+        let productDesc = `### ${emoji} ${p.name}\n`;
         productDesc += `> 💰 **Giá:** \`${priceText}\` | ⏱️ **Thời hạn:** \`${p.duration_months} tháng\`\n`;
         if (p.description) {
           productDesc += `> ℹ️ **Chi tiết:** *${p.description}*\n`;
@@ -595,7 +658,7 @@ async function handlePriceListSelect(interaction) {
         }
         productDesc += `> ⚡ **Trạng thái:** ${statusText}\n\n`;
 
-        if (desc.length + productDesc.length > 3900) {
+        if (desc.length + productDesc.length > 2200) {
           currentEmbed.setDescription(desc);
           embeds.push(currentEmbed);
           currentEmbed = new EmbedBuilder().setColor(embedColor);
@@ -604,6 +667,12 @@ async function handlePriceListSelect(interaction) {
           desc += productDesc;
         }
       }
+
+      if (category.toLowerCase() === 'ai') {
+        const ticketTag = guildConfig?.ticket_panel_channel_id ? `<#${guildConfig.ticket_panel_channel_id}>` : '**Ticket**';
+        desc += `\n**Các Sản Phẩm AI Khác Vui Lòng Liên Hệ ${ticketTag} trong server á!**\n`;
+      }
+
       currentEmbed.setDescription(desc);
       currentEmbed.setTimestamp();
       embeds.push(currentEmbed);
@@ -618,7 +687,7 @@ async function handlePriceListSelect(interaction) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(p.emoji, '🛒')
+      emoji: resolveSelectMenuEmoji(interaction.guildId, p.emoji, '🛒')
     }));
 
     const purchaseRow = new ActionRowBuilder().addComponents(
@@ -650,11 +719,46 @@ async function handlePriceListSelect(interaction) {
   );
   rows.push(adminRow);
 
-  await interaction.reply({
-    embeds: embeds,
-    components: rows,
-    ephemeral: true
-  });
+  try {
+    await interaction.reply({
+      embeds: embeds,
+      components: rows,
+      ephemeral: true
+    });
+  } catch (error) {
+    if (error.code === 50035 || error.message?.includes('50035') || error.message?.includes('emoji') || error.message?.includes('Emoji')) {
+      console.warn('[handlePriceListSelect] Reply failed with emoji-related/form error, retrying without option emojis:', error);
+      if (products.length > 0) {
+        const cleanSelectOptions = products.slice(0, 25).map(p => ({
+          label: `${p.name}`.slice(0, 100),
+          description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
+          value: `${p.id}`
+        }));
+
+        const cleanPurchaseRow = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('product:select')
+            .setPlaceholder('🛒 Chọn gói dịch vụ bạn muốn đặt mua')
+            .addOptions(cleanSelectOptions)
+        );
+
+        const cleanRows = [cleanPurchaseRow];
+        if (rows.length > 1) {
+          cleanRows.push(rows[1]);
+        }
+
+        await interaction.reply({
+          embeds: embeds,
+          components: cleanRows,
+          ephemeral: true
+        }).catch(err => console.error('[handlePriceListSelect] Retrying without emojis also failed:', err));
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 }
 
 /**
@@ -964,6 +1068,12 @@ function getDefaultCategoryDetails(category) {
   if (cat === 'decor') {
     return { title: '⚙️ DECOR / NPL', color: 'EB459E', name: 'Decor Discord', display_mode: 'compact', subtitle: '⚙️ DEC/NPL ( LOG ACC )' };
   }
+  if (cat === 'ai') {
+    return { title: '🤖 BẢNG GIÁ AI & PHẦN MỀM PREMIUM', color: '9B59B6', name: 'AI & Phần Mềm' };
+  }
+  if (cat === 'gearup') {
+    return { title: '🎮 BẢNG GIÁ GEARUP BOOSTER', color: '00E6FF', name: 'Gearup Booster' };
+  }
   return { title: `BẢNG GIÁ ${category.toUpperCase()}`, color: 'F3A6D7', name: category.toUpperCase() };
 }
 
@@ -1175,7 +1285,7 @@ async function handlePriceListAdminEditButton(interaction, category) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T | Trạng thái: ${statusText}`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(p.emoji, '📦')
+      emoji: resolveSelectMenuEmoji(interaction.guildId, p.emoji, '📦')
     };
   });
 
@@ -3349,3 +3459,26 @@ export function getClientOptions() {
     partials: [Partials.Channel],
   };
 }
+
+function resolveDecorEmoji(guildId, emojiName) {
+  const isServer1 = guildId === '1282637033340403754';
+  if (isServer1) {
+    switch (emojiName) {
+      case 'header': return '<a:ccjdeobt:1481142015994495059>';
+      case 'bullet': return '<a:chamxanh:1481124932447371374>';
+      case 'arrow': return '<a:69_Arrow:1448888143120957532>';
+      case 'check': return '<:verifybadge:1481127479702847646>';
+      case 'husky': return '<a:husky:1105033204114673675>';
+    }
+  } else {
+    switch (emojiName) {
+      case 'header': return '✨';
+      case 'bullet': return '🟢';
+      case 'arrow': return '➡️';
+      case 'check': return '🔵';
+      case 'husky': return '<a:husky:1105033204114673675>';
+    }
+  }
+  return '';
+}
+

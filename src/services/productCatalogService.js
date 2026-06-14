@@ -1,4 +1,5 @@
 import { db, nowIso } from '../database/db.js';
+import { resolveProductEmoji } from './emojiService.js';
 
 // ═══════════════════════════════════════════════
 // Product Catalog CRUD
@@ -116,7 +117,8 @@ export function generateProductKnowledgeText(guildId) {
   for (const p of products) {
     const priceText = p.price > 0 ? `${Number(p.price).toLocaleString('vi-VN')} VND` : 'Liên hệ';
     const durationText = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
-    lines.push(`• ${p.emoji} ${p.name} — ${priceText} / ${durationText}${p.description ? ` — ${p.description}` : ''}`);
+    const emoji = resolveProductEmoji(guildId, p.emoji);
+    lines.push(`• ${emoji} ${p.name} — ${priceText} / ${durationText}${p.description ? ` — ${p.description}` : ''}`);
   }
   lines.push('=====================================');
   return lines.join('\n');

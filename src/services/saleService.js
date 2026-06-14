@@ -1,5 +1,5 @@
 import { db, nowIso } from '../database/db.js';
-import { getEmojiMap, resolveSelectMenuEmoji } from './emojiService.js';
+import { getEmojiMap, resolveSelectMenuEmoji, resolveProductEmoji } from './emojiService.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { config } from '../config.js';
 import {
@@ -65,7 +65,7 @@ export function buildSalePanelComponents(guildId) {
     const salePriceText = `**${formatCurrency(p.price)}**`;
     const dur = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
     const desc = p.description ? `\n  *${p.description}*` : '';
-    const emoji = p.emoji || E('order_product', '📦');
+    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product', '📦');
     
     return `${emoji} **${p.name}**\n` +
            `  ➔ Giá cũ: ${originalPriceText} | Giá Sale: ${salePriceText} (Giảm ${salePercent}%)\n` +
@@ -92,7 +92,7 @@ export function buildSalePanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: `Sale: ${formatCurrency(p.price)} (Gốc: ${formatCurrency(p.original_price)})`.slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(p.emoji, E('order_product', '📦')),
+    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product', '📦')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(

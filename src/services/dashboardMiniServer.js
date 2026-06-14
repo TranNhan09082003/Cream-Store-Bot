@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { encrypt, decrypt } from '../utils/crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,11 +82,18 @@ function getDashboardSnapshotRaw() {
   };
 }
 
+function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a ?? ''), 'utf8');
+  const bufB = Buffer.from(String(b ?? ''), 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 function isDashboardAuthorized(req) {
   const token = String(process.env.DASHBOARD_TOKEN ?? '').trim();
-  if (!token) return true;
+  if (!token) return false;
   const provided = req.headers['x-dashboard-token'] || req.query.token;
-  return provided === token;
+  return safeEqual(provided, token);
 }
 
 export function registerDashboardRoutes(app) {
@@ -164,8 +172,11 @@ export function registerDashboardRoutes(app) {
 
   app.post('/dashboard/api/login', (req, res) => {
     const { password } = req.body || {};
-    const validPassword = process.env.DASHBOARD_TOKEN || 'creamstore1231';
-    if (password === validPassword) {
+    const validPassword = String(process.env.DASHBOARD_TOKEN ?? '').trim();
+    if (!validPassword) {
+      return res.status(503).json({ ok: false, error: 'Dashboard chưa cấu hình DASHBOARD_TOKEN.' });
+    }
+    if (safeEqual(password, validPassword)) {
       return res.json({ ok: true, token: validPassword });
     }
     return res.status(401).json({ ok: false, error: 'Sai mật khẩu!' });
@@ -186,10 +197,10 @@ export function registerDashboardRoutes(app) {
           id: o.order_code,
           service: aiClassifyService(o.product_name),
           productName: (o.product_name || '').replace(/<.*?>/g, '').trim(),
-          email: o.credential_email || '',
-          password: o.credential_password || '',
-          profileName: o.credential_profile || '',
-          pin: o.credential_pin || '',
+          email: decrypt(o.credential_email) || '',
+          password: decrypt(o.credential_password) || '',
+          profileName: decrypt(o.credential_profile) || '',
+          pin: decrypt(o.credential_pin) || '',
           customerName: o.customer_id, // we will display ID if name is missing
           customerDiscord: o.customer_id,
           customerGmail: o.customer_gmail || '',
@@ -309,10 +320,14 @@ export function registerDashboardRoutes(app) {
         timestamp: new Date().toISOString()
       };
 
-      if (order.credential_email) embed.fields.push({ name: '📧 Email', value: `\`${order.credential_email}\``, inline: true });
-      if (order.credential_password) embed.fields.push({ name: '🔑 Mật Khẩu', value: `\`${order.credential_password}\``, inline: true });
-      if (order.credential_profile) embed.fields.push({ name: '👤 Profile', value: `\`${order.credential_profile}\``, inline: true });
-      if (order.credential_pin) embed.fields.push({ name: '🔢 Mã PIN', value: `\`${order.credential_pin}\``, inline: true });
+      const _email = decrypt(order.credential_email);
+      const _password = decrypt(order.credential_password);
+      const _profile = decrypt(order.credential_profile);
+      const _pin = decrypt(order.credential_pin);
+      if (_email) embed.fields.push({ name: '📧 Email', value: `\`${_email}\``, inline: true });
+      if (_password) embed.fields.push({ name: '🔑 Mật Khẩu', value: `\`${_password}\``, inline: true });
+      if (_profile) embed.fields.push({ name: '👤 Profile', value: `\`${_profile}\``, inline: true });
+      if (_pin) embed.fields.push({ name: '🔢 Mã PIN', value: `\`${_pin}\``, inline: true });
       if (order.expiry_at) embed.fields.push({ name: '⏳ Ngày Hết Hạn', value: `<t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:D>`, inline: false });
 
       await targetUser.send({ embeds: [embed] });
@@ -380,7 +395,11 @@ export function registerDashboardRoutes(app) {
           'COMPLETED', ?, ?, ?, ?
         )
       `).run(
-        id, data.service, data.email, data.password, data.profileName, data.pin,
+        id, data.service,
+        data.email != null ? encrypt(data.email) : null,
+        data.password != null ? encrypt(data.password) : null,
+        data.profileName != null ? encrypt(data.profileName) : null,
+        data.pin != null ? encrypt(data.pin) : null,
         data.customerName, data.customerDiscord, data.customerGmail, data.spotifyOwner, data.spotifyMember,
         data.discordPaymentGmail, data.discordRenewalCycle, data.monthsPurchased,
         data.expiryDate, data.startDate || new Date().toISOString(), new Date().toISOString(),
@@ -411,7 +430,11 @@ export function registerDashboardRoutes(app) {
           expiry_at=?, claimed_at=?, updated_at=?, history_json=?
         WHERE order_code=?
       `).run(
-        data.service, data.email, data.password, data.profileName, data.pin,
+        data.service,
+        data.email != null ? encrypt(data.email) : null,
+        data.password != null ? encrypt(data.password) : null,
+        data.profileName != null ? encrypt(data.profileName) : null,
+        data.pin != null ? encrypt(data.pin) : null,
         data.customerName, data.customerDiscord, data.customerGmail, data.spotifyOwner, data.spotifyMember,
         data.discordPaymentGmail, data.discordRenewalCycle, data.monthsPurchased,
         data.expiryDate, data.startDate, new Date().toISOString(), data.history ? JSON.stringify(data.history) : '[]', id
@@ -684,7 +707,7 @@ export function registerDashboardRoutes(app) {
         months: monthsNum,
         startDate: newStart.toISOString(),
         expiryDate: newExpiry.toISOString(),
-        accountEmail: order.credential_email || ''
+        accountEmail: decrypt(order.credential_email) || ''
       });
 
       db.prepare(`
@@ -718,10 +741,24 @@ export function registerWebSocketUpgrade(server) {
   if (!server) return;
 
   server.on('upgrade', (request, socket, head) => {
-    if (request.url !== '/ws/dashboard') {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(request.url, 'http://localhost');
+    } catch {
       socket.destroy();
       return;
     }
+    if (parsedUrl.pathname !== '/ws/dashboard') {
+      socket.destroy();
+      return;
+    }
+
+    // Auth: yêu cầu token hợp lệ qua query (?token=) hoặc header
+    const token = String(process.env.DASHBOARD_TOKEN ?? '').trim();
+    if (!token) { socket.destroy(); return; }
+    const provided = parsedUrl.searchParams.get('token')
+      || request.headers['x-dashboard-token'];
+    if (!safeEqual(provided, token)) { socket.destroy(); return; }
 
     // Simple WebSocket handshake
     const key = request.headers['sec-websocket-key'];

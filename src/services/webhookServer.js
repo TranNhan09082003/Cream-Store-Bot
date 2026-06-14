@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'node:path';
 import { registerDashboardRoutes, registerWebSocketUpgrade } from './dashboardMiniServer.js';
 import { handlePayOSWebhook } from './paymentService.js';
-import { handleSepayWebhook } from './sepayService.js';
 import { registerBotApiRoutes } from './botApiRoutes.js';
 import { registerAuthRoutes } from './authApiRoutes.js';
 import { registerAdminRoutes } from './adminApiRoutes.js';
@@ -18,10 +17,6 @@ function getBaseUrl() {
 
 function getWebhookPath() {
   return String(process.env.PAYOS_WEBHOOK_PATH ?? '/webhooks/payos').trim() || '/webhooks/payos';
-}
-
-function getSepayWebhookPath() {
-  return String(process.env.SEPAY_WEBHOOK_PATH ?? '/webhooks/sepay').trim() || '/webhooks/sepay';
 }
 
 function getReturnPath() {
@@ -91,31 +86,6 @@ export function registerPaymentRoutes(app) {
       });
     }
   });
-
-  // ═══ SePay Webhook ═══
-  app.get(getSepayWebhookPath(), (req, res) => {
-    res.status(200).json({
-      ok: true,
-      message: 'SePay webhook endpoint is alive. Use POST for webhook payloads.',
-    });
-  });
-
-  app.post(getSepayWebhookPath(), async (req, res) => {
-    try {
-      const result = await handleSepayWebhook({
-        client: req.app.locals.discordClient,
-        body: req.body,
-        authHeader: req.headers['authorization'] || '',
-      });
-      return res.status(result.status ?? 200).json(result.body ?? { success: true });
-    } catch (error) {
-      console.error('[SEPAY WEBHOOK] Lỗi xử lý SePay webhook:', error);
-      return res.status(500).json({
-        success: false,
-        message: error.message || 'SePay webhook processing failed',
-      });
-    }
-  });
 }
 
 export async function startWebhookServer(client = null) {
@@ -166,7 +136,6 @@ export async function startWebhookServer(client = null) {
 
   console.log(`[WEBHOOK] HTTP server listening on port ${port}`);
   console.log(`[WEBHOOK] PayOS path: ${getWebhookPath()}`);
-  console.log(`[WEBHOOK] SePay path: ${getSepayWebhookPath()}`);
 
   // Register WebSocket upgrade handler
   registerWebSocketUpgrade(httpServer);
@@ -174,7 +143,6 @@ export async function startWebhookServer(client = null) {
   const baseUrl = getBaseUrl();
   if (baseUrl) {
     console.log(`[WEBHOOK] Public PayOS URL: ${baseUrl}${getWebhookPath()}`);
-    console.log(`[WEBHOOK] Public SePay URL: ${baseUrl}${getSepayWebhookPath()}`);
     console.log(`[WEBHOOK] Return URL: ${baseUrl}${getReturnPath()}`);
     console.log(`[WEBHOOK] Cancel URL: ${baseUrl}${getCancelPath()}`);
     if (String(process.env.DASHBOARD_ENABLED ?? 'false').toLowerCase() === 'true') {

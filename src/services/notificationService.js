@@ -55,9 +55,13 @@ export async function sendPaymentConfirmedFlow({ guild, order, amount, transacti
 
 export async function sendCompletedTicketFlow({ guild, order, actorId, supportId }) {
   const guildConfig = getGuildConfig(guild.id);
-  const ticketChannel = await guild.channels.fetch(order.ticket_channel_id).catch(() => null);
+  const ticketChannel = await guild.channels.fetch(order.ticket_channel_id).catch((err) => {
+    console.error(`[sendCompletedTicketFlow] Fetch ticket channel ${order.ticket_channel_id} failed:`, err.message);
+    return null;
+  });
 
   if (!ticketChannel?.isTextBased()) {
+    console.warn(`[sendCompletedTicketFlow] Ticket channel ${order.ticket_channel_id} not found or not text-based.`);
     return { posted: false };
   }
 
@@ -67,16 +71,27 @@ export async function sendCompletedTicketFlow({ guild, order, actorId, supportId
       buildOrderCompletedMainEmbed(order),
       buildOrderCompletedInfoEmbed(order, actorId, supportId),
     ],
-  }).catch(() => null);
+  }).catch((err) => {
+    console.error('[sendCompletedTicketFlow] Error sending completion embed:', err);
+  });
 
-  await ticketChannel.send({
-    content: buildFeedbackReminderText(order.order_code),
-    components: [
-      ...buildQuickFeedbackComponents(order.order_code),
-      ...buildWarrantyActionComponents(order.order_code),
-      ...buildFeedbackLinkComponents(guild.id, guildConfig?.feedback_channel_id),
-    ],
-  }).catch(() => null);
+  try {
+    const feedbackRem = buildFeedbackReminderText(order.order_code);
+    const quickFb = buildQuickFeedbackComponents(order.order_code);
+    const warranty = buildWarrantyActionComponents(order.order_code);
+    const links = buildFeedbackLinkComponents(guild.id, guildConfig?.feedback_channel_id);
+
+    await ticketChannel.send({
+      content: feedbackRem,
+      components: [
+        ...quickFb,
+        ...warranty,
+        ...links,
+      ],
+    });
+  } catch (err) {
+    console.error('[sendCompletedTicketFlow] Error sending feedback stars components:', err);
+  }
 
   return { posted: true };
 }

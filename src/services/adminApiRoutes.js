@@ -13,30 +13,33 @@ import { addWalletBalance } from './walletService.js';
 import { createCoupon, listCoupons, deactivateCoupon } from './couponService.js';
 import * as subService from './subscriptionService.js';
 import { getAiKnowledge, updateAiKnowledge } from './aiKnowledgeService.js';
+import { encrypt, decrypt } from '../utils/crypto.js';
 
 export function registerAdminRoutes(app) {
+  function safeEqual(a, b) {
+    const bufA = Buffer.from(String(a ?? ''), 'utf8');
+    const bufB = Buffer.from(String(b ?? ''), 'utf8');
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  }
+
   function requireAdminRole(req, res, next) {
     const expectedKey = process.env.BOT_API_KEY?.trim();
     if (!expectedKey) return res.status(503).json({ ok: false, error: 'BOT_API_KEY chưa cấu hình' });
-    
-    const providedKey = (req.header('x-bot-api-key') || req.header('X-Bot-Api-Key') || '').trim();
-    if (providedKey !== expectedKey) return res.status(401).json({ ok: false, error: 'Unauthorized key' });
 
-    // Cần header x-user-id từ nextjs backend gửi xuống
+    const providedKey = (req.header('x-bot-api-key') || req.header('X-Bot-Api-Key') || '').trim();
+    if (!safeEqual(providedKey, expectedKey)) return res.status(401).json({ ok: false, error: 'Unauthorized key' });
+
+    // Cần header x-user-id từ nextjs backend gửi xuống — phải là user thật trong web_users
     const userId = req.header('x-user-id');
     if (!userId) return res.status(401).json({ ok: false, error: 'Thiếu x-user-id' });
-
-    if (userId === 'admin' || userId === 'system') {
-      req.adminRole = 'admin';
-      return next();
-    }
 
     const user = db.prepare('SELECT role FROM web_users WHERE id = ?').get(userId);
 
     if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
       return res.status(403).json({ ok: false, error: 'Forbidden. Cần quyền Admin hoặc Staff.' });
     }
-    
+
     req.adminRole = user.role; // 'admin' or 'staff'
     next();
   }
@@ -489,9 +492,15 @@ export function registerAdminRoutes(app) {
       const { filename } = req.body;
       if (!filename) return res.status(400).json({ ok: false, error: 'Thiếu tên file khôi phục' });
 
+      // Chống path traversal: chỉ chấp nhận đúng định dạng file backup do hệ thống tạo ra
+      const safeName = path.basename(String(filename));
+      if (safeName !== filename || !/^backup_\d+\.sqlite$/.test(safeName)) {
+        return res.status(400).json({ ok: false, error: 'Tên file backup không hợp lệ' });
+      }
+
       const projectRoot = path.resolve(path.dirname(db.name), '..');
       const backupDir = path.resolve(projectRoot, 'backups');
-      const filePath = path.join(backupDir, filename);
+      const filePath = path.join(backupDir, safeName);
 
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ ok: false, error: 'Không tìm thấy file backup tương ứng' });
@@ -665,7 +674,8 @@ const fetchWithTimeout = (promise, ms) => {
         GROUP BY service_type
       `).all();
 
-      const stock = db.prepare('SELECT * FROM account_stock ORDER BY id DESC LIMIT 500').all();
+      const stock = db.prepare('SELECT * FROM account_stock ORDER BY id DESC LIMIT 500').all()
+        .map(s => ({ ...s, credentials: decrypt(s.credentials) }));
       res.json({ ok: true, data: { counts, stock } });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
@@ -684,7 +694,7 @@ const fetchWithTimeout = (promise, ms) => {
 
       const transact = db.transaction((type, accounts) => {
         for (const acc of accounts) {
-          insertStmt.run(type.toLowerCase(), acc);
+          insertStmt.run(type.toLowerCase(), encrypt(acc));
         }
       });
       transact(serviceType, lines);

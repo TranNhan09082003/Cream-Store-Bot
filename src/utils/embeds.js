@@ -13,6 +13,7 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { config, getWebhookUrl, getPayOSReturnUrl, getPayOSCancelUrl } from '../config.js';
+import { decrypt } from './crypto.js';
 import { formatDateTime, formatDurationSince } from './time.js';
 import {
   formatCurrency,
@@ -960,16 +961,20 @@ export function buildDeliveryClaimComponents(orderCode) {
 }
 
 export function buildDeliveryCredentialEmbeds(order) {
+  const credEmail = decrypt(order.credential_email);
+  const credPassword = decrypt(order.credential_password);
+  const credProfile = decrypt(order.credential_profile);
+  const credPin = decrypt(order.credential_pin);
   const accountEmbed = applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorInfo)
       .setTitle(`🔑  Thông Tin Tài Khoản — ${order.product_name}`)
       .setDescription('> ⚠️ Bảo mật thông tin này, **không chia sẻ** với bất kỳ ai!')
       .addFields(
-        { name: '📧 Email', value: `\`${order.credential_email ?? 'Chưa cấu hình'}\``, inline: true },
-        { name: '🔐 Mật Khẩu', value: `\`${order.credential_password ?? 'Chưa cấu hình'}\``, inline: true },
-        { name: '👤 Profile', value: order.credential_profile ? `\`${order.credential_profile}\`` : '`—`', inline: true },
-        { name: '📍 PIN', value: order.credential_pin ? `\`${order.credential_pin}\`` : '`—`', inline: true },
+        { name: '📧 Email', value: `\`${credEmail ?? 'Chưa cấu hình'}\``, inline: true },
+        { name: '🔐 Mật Khẩu', value: `\`${credPassword ?? 'Chưa cấu hình'}\``, inline: true },
+        { name: '👤 Profile', value: credProfile ? `\`${credProfile}\`` : '`—`', inline: true },
+        { name: '📍 PIN', value: credPin ? `\`${credPin}\`` : '`—`', inline: true },
         ...(order.expiry_at ? [{ name: '📅 Hết Hạn', value: `<t:${unixTs(order.expiry_at)}:F>`, inline: false }] : []),
       )
       .setTimestamp(),
@@ -996,14 +1001,16 @@ export function buildDeliveryLoginComponents(order) {
 }
 
 export function buildCredentialEmbeds(order) {
+  const credEmail = decrypt(order.credential_email);
+  const credPassword = decrypt(order.credential_password);
   const credentialEmbed = applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorInfo)
       .setTitle('📧  Thông Tin Tài Khoản Nhận Hàng')
       .addFields(
         { name: '🆔 Mã Đơn', value: `\`${order.order_code}\`` },
-        { name: '📧 Gmail', value: `\`${order.credential_email}\`` },
-        { name: '🔐 Mật Khẩu', value: `\`${order.credential_password}\`` },
+        { name: '📧 Gmail', value: `\`${credEmail}\`` },
+        { name: '🔐 Mật Khẩu', value: `\`${credPassword}\`` },
       )
       .setTimestamp(),
   );

@@ -64,7 +64,15 @@ export const EMOJI_SLOTS = {
   brand_spotify:      { label: 'Spotify',              default: '🎵' },
   brand_youtube:      { label: 'YouTube',              default: '📺' },
   brand_chatgpt:      { label: 'ChatGPT',              default: '🤖' },
+  brand_nitro:        { label: 'Discord Nitro',        default: '💎' },
+  brand_boost:        { label: 'Discord Boost',        default: '🚀' },
   brand_discord:      { label: 'Discord',              default: '💬' },
+  brand_adobe:        { label: 'Adobe CC',             default: '🎨' },
+  brand_capcut:       { label: 'CapCut',               default: '🎬' },
+  brand_claude:       { label: 'Claude AI',            default: '🤖' },
+  brand_office:       { label: 'Office 365',           default: '📈' },
+  brand_gearup:       { label: 'GearUP Booster',       default: '🎮' },
+  brand_gemini:       { label: 'Gemini AI',            default: '✨' },
 
   // Misc
   icon_price:         { label: 'Biểu tượng giá',       default: '💰' },
@@ -136,11 +144,19 @@ export const SLOT_ALIASES = {
   status_loading: ['loading', 'loading_icon', 'dang_tai'],
 
   // Brand
-  brand_netflix: ['netflix', 'brand_netflix'],
-  brand_spotify: ['spotify', 'brand_spotify'],
+  brand_netflix: ['netflix', 'brand_netflix', 'netflix62'],
+  brand_spotify: ['spotify', 'brand_spotify', 'spotify2', 'spotify_app_logo10'],
   brand_youtube: ['youtube', 'brand_youtube'],
-  brand_chatgpt: ['chatgpt', 'brand_chatgpt'],
+  brand_chatgpt: ['chatgpt', 'brand_chatgpt', 'cr_chatgpt'],
+  brand_nitro: ['nitro', 'brand_nitro', 'discord_nitro', '9836flyingnitroboost'],
+  brand_boost: ['boost', 'brand_boost', 'booster', 'discord_boost', '3825boosterorange', '9836flyingnitroboost'],
   brand_discord: ['discord', 'brand_discord'],
+  brand_adobe: ['adobe', 'cr_adobe', 'photoshop_cc_icon3'],
+  brand_capcut: ['capcut', 'cr_capcut'],
+  brand_claude: ['claude', 'cr_claude'],
+  brand_office: ['office', 'office365', 'tsm_offices'],
+  brand_gearup: ['gearup', 'gear_up'],
+  brand_gemini: ['gemini', 'tsm_gemini'],
 
   // Misc
   icon_price: ['price_tag', 'tag_gia'],
@@ -354,28 +370,75 @@ export function parseDiscordEmoji(str) {
 }
 
 /**
- * Resolve an emoji string (standard or custom) for Discord.js Select Menu option emoji field
+ * Check if a string looks like a valid standard Unicode emoji.
+ * Rejects plain ASCII text, empty strings, and overly long strings.
+ * Discord API only accepts real emoji characters as component emoji names.
+ */
+function isValidUnicodeEmoji(str) {
+  if (!str || typeof str !== 'string') return false;
+  // Emoji codepoints are very short (1-8 chars accounting for ZWJ sequences)
+  if (str.length > 14) return false;
+  // If the string is only ASCII letters, digits, underscores, or spaces → NOT an emoji
+  if (/^[a-zA-Z0-9_\s.,!?:;'"()\-]+$/.test(str)) return false;
+  // Must contain at least one character outside basic ASCII (emoji live in higher Unicode planes)
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]+$/.test(str)) return false;
+  return true;
+}
+
+/**
+ * Resolve an emoji string (standard or custom) for Discord.js Select Menu option emoji field.
+ * Returns a validated emoji or null. Never returns an invalid value that would crash Discord API.
+ * @param {string} guildId
  * @param {string} emojiStr 
  * @param {string} fallback 
  * @returns {string|{id: string, name: string, animated: boolean}|null}
  */
-export function resolveSelectMenuEmoji(emojiStr, fallback = null) {
-  if (!emojiStr) {
-    return fallback ? resolveSelectMenuEmoji(fallback, null) : null;
-  }
-  const parsed = parseDiscordEmoji(emojiStr);
-  if (parsed) {
-    // If the custom emoji ID is not in the bot's cache, it's invalid/deleted/external.
-    // We must reject it and resolve the fallback to prevent COMPONENT_INVALID_EMOJI API crash.
-    if (global.discordClient && !global.discordClient.emojis.cache.has(parsed.id)) {
-      return fallback ? resolveSelectMenuEmoji(fallback, null) : null;
+export function resolveSelectMenuEmoji(guildId, emojiStr, fallback = null) {
+  try {
+    if (!emojiStr) {
+      return fallback ? resolveSelectMenuEmoji(guildId, fallback, null) : null;
     }
-    return {
-      id: parsed.id,
-      name: parsed.name,
-      animated: parsed.animated,
-    };
+
+    // If emojiStr is a slot key, resolve it first
+    let resolvedEmoji = emojiStr;
+    if (EMOJI_SLOTS[emojiStr]) {
+      resolvedEmoji = getEmoji(guildId, emojiStr);
+    }
+
+    const parsed = parseDiscordEmoji(resolvedEmoji);
+    if (parsed) {
+      // If the custom emoji ID is not in the bot's cache, it's invalid/deleted/external.
+      // We must reject it and resolve the fallback to prevent COMPONENT_INVALID_EMOJI API crash.
+      if (global.discordClient && !global.discordClient.emojis.cache.has(parsed.id)) {
+        return fallback ? resolveSelectMenuEmoji(guildId, fallback, null) : null;
+      }
+      return {
+        id: parsed.id,
+        name: parsed.name,
+        animated: parsed.animated,
+      };
+    }
+    // Validate that the string is actually a Unicode emoji, not arbitrary text
+    if (!isValidUnicodeEmoji(resolvedEmoji)) {
+      return fallback ? resolveSelectMenuEmoji(guildId, fallback, null) : null;
+    }
+    return resolvedEmoji;
+  } catch {
+    // Any unexpected error → gracefully return null instead of crashing
+    return null;
   }
+}
+
+/**
+ * Resolve product catalog emoji slot/string into displayable string format.
+ * @param {string} guildId
+ * @param {string} emojiStr
+ * @returns {string}
+ */
+export function resolveProductEmoji(guildId, emojiStr) {
+  if (!emojiStr) return '📦';
+  if (EMOJI_SLOTS[emojiStr]) return getEmoji(guildId, emojiStr);
   return emojiStr;
 }
 

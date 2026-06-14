@@ -601,22 +601,22 @@ export function getDatabasePath() {
 export function seedProductCatalog(dbInstance) {
   const products = [
     // Discord Nitro Boost Log
-    { name: 'Discord Nitro Boost 1 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 2 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 110000, duration_months: 2, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 4 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 280000, duration_months: 4, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 6 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 380000, duration_months: 6, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 8 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 480000, duration_months: 8, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 12 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 680000, duration_months: 12, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Discord Nitro Boost 1 Năm (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 880000, duration_months: 12, service_type: 'GAME', emoji: '🚀', original_price: 0 },
-    { name: 'Gia hạn Discord Nitro Boost 2 Tháng', description: 'Dành cho khách hàng cũ đã từng mua Nitro 2 tháng tại shop. (Gia hạn chỉ 95k). Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 99000, duration_months: 2, service_type: 'GAME', emoji: '🚀', original_price: 0 },
+    { name: 'Discord Nitro Boost 1 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 90000, duration_months: 1, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 2 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 110000, duration_months: 2, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 4 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 280000, duration_months: 4, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 6 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 380000, duration_months: 6, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 8 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 480000, duration_months: 8, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 12 Tháng (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua. Gia hạn 2 tháng 1 lần.', price: 680000, duration_months: 12, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Discord Nitro Boost 1 Năm (Login)', description: 'Đăng nhập gia hạn. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 880000, duration_months: 12, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
+    { name: 'Gia hạn Discord Nitro Boost 2 Tháng', description: 'Dành cho khách hàng cũ đã từng mua Nitro 2 tháng tại shop. (Gia hạn chỉ 95k). Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 99000, duration_months: 2, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
     // Discord Nitro Boost Trail
-    { name: 'Discord Nitro Boost 3 Tháng (Trail)', description: 'Dành cho tài khoản chưa từng sử dụng Nitro và đã tạo trên 1 tháng. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 50000, duration_months: 3, service_type: 'GAME', emoji: '⚡', original_price: 0 },
+    { name: 'Discord Nitro Boost 3 Tháng (Trail)', description: 'Dành cho tài khoản chưa từng sử dụng Nitro và đã tạo trên 1 tháng. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng khi mua.', price: 50000, duration_months: 3, service_type: 'GAME', emoji: 'brand_nitro', original_price: 0 },
 
     // Bót Server
-    { name: 'Discord Server Boost Level 2 (1 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 1 tháng. Giao hàng nhanh chóng.', price: 75000, duration_months: 1, service_type: 'GAME', emoji: '🔮', original_price: 0 },
-    { name: 'Discord Server Boost Level 3 (1 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 1 tháng. Giao hàng nhanh chóng.', price: 150000, duration_months: 1, service_type: 'GAME', emoji: '🔮', original_price: 0 },
-    { name: 'Discord Server Boost Level 2 (3 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 3 tháng. Giao hàng nhanh chóng.', price: 185000, duration_months: 3, service_type: 'GAME', emoji: '🔮', original_price: 0 },
-    { name: 'Discord Server Boost Level 3 (3 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 3 tháng. Giao hàng nhanh chóng.', price: 380000, duration_months: 3, service_type: 'GAME', emoji: '🔮', original_price: 0 },
+    { name: 'Discord Server Boost Level 2 (1 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 1 tháng. Giao hàng nhanh chóng.', price: 75000, duration_months: 1, service_type: 'GAME', emoji: 'brand_boost', original_price: 0 },
+    { name: 'Discord Server Boost Level 3 (1 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 1 tháng. Giao hàng nhanh chóng.', price: 150000, duration_months: 1, service_type: 'GAME', emoji: 'brand_boost', original_price: 0 },
+    { name: 'Discord Server Boost Level 2 (3 Tháng)', description: 'Nâng cấp Server Boost Level 2 trong 3 tháng. Giao hàng nhanh chóng.', price: 185000, duration_months: 3, service_type: 'GAME', emoji: 'brand_boost', original_price: 0 },
+    { name: 'Discord Server Boost Level 3 (3 Tháng)', description: 'Nâng cấp Server Boost Level 3 trong 3 tháng. Giao hàng nhanh chóng.', price: 380000, duration_months: 3, service_type: 'GAME', emoji: 'brand_boost', original_price: 0 },
 
     // Decor Trang Trí - Có Nitro
     { name: 'Decor Discord (Acc Có Nitro) - Gói 25k', description: 'Trang trí hồ sơ cho tài khoản ĐÃ CÓ Nitro. Vui lòng gửi tài khoản, mật khẩu và 4-5 mã dự phòng.', price: 25000, duration_months: 1, service_type: 'decor', emoji: '✨', original_price: 66000 },
@@ -648,25 +648,33 @@ export function seedProductCatalog(dbInstance) {
     { name: 'Decor Discord Combo Gift - Gói 180k', description: 'Trang trí hồ sơ dạng Combo Gift (bấm nhận ngay). Tiết kiệm tối đa.', price: 180000, duration_months: 1, service_type: 'decor', emoji: '🎁', original_price: 220000 },
 
     // AI & Phần Mềm
-    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Full BH)', description: 'Đăng ký sử dụng gói cước 1 năm, hỗ trợ bảo hành toàn diện từ shop.', price: 200000, duration_months: 12, service_type: 'AI', emoji: '✨', original_price: 350000 },
-    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Không BH)', description: 'Đăng ký sử dụng gói cước 1 năm, không đi kèm chính sách bảo hành.', price: 120000, duration_months: 12, service_type: 'AI', emoji: '✨', original_price: 0 },
-    { name: 'Claude Pro Add Team 1 Tháng (Full BH)', description: 'Thêm vào Team Claude Pro trong 1 tháng. Bảo hành trọn gói.', price: 390000, duration_months: 1, service_type: 'AI', emoji: '🎨', original_price: 490000 },
-    { name: 'ChatGPT Plus 1 Tháng (Cấp Tài Khoản)', description: 'Nhận tài khoản ChatGPT Plus đã kích hoạt sẵn trong 1 tháng.', price: 280000, duration_months: 1, service_type: 'AI', emoji: '🤖', original_price: 350000 },
-    { name: 'ChatGPT Plus 1 Tháng (Chính Chủ - Full BH)', description: 'Nâng cấp chính chủ tài khoản ChatGPT của bạn trong 1 tháng.', price: 390000, duration_months: 1, service_type: 'AI', emoji: '🤖', original_price: 490000 },
-    { name: 'Adobe Creative Cloud All Apps (1 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 1 tháng.', price: 80000, duration_months: 1, service_type: 'DESIGN', emoji: '🎨', original_price: 120000 },
-    { name: 'Adobe Creative Cloud All Apps (2 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 2 tháng.', price: 180000, duration_months: 2, service_type: 'DESIGN', emoji: '🎨', original_price: 240000 },
-    { name: 'Office 365 & 1 TB OneDrive (12 Tháng)', description: 'Tài khoản bản quyền Office 365 + 1 TB lưu trữ OneDrive trong 1 năm.', price: 200000, duration_months: 12, service_type: 'OTHER', emoji: '📈', original_price: 300000 },
-    { name: 'CapCut Pro 1 Tháng (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 1 tháng, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 100000, duration_months: 1, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
-    { name: 'CapCut Pro 7 Ngày (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 7 ngày, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 20000, duration_months: 1, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
-    { name: 'CapCut Pro 12 Tháng (3 Thiết Bị - Chính Chủ)', description: 'Nâng cấp chính chủ tài khoản CapCut Pro của bạn trong 12 tháng, dùng cho 3 thiết bị.', price: 1250000, duration_months: 12, service_type: 'DESIGN', emoji: '🎬', original_price: 0 },
+    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Full BH)', description: 'Đăng ký sử dụng gói cước 1 năm, hỗ trợ bảo hành toàn diện từ shop.', price: 200000, duration_months: 12, service_type: 'AI', emoji: 'brand_gemini', original_price: 350000 },
+    { name: 'Gemini Advanced & 5 TB Google One (1 Năm - Không BH)', description: 'Đăng ký sử dụng gói cước 1 năm, không đi kèm chính sách bảo hành.', price: 120000, duration_months: 12, service_type: 'AI', emoji: 'brand_gemini', original_price: 0 },
+    { name: 'Claude Pro Add Team 1 Tháng (Full BH)', description: 'Thêm vào Team Claude Pro trong 1 tháng. Bảo hành trọn gói.', price: 390000, duration_months: 1, service_type: 'AI', emoji: 'brand_claude', original_price: 490000 },
+    { name: 'ChatGPT Plus 1 Tháng (Cấp Tài Khoản)', description: 'Nhận tài khoản ChatGPT Plus đã kích hoạt sẵn trong 1 tháng.', price: 280000, duration_months: 1, service_type: 'AI', emoji: 'brand_chatgpt', original_price: 350000 },
+    { name: 'ChatGPT Plus 1 Tháng (Chính Chủ - Full BH)', description: 'Nâng cấp chính chủ tài khoản ChatGPT của bạn trong 1 tháng.', price: 390000, duration_months: 1, service_type: 'AI', emoji: 'brand_chatgpt', original_price: 490000 },
+    { name: 'Chat GPT Plus Cấp Acc FULL bảo Hành 1 tháng', description: 'Tài khoản ChatGPT Plus cấp sẵn FULL bảo hành 1 tháng.', price: 230000, duration_months: 1, service_type: 'AI', emoji: 'brand_chatgpt', original_price: 0 },
+    { name: 'Gemini Pro + 5TB Google Driver (12 Tháng)', description: 'Gói Gemini Pro đi kèm dung lượng 5TB Google Drive trong 12 tháng.', price: 250000, duration_months: 12, service_type: 'AI', emoji: 'brand_gemini', original_price: 0 },
+    { name: 'Office 365 + 1 TB One Driver (12 Tháng)', description: 'Tài khoản Office 365 đi kèm 1 TB dung lượng lưu trữ OneDrive trong 12 tháng.', price: 250000, duration_months: 12, service_type: 'AI', emoji: 'brand_office', original_price: 0 },
+    { name: 'Adobe Creative Cloud All Apps (1 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 1 tháng.', price: 80000, duration_months: 1, service_type: 'AI', emoji: 'brand_adobe', original_price: 120000 },
+    { name: 'Adobe Creative Cloud All Apps (2 Tháng - 2 Thiết Bị)', description: 'Kích hoạt bộ công cụ Adobe All Apps dùng cho 2 thiết bị trong 2 tháng.', price: 180000, duration_months: 2, service_type: 'AI', emoji: 'brand_adobe', original_price: 240000 },
+    { name: 'Office 365 & 1 TB OneDrive (12 Tháng)', description: 'Tài khoản bản quyền Office 365 + 1 TB lưu trữ OneDrive trong 1 năm.', price: 200000, duration_months: 12, service_type: 'AI', emoji: 'brand_office', original_price: 300000 },
+    { name: 'CapCut Pro 1 Tháng (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 1 tháng, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 100000, duration_months: 1, service_type: 'AI', emoji: 'brand_capcut', original_price: 0 },
+    { name: 'CapCut Pro 7 Ngày (2 Thiết Bị - Cấp Acc)', description: 'Sử dụng CapCut Pro trong 7 ngày, cấp tài khoản riêng dùng tối đa 2 thiết bị.', price: 20000, duration_months: 1, service_type: 'AI', emoji: 'brand_capcut', original_price: 0 },
+    { name: 'CapCut Pro 12 Tháng (3 Thiết Bị - Chính Chủ)', description: 'Nâng cấp chính chủ tài khoản CapCut Pro của bạn trong 12 tháng, dùng cho 3 thiết bị.', price: 1250000, duration_months: 12, service_type: 'AI', emoji: 'brand_capcut', original_price: 0 },
+
+    // GearUP Booster
+    { name: 'Gearup Booster 3 Tháng', description: 'Gói Gearup Booster giảm giật lag chơi game 3 tháng.', price: 180000, duration_months: 3, service_type: 'gearup', emoji: 'brand_gearup', original_price: 0 },
+    { name: 'Gearup Booster 6 Tháng', description: 'Gói Gearup Booster giảm giật lag chơi game 6 tháng.', price: 380000, duration_months: 6, service_type: 'gearup', emoji: 'brand_gearup', original_price: 0 },
+    { name: 'Gearup Booster 12 Tháng (1 Năm)', description: 'Gói Gearup Booster giảm giật lag chơi game 12 tháng (1 năm).', price: 460000, duration_months: 12, service_type: 'gearup', emoji: 'brand_gearup', original_price: 0 },
 
     // YouTube Premium
-    { name: 'YouTube Premium 3 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 3 tháng liên tục không bị ngắt quãng.', price: 180000, duration_months: 3, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
-    { name: 'YouTube Premium 6 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 6 tháng liên tục không bị ngắt quãng.', price: 290000, duration_months: 6, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
-    { name: 'YouTube Premium 12 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 12 tháng liên tục không bị ngắt quãng.', price: 520000, duration_months: 12, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
-    { name: 'YouTube Premium 3 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 90000, duration_months: 3, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
-    { name: 'YouTube Premium 6 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 180000, duration_months: 6, service_type: 'STREAMING', emoji: '▶️', original_price: 0 },
-    { name: 'YouTube Premium 12 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 250000, duration_months: 12, service_type: 'STREAMING', emoji: '▶️', original_price: 0 }
+    { name: 'YouTube Premium 3 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 3 tháng liên tục không bị ngắt quãng.', price: 180000, duration_months: 3, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 },
+    { name: 'YouTube Premium 6 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 6 tháng liên tục không bị ngắt quãng.', price: 290000, duration_months: 6, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 },
+    { name: 'YouTube Premium 12 Tháng (Gia Hạn Đều)', description: 'Gia hạn gói cước YouTube Premium 12 tháng liên tục không bị ngắt quãng.', price: 520000, duration_months: 12, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 },
+    { name: 'YouTube Premium 3 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 90000, duration_months: 3, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 },
+    { name: 'YouTube Premium 6 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 180000, duration_months: 6, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 },
+    { name: 'YouTube Premium 12 Tháng (Gia Hạn 1 Tháng/Lần)', description: 'Không lo bị giới hạn 12 tháng khi rời Family. Hỗ trợ tốt nhất.', price: 250000, duration_months: 12, service_type: 'STREAMING', emoji: 'brand_youtube', original_price: 0 }
   ];
 
   const insertStmt = dbInstance.prepare(`

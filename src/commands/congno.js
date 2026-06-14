@@ -15,6 +15,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export function buildCongnoPanel(guildId, customerId, page = 1) {
+  const E = createEmojiResolver(guildId);
   const summary = getOutstandingSummary(guildId, customerId);
   const offset = (page - 1) * PAGE_SIZE;
   const orders = getOutstandingOrders(guildId, customerId, PAGE_SIZE, offset);

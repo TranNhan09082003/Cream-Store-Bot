@@ -14,6 +14,7 @@
 
 import { db, nowIso } from '../database/db.js';
 import { config } from '../config.js';
+import { getAiKnowledge } from './aiKnowledgeService.js';
 
 /**
  * Middleware xác thực API key
@@ -90,6 +91,12 @@ export function registerBotApiRoutes(app) {
             });
             return settings;
         });
+        res.json(result);
+    });
+
+    // ── AI KNOWLEDGE (read-only) — web AI chat đọc tài liệu huấn luyện ──
+    app.get('/api/bot/ai-knowledge', (req, res) => {
+        const result = safeQuery(() => ({ content: getAiKnowledge('WEB') }));
         res.json(result);
     });
 
@@ -605,10 +612,6 @@ export function registerBotApiRoutes(app) {
                     bankBin = guildConfig.bank_bin;
                     accountNo = guildConfig.bank_account_no;
                     accountName = guildConfig.bank_account_name || 'CREAM STORE';
-                } else if (process.env.SEPAY_BANK_ACCOUNT) {
-                    bankBin = process.env.VIETQR_BANK_BIN || '970418';
-                    accountNo = process.env.SEPAY_BANK_ACCOUNT;
-                    accountName = process.env.VIETQR_ACCOUNT_NAME || 'CREAM STORE';
                 }
 
                 if (accountNo) {

@@ -5,6 +5,7 @@ import { randomDigits } from '../utils/id.js';
 import { syncCustomerStats, getCustomerProfile } from './customerService.js';
 import { normalizeQueueGroup } from '../utils/formatters.js';
 import { broadcastDashboardEvent } from './dashboardMiniServer.js';
+import { encrypt } from '../utils/crypto.js';
 
 function createOrderStmt() {
   return db.prepare(`
@@ -115,7 +116,7 @@ export function markOrderCompleted(orderCode, completedById, timeoutHours = conf
   return updated;
 }
 export function cancelOrder(orderCode, reason = null){const order=getOrderByCode(orderCode); if(!order) return null; cancelOrderStmt().run(nowIso(), reason ?? null, nowIso(), orderCode); clearClaimStmt().run(nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;}
-export function saveDelivery(orderCode,deliveredById,credentialEmail,credentialPassword,credentialProfile,credentialPin,deliveryLoginUrl,claimNotes,dmChannelId,dmMessageId){const timestamp=nowIso(); saveDeliveryStmt().run(deliveredById,timestamp,credentialEmail ?? null,credentialPassword ?? null,credentialProfile ?? null,credentialPin ?? null,deliveryLoginUrl ?? null,claimNotes ?? null,dmChannelId ?? null,dmMessageId ?? null,timestamp,orderCode); return getOrderByCode(orderCode);}
+export function saveDelivery(orderCode,deliveredById,credentialEmail,credentialPassword,credentialProfile,credentialPin,deliveryLoginUrl,claimNotes,dmChannelId,dmMessageId){const timestamp=nowIso(); saveDeliveryStmt().run(deliveredById,timestamp,credentialEmail!=null?encrypt(credentialEmail):null,credentialPassword!=null?encrypt(credentialPassword):null,credentialProfile!=null?encrypt(credentialProfile):null,credentialPin!=null?encrypt(credentialPin):null,deliveryLoginUrl ?? null,claimNotes ?? null,dmChannelId ?? null,dmMessageId ?? null,timestamp,orderCode); return getOrderByCode(orderCode);}
 
 export function submitFeedback({ orderCode, customerId, stars, content, feedbackChannelId, feedbackMessageId }) {
   const order = getOrderByCode(orderCode); if (!order) throw new Error('Không tìm thấy đơn hàng để liên kết feedback.');

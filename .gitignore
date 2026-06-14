@@ -34,18 +34,10 @@ scripts/*
 !scripts/backup-gdrive.sh
 !scripts/check-env.js
 !scripts/confirm-payos-webhook.js
-!scripts/connect-cloudfly.bat
 !scripts/deploy-cloudfly.sh
-!scripts/kill-cpanel-processes.py
-!scripts/pull-bot-vps.py
-!scripts/read-vps-db.py
-!scripts/read-vps-env.py
 !scripts/reorganize-roles.js
 !scripts/resyncCustomerStats.js
 !scripts/send-announcement.js
-!scripts/setup-cloudfly.sh
 !scripts/smoke-test.js
-!scripts/ssh-setup.py
-!scripts/sync-vps-db.py
 
 

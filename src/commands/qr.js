@@ -13,7 +13,7 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
       .addChoices(
         { name: '💳 PayOS (checkout link)', value: 'payos' },
-        { name: '🏦 VietQR (chuyển khoản → SePay)', value: 'vietqr' },
+        { name: '🏦 VietQR (chuyển khoản → xác nhận tay)', value: 'vietqr' },
       ),
   )
   .addStringOption((option) =>
@@ -86,9 +86,9 @@ export async function execute(interaction) {
 
   try {
     if (provider === 'vietqr') {
-      // ═══ VietQR (chuyển khoản ngân hàng → SePay tự động xác nhận) ═══
+      // ═══ VietQR (chuyển khoản ngân hàng → xác nhận tay) ═══
       const result = await sendVietQRPayment({ guild: interaction.guild, orderCode });
-      await interaction.editReply(`${E('status_check', '✅')} Đã gửi QR **VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.\n> SePay sẽ tự động xác nhận khi nhận được tiền.`);
+      await interaction.editReply(`${E('status_check', '✅')} Đã gửi QR **VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.\n> Sau khi khách chuyển khoản, dùng \`/qr xac_nhan_tay:true\` để xác nhận.`);
     } else {
       // ═══ PayOS (checkout link) ═══
       try {
@@ -101,7 +101,7 @@ export async function execute(interaction) {
           await sendVietQRPayment({ guild: interaction.guild, orderCode });
           await interaction.editReply(`${E('status_warn', '⚠️')} PayOS lỗi: _${payosError.message}_\n${E('status_check', '✅')} Đã **tự động chuyển sang VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.`);
         } catch (vietqrError) {
-          await interaction.editReply(`${E('status_cross', '❌')} PayOS lỗi: ${payosError.message}\n${E('status_cross', '❌')} VietQR cũng lỗi: ${vietqrError.message}\n\n💡 Hãy dùng \`/setup-bank\` để cấu hình ngân hàng, hoặc thêm \`SEPAY_BANK_ACCOUNT\` vào .env.`);
+          await interaction.editReply(`${E('status_cross', '❌')} PayOS lỗi: ${payosError.message}\n${E('status_cross', '❌')} VietQR cũng lỗi: ${vietqrError.message}\n\n💡 Hãy dùng \`/setup-bank\` để cấu hình ngân hàng.`);
         }
       }
     }

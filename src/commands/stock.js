@@ -16,7 +16,7 @@ import {
 import { getActiveProducts } from '../services/productCatalogService.js';
 import { config } from '../config.js';
 import { formatCurrency } from '../utils/formatters.js';
-import { getEmojiMap, resolveSelectMenuEmoji } from '../services/emojiService.js';
+import { getEmojiMap, resolveSelectMenuEmoji, resolveProductEmoji } from '../services/emojiService.js';
 import { fmt, h2, subtext } from '../utils/embedHelpers.js';
 
 export const data = new SlashCommandBuilder()
@@ -53,7 +53,7 @@ export function buildStockPanelComponents(guildId) {
     const priceText = p.price > 0 ? fmt.b(formatCurrency(p.price)) : `${E('icon_gift', '🎁')} ${fmt.b('Miễn phí')}`;
     const dur = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
     const desc = p.description ? `\n  ${subtext(p.description)}` : '';
-    const emoji = p.emoji || E('order_product', '📦');
+    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product', '📦');
     return `${emoji} ${fmt.b(p.name)} ${fmt.b('·')} ${priceText} ${fmt.b('·')} ${E('icon_duration', '⏱️')} ${dur}${desc}`;
   }).join('\n');
 
@@ -77,7 +77,7 @@ export function buildStockPanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(p.emoji, E('order_product', '📦')),
+    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product', '📦')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
@@ -117,7 +117,7 @@ export async function execute(interaction) {
   try {
     const components = buildStockPanelComponents(interaction.guildId);
     if (!components) {
-      return interaction.editReply(`${ICONS.defaultProduct} Chưa có sản phẩm nào. Dùng \`/product add\` hoặc \`/product sale\` để thêm trước.`);
+      return interaction.editReply(`Chưa có sản phẩm nào. Dùng \`/product add\` hoặc \`/product sale\` để thêm trước.`);
     }
 
     const panelMessage = await interaction.channel.send({

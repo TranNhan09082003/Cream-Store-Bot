@@ -28,6 +28,7 @@ import {
   buildPaymentWaitingAckEmbed,
 } from '../utils/embeds.js';
 import { formatCurrency } from '../utils/formatters.js';
+import { decrypt } from '../utils/crypto.js';
 
 const PAYOS_API_BASE = 'https://api-merchant.payos.vn';
 
@@ -73,11 +74,29 @@ function convertObjToQueryStr(object) {
 }
 
 function verifyPayOSWebhookSignature(data, signature) {
-  if (!config.payosChecksumKey || !signature || !data) return false;
+  if (!config.payosChecksumKey || !signature || !data) {
+    console.warn('[PAYOS-SIGNATURE] Thiếu checksum key, signature hoặc data:', {
+      hasChecksumKey: !!config.payosChecksumKey,
+      hasSignature: !!signature,
+      hasData: !!data
+    });
+    return false;
+  }
   const sortedData = sortObjDataByKey(data);
   const queryString = convertObjToQueryStr(sortedData);
   const expected = createHmacHex(config.payosChecksumKey, queryString);
-  return expected.toLowerCase() === String(signature).toLowerCase();
+  const matched = expected.toLowerCase() === String(signature).toLowerCase();
+  if (!matched) {
+    console.error('[PAYOS-SIGNATURE] Sai chữ ký PayOS!', {
+      queryString,
+      expectedSignature: expected.toLowerCase(),
+      receivedSignature: String(signature).toLowerCase(),
+      checksumKeyUsed: config.payosChecksumKey ? `${config.payosChecksumKey.slice(0, 4)}...${config.payosChecksumKey.slice(-4)}` : 'empty'
+    });
+  } else {
+    console.log('[PAYOS-SIGNATURE] Xác thực chữ ký PayOS thành công cho đơn:', data.orderCode);
+  }
+  return matched;
 }
 
 function buildPayOSRequestPayload(order) {
@@ -216,7 +235,7 @@ export async function confirmPayOSWebhookUrl() {
   return callPayOSApi('POST', '/confirm-webhook', { webhookUrl });
 }
 
-// ═══ VietQR — Tạo QR chuyển khoản ngân hàng (SePay bắt webhook) ═══
+// ═══ VietQR — Tạo QR chuyển khoản ngân hàng (xác nhận tay bằng /qr xac_nhan_tay:true) ═══
 
 import { getGuildConfig, hasBankConfig } from './guildConfigService.js';
 
@@ -227,15 +246,6 @@ function getBankInfo(guildId) {
       bankBin: gc.bank_bin,
       accountNo: gc.bank_account_no,
       accountName: gc.bank_account_name,
-    };
-  }
-  // Fallback: dùng SEPAY_BANK_ACCOUNT từ .env nếu có
-  const sepayAccount = config.sepayBankAccount;
-  if (sepayAccount) {
-    return {
-      bankBin: config.vietqrBankBin || '970418', // BIDV mặc định
-      accountNo: sepayAccount,
-      accountName: config.vietqrAccountName || 'CREAM STORE',
     };
   }
   return null;
@@ -257,7 +267,7 @@ export async function sendVietQRPayment({ guild, orderCode }) {
 
   const bankInfo = getBankInfo(order.guild_id);
   if (!bankInfo) {
-    throw new Error('Chưa cấu hình ngân hàng. Dùng `/setup-bank` hoặc thêm SEPAY_BANK_ACCOUNT vào .env.');
+    throw new Error('Chưa cấu hình ngân hàng. Dùng `/setup-bank` để cấu hình tài khoản nhận tiền.');
   }
 
   const transferContent = order.payment_code || order.order_code;
@@ -454,7 +464,7 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
     }
 
     if (stockItem) {
-      const parts = stockItem.credentials.split('|').map(p => p.trim());
+      const parts = decrypt(stockItem.credentials).split('|').map(p => p.trim());
       const email = parts[0] || '';
       const password = parts[1] || '';
       const profile = parts[2] || '';
