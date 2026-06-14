@@ -58,7 +58,7 @@ export async function execute(interaction) {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('bulk_data')
-              .setLabel('Danh sách (Icon Tên | Giá gốc | Tháng | Mô tả)')
+              .setLabel('Danh sách (Tên | Giá gốc | Tháng | Mô tả)')
               .setPlaceholder(
                 '🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng\n' +
                 '📺 Spotify Premium | 30k | 1\n' +
