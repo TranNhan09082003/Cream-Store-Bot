@@ -12,7 +12,6 @@ import {
   TextDisplayBuilder,
 } from 'discord.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
-import { config } from '../config.js';
 import { brandName, accentFor } from '../utils/uiKit.js';
 
 export const data = new SlashCommandBuilder()
@@ -41,32 +40,32 @@ export async function execute(interaction) {
   }
 
   if (!verifyChannel) {
-    await interaction.editReply({ content: `${E('status_cross')} Khong tim thay kenh verify. Dung option \`kenh\` de chi ro.` });
+    await interaction.editReply({ content: `${E('status_cross')} Không tìm thấy kênh xác minh. Dùng option \`kenh\` để chỉ rõ.` });
     return;
   }
 
   // ─── Dựng Components V2 panel ───────────────────────────────
-  const iconSparkle  = E('icon_sparkle');
-  const iconCheck    = E('status_check');
-  const iconLock     = E('icon_lock') || E('status_cross');
-  const iconMoney    = E('payment_money');
-  const iconOrder    = E('panel_order');
-  const iconDiscord  = E('brand_discord');
+  const iconSparkle = E('icon_sparkle');
+  const iconCheck   = E('status_check');
+  const iconLock    = E('icon_lock') || E('status_cross');
+  const iconMoney   = E('payment_money');
+  const iconOrder   = E('panel_order');
+  const iconDiscord = E('brand_discord');
 
-  const headerLine = [iconSparkle, `XAC MINH TAI KHOAN — ${storeName.toUpperCase()}`]
+  const headerLine = [iconSparkle, `XÁC MINH TÀI KHOẢN — ${storeName.toUpperCase()}`]
     .filter(Boolean).join(' ');
 
   const bodyLines = [
-    `${iconCheck || '>'} **Tai sao can xac minh?**`,
-    `> ${iconLock} Bao ve server khoi tai khoan ao, spam va raid`,
-    `> ${iconSparkle} Bot tu dong sao luu thong tin — neu server bi xoa ban duoc keo sang server du phong!`,
-    `> ${iconCheck} Sau xac minh, ban mo khoa toan bo kenh:`,
-    `>   ${iconMoney} Bang gia & san pham`,
-    `>   ${iconDiscord} Phong chat & tro chuyen`,
-    `>   ${iconOrder} Tao ticket mua hang / ho tro`,
+    `${iconCheck} **Tại sao cần xác minh?**`.trim(),
+    `> ${iconLock} Bảo vệ server khỏi tài khoản ảo, spam và raid`.trim(),
+    `> ${iconSparkle} Bot tự động sao lưu thông tin — nếu server bị xóa bạn được kéo sang server dự phòng!`.trim(),
+    `> ${iconCheck} Sau xác minh, bạn mở khóa toàn bộ kênh:`.trim(),
+    `>   ${iconMoney} Bảng giá & sản phẩm`.trim(),
+    `>   ${iconDiscord} Phòng chat & trò chuyện`.trim(),
+    `>   ${iconOrder} Tạo ticket mua hàng / hỗ trợ`.trim(),
     '',
-    '**Bam nut ben duoi de xac minh ngay (chi mat 5 giay):**',
-  ].filter(s => s !== undefined).join('\n');
+    '**Bấm nút bên dưới để xác minh ngay (chỉ mất 5 giây):**',
+  ].join('\n');
 
   const container = new ContainerBuilder()
     .setAccentColor(accentFor('primary'));
@@ -87,7 +86,7 @@ export async function execute(interaction) {
   // ─── Nút xác minh ───────────────────────────────────────────
   const verifyBtn = new ButtonBuilder()
     .setCustomId('oauth:verify:button')
-    .setLabel('Xac Minh Ngay')
+    .setLabel('Xác Minh Ngay')
     .setStyle(ButtonStyle.Success);
 
   const btnEmoji = E.component('status_check');
@@ -105,16 +104,14 @@ export async function execute(interaction) {
     const messages = await verifyChannel.messages.fetch({ limit: 50 });
     const botMessages = messages.filter(m => m.author.id === interaction.client.user.id && m.components?.length > 0);
 
-    // Xoá tất cả tin nhắn cũ của bot có component (panel xác minh cũ)
     for (const [, msg] of botMessages) {
       await msg.delete().catch(() => null);
     }
 
-    // Gửi panel mới
     await verifyChannel.send(panelPayload);
-    await interaction.editReply({ content: `${E('status_check')} Da xoa panel cu va gui panel xac minh moi vao ${verifyChannel}.` });
+    await interaction.editReply({ content: `${E('status_check')} Đã xoá panel cũ và gửi panel xác minh mới vào ${verifyChannel}.` });
   } catch (err) {
     console.error('[SETUP-VERIFY] Error sending panel:', err);
-    await interaction.editReply({ content: `${E('status_cross')} Loi: ${err.message}` });
+    await interaction.editReply({ content: `${E('status_cross')} Lỗi: ${err.message}` });
   }
 }
