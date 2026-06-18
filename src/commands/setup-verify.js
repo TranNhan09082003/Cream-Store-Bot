@@ -100,21 +100,19 @@ export async function execute(interaction) {
     flags: MessageFlags.IsComponentsV2,
   };
 
-  // ─── Gửi hoặc cập nhật message cũ ──────────────────────────
+  // ─── Xoá panel cũ và gửi panel mới ────────────────────────
   try {
-    const messages = await verifyChannel.messages.fetch({ limit: 20 });
-    const existing = messages.find(m => m.author.id === interaction.client.user.id &&
-      m.components?.length > 0 &&
-      JSON.stringify(m.components).includes('oauth:verify:button')
-    );
+    const messages = await verifyChannel.messages.fetch({ limit: 50 });
+    const botMessages = messages.filter(m => m.author.id === interaction.client.user.id && m.components?.length > 0);
 
-    if (existing) {
-      await existing.edit(panelPayload);
-      await interaction.editReply({ content: `${E('status_check')} Da cap nhat panel xac minh trong ${verifyChannel}.` });
-    } else {
-      await verifyChannel.send(panelPayload);
-      await interaction.editReply({ content: `${E('status_check')} Da gui panel xac minh moi vao ${verifyChannel}.` });
+    // Xoá tất cả tin nhắn cũ của bot có component (panel xác minh cũ)
+    for (const [, msg] of botMessages) {
+      await msg.delete().catch(() => null);
     }
+
+    // Gửi panel mới
+    await verifyChannel.send(panelPayload);
+    await interaction.editReply({ content: `${E('status_check')} Da xoa panel cu va gui panel xac minh moi vao ${verifyChannel}.` });
   } catch (err) {
     console.error('[SETUP-VERIFY] Error sending panel:', err);
     await interaction.editReply({ content: `${E('status_cross')} Loi: ${err.message}` });
