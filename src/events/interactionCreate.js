@@ -1668,7 +1668,7 @@ async function handleTicketClose(interaction, ticketId) {
 
     // Ack confirm button
     if (interaction.isButton()) {
-      await interaction.update({ content: '🗃️ Đang xuất transcript và đóng ticket...', embeds: [], components: [] }).catch(() => null);
+      await interaction.update({ content: `${E('icon_clipboard')} Đang xuất transcript và đóng ticket...`, embeds: [], components: [] }).catch(() => null);
     }
 
     const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
@@ -1712,17 +1712,29 @@ async function handleTicketClose(interaction, ticketId) {
       await deliverTranscript({ guild: interaction.guild, ticket, transcriptResult, closedById: interaction.user.id });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🔒  Ticket Đã Đóng')
-      .setDescription([
-        `> **Đóng bởi:** <@${interaction.user.id}>`,
-        '> ⏳ Channel sẽ **tự xóa sau 2 phút**.',
-        '> 📄 Transcript đã được lưu và gửi cho khách.',
-      ].join('\n'))
-      .setColor(0xED4245)
-      .setTimestamp();
-
-    await interaction.channel.send({ embeds: [embed] }).catch(() => null);
+    const closeContainer = new ContainerBuilder().setAccentColor(0xED4245);
+    closeContainer.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent([
+        `## ${E('icon_lock')} Ticket Đã Đóng`.trim(),
+        `> ${E('ticket_user')} **Đóng bởi:** <@${interaction.user.id}>`,
+        `> ${E('icon_clock')} Channel sẽ **tự xóa sau 2 phút**.`,
+        transcriptResult
+          ? `> ${E('icon_clipboard')} Transcript đã được lưu và gửi cho khách.`
+          : `> ${E('status_warn')} Không thể xuất transcript lần này.`,
+      ].filter(Boolean).join('\n'))
+    );
+    closeContainer.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+    closeContainer.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# ${E('icon_heart_purple')} Cảm ơn bạn đã tin tưởng sử dụng dịch vụ!`.trim()
+      )
+    );
+    await interaction.channel.send({
+      components: [closeContainer],
+      flags: MessageFlags.IsComponentsV2,
+    }).catch(() => null);
 
     setTimeout(async () => {
       try {
