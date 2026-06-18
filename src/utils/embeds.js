@@ -1007,6 +1007,53 @@ export function buildPublicOrderLogEmbed(order) {
   return applyBranding(embed);
 }
 
+export function buildPublicOrderLogV2(order) {
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback = '') => em[slot] || fallback;
+
+  const ticketVal = order.ticket_channel_id
+    ? `<#${order.ticket_channel_id}>`
+    : `\`${order.ticket_code || 'N/A'}\``;
+
+  const container = new ContainerBuilder().setAccentColor(0x22c55e);
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent([
+      `## ${E('order_complete')} GIAO H\u00c0NG TH\u00c0NH C\u00d4NG \u2014 \`${order.order_code}\``,
+      `> ${E('icon_heart_purple')} C\u1ea3m \u01a1n qu\u00fd kh\u00e1ch \u0111\u00e3 tin t\u01b0\u1edfng v\u00e0 mua h\u00e0ng t\u1ea1i **${brandName()}**!`,
+    ].join('\n'))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent([
+      `${E('ticket_user')} **Kh\u00e1ch H\u00e0ng** \u2014 <@${order.customer_id}>`,
+      `${E('order_product')} **S\u1ea3n Ph\u1ea9m** \u2014 ${formatOrderProduct(order.quantity, order.product_name)}`,
+      `${E('payment_money')} **T\u1ed5ng Ti\u1ec1n** \u2014 \`${vnd(order.total_amount)}\u0111\``,
+      `${E('payment_success')} **Thanh To\u00e1n** \u2014 ${statusPill(order.payment_status || 'PAID')}`,
+      `${E('ticket_open')} **Ticket** \u2014 ${ticketVal}`,
+      order.completed_at
+        ? `${E('icon_clock')} **Ho\u00e0n Th\u00e0nh** \u2014 ${T.rel(order.completed_at)}`
+        : null,
+    ].filter(Boolean).join('\n'))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `-# ${E('icon_sparkle')} **${brandName()}** \u2014 Uy T\u00edn \u2022 Ch\u1ea5t L\u01b0\u1ee3ng \u2022 H\u1ed7 Tr\u1ee3 24/7`
+    )
+  );
+
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+}
+
 
 // ═══════════════════════════════════════════════
 // Feedback

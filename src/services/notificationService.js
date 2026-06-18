@@ -14,6 +14,7 @@ import {
   buildTranscriptLinkComponents,
   buildWarrantyActionComponents,
   buildPublicOrderLogEmbed,
+  buildPublicOrderLogV2,
 } from '../utils/embeds.js';
 import { formatCurrency, buildOrderLogContent } from '../utils/formatters.js';
 
@@ -101,7 +102,7 @@ export async function sendCompletedFlow({ guild, order, actorId, supportId }) {
   if (guildConfig?.public_order_log_channel_id) {
     const publicLogChannel = await guild.channels.fetch(guildConfig.public_order_log_channel_id).catch(() => null);
     if (publicLogChannel?.isTextBased()) {
-      await publicLogChannel.send({ embeds: [buildPublicOrderLogEmbed(order)] }).catch(() => null);
+      await publicLogChannel.send(buildPublicOrderLogV2(order)).catch(() => null);
     }
   }
 
