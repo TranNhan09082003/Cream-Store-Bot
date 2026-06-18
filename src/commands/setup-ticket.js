@@ -24,7 +24,8 @@ export const data = new SlashCommandBuilder()
   .addChannelOption(opt => opt.setName('transcript_channel').setDescription('Kênh lưu transcript ticket đã đóng').addChannelTypes(ChannelType.GuildText).setRequired(false))
   .addRoleOption(opt => opt.setName('non_legit_role').setDescription('Role gắn khi khách không feedback đúng hạn').setRequired(false))
   .addChannelOption(opt => opt.setName('staff_log_channel').setDescription('Kênh nhật ký hoạt động staff').addChannelTypes(ChannelType.GuildText).setRequired(false))
-  .addChannelOption(opt => opt.setName('reminder_channel').setDescription('Kênh nhắc việc tự động').addChannelTypes(ChannelType.GuildText).setRequired(false));
+  .addChannelOption(opt => opt.setName('reminder_channel').setDescription('Kênh nhắc việc tự động').addChannelTypes(ChannelType.GuildText).setRequired(false))
+  .addChannelOption(opt => opt.setName('warranty_log_channel').setDescription('Kênh log bảo hành (admin theo dõi yêu cầu bảo hành)').addChannelTypes(ChannelType.GuildText).setRequired(false));
 
 export async function execute(interaction) {
   const E = createEmojiResolver(interaction?.guildId);
@@ -47,6 +48,7 @@ export async function execute(interaction) {
     const nonLegitRole = interaction.options.getRole('non_legit_role');
     const staffLogChannel = interaction.options.getChannel('staff_log_channel');
     const reminderChannel = interaction.options.getChannel('reminder_channel');
+    const warrantyLogChannel = interaction.options.getChannel('warranty_log_channel');
 
     const { container: panelContainer, rows: panelRows, flags: panelFlags } = buildTicketPanelV2({ guild_id: interaction.guildId });
     const panelMessage = await panelChannel.send({
@@ -71,6 +73,7 @@ export async function execute(interaction) {
       non_legit_role_id: nonLegitRole?.id ?? null,
       staff_log_channel_id: staffLogChannel?.id ?? null,
       reminder_channel_id: reminderChannel?.id ?? null,
+      warranty_log_channel_id: warrantyLogChannel?.id ?? null,
       updated_by: interaction.user.id,
     });
 
@@ -91,6 +94,7 @@ export async function execute(interaction) {
         { name: `${E('ticket_claim')} Role Manager`, value: managerRole ? `${managerRole}` : `_Chưa cấu hình_`, inline: true },
         { name: `${E('icon_doc')} Transcript`, value: transcriptChannel ? `${transcriptChannel}` : `_Chưa cấu hình_`, inline: true },
         { name: `${E('icon_doc')} Staff Log`, value: staffLogChannel ? `${staffLogChannel}` : `_Chưa cấu hình_`, inline: true },
+        { name: `${E('panel_warranty')} Log Bảo Hành`, value: warrantyLogChannel ? `${warrantyLogChannel}` : `_Chưa cấu hình_`, inline: true },
       )
       .setFooter({ text: 'Dùng /setup-ticket lại để cập nhật cấu hình bất cứ lúc nào.' })
       .setTimestamp();

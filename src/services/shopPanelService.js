@@ -66,6 +66,32 @@ export function deleteShopPanel(id) {
 }
 
 // ═══════════════════════════════════════════════
+// Màu accent theo danh mục dịch vụ
+// ═══════════════════════════════════════════════
+const CATEGORY_ACCENT = {
+  netflix:    0xE50914,
+  spotify:    0x1DB954,
+  youtube:    0xFF0000,
+  chatgpt:    0x10A37F,
+  claude:     0xD97706,
+  gemini:     0x4285F4,
+  office:     0xD83B01,
+  adobe:      0xFF0000,
+  capcut:     0x000000,
+  discord:    0x5865F2,
+  nitro:      0x5865F2,
+  gearup:     0x00C2FF,
+};
+
+function accentForCategory(category) {
+  const key = (category || '').toLowerCase().replace(/\s+/g, '');
+  for (const [k, v] of Object.entries(CATEGORY_ACCENT)) {
+    if (key.includes(k)) return v;
+  }
+  return config.accentColorPrimary;
+}
+
+// ═══════════════════════════════════════════════
 // Build Components V2 Panel
 // ═══════════════════════════════════════════════
 
@@ -83,14 +109,22 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   };
   const displayTitle = title || category;
 
-  // ─── Container ───
-  const container = new ContainerBuilder().setAccentColor(config.accentColorPrimary);
+  // Tìm emoji brand phù hợp với danh mục
+  const catKey = (category || '').toLowerCase();
+  const brandSlots = ['netflix','spotify','youtube','chatgpt','claude','gemini','office','adobe','capcut','discord','nitro','gearup'];
+  const matchedBrandSlot = brandSlots.find(s => catKey.includes(s));
+  const brandEmoji = matchedBrandSlot ? E(`brand_${matchedBrandSlot}`) : E('icon_store');
+  const accentColor = accentForCategory(category);
 
-  // Header
+  // ─── Container ───
+  const container = new ContainerBuilder().setAccentColor(accentColor);
+
+  // Header — trang trí với emoji brand + thương hiệu
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `## ${displayTitle}`
-    )
+    new TextDisplayBuilder().setContent([
+      `## ${brandEmoji} ${displayTitle}`,
+      `> ${E('icon_sparkle')} Dịch vụ số chính hãng — bảo hành uy tín tại **${config.storeName || 'Cenar Store'}**`,
+    ].join('\n'))
   );
 
   // Banner image
@@ -106,20 +140,19 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
 
-  // Features list
+  // Features list — với tiêu đề và bullet có emoji
   if (features) {
     const featureLines = features.split('\n').filter(l => l.trim());
     const formatted = featureLines.map(line => {
       const trimmed = line.trim();
-      // If line already starts with bullet/emoji, keep as is
       if (/^[•\-\*]/.test(trimmed)) return trimmed;
       if (/^\p{Emoji}/u.test(trimmed)) return trimmed;
-      return `• ${trimmed}`;
+      return `${E('status_check')} ${trimmed}`;
     }).join('\n');
 
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `**Systems** ${E('icon_settings')}\n${formatted}`
+        `### ${E('icon_sparkle')} Quyền Lợi Dịch Vụ\n${formatted}`
       )
     );
 
@@ -128,10 +161,25 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
     );
   }
 
+  // Thông tin bảng giá inline nếu có sản phẩm
+  if (products.length > 0) {
+    const priceLines = products.slice(0, 10).map(p =>
+      `${E('icon_tag')} **${p.name}** — \`${formatCurrency(p.price)}đ\` / ${p.duration_months} tháng`
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `### ${E('icon_price')} Bảng Giá\n${priceLines.join('\n')}`
+      )
+    );
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+  }
+
   // Footer
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      subtext(`${E('icon_heart_purple')} Chọn gói bên dưới · Cream Store`)
+      subtext(`${E('icon_heart_purple')} Chọn gói bên dưới để đặt hàng · ${config.storeName || 'Cenar Store'}`)
     )
   );
 
@@ -140,7 +188,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   if (products.length > 0) {
     const selectOptions = products.slice(0, 25).map(p => ({
       label: `${p.name}`.slice(0, 100),
-      description: `Giá: ${formatCurrency(p.price)} | ${p.duration_months} tháng`.slice(0, 100),
+      description: `${formatCurrency(p.price)}đ · ${p.duration_months} tháng`.slice(0, 100),
       value: `${p.id}`,
       emoji: resolveSelectMenuEmoji(guildId, p.emoji, 'order_product'),
     }));
@@ -148,7 +196,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
     selectRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('product:select')
-        .setPlaceholder('Chọn gói ( Updated )')
+        .setPlaceholder(`${displayTitle} — Chọn gói phù hợp với bạn`)
         .addOptions(selectOptions)
     );
   }

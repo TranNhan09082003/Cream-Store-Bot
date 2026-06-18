@@ -474,19 +474,26 @@ export function buildWarrantySelectV2(guildId = null) {
   const em = guildId ? getEmojiMap(guildId) : {};
   const E = (slot, fallback = '') => em[slot] || fallback;
   const container = new ContainerBuilder().setAccentColor(accentFor('warning'));
+
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(joinLines(
-      h2(`${E('panel_warranty')}  Chọn Sản Phẩm Cần Bảo Hành`),
-      `> Dưới đây là danh sách ${fmt.b('đơn hàng đã hoàn thành')} của bạn.`,
-      '> Chọn sản phẩm cần bảo hành từ menu bên dưới.',
-    ))
+    new TextDisplayBuilder().setContent([
+      h2(`${E('panel_warranty')} Bảo Hành Sản Phẩm`),
+      `> ${E('icon_sparkle')} Chọn đơn hàng cần bảo hành từ danh sách bên dưới.`,
+      `> Sau khi chọn, bạn sẽ cần điền thông tin tài khoản để chúng tôi hỗ trợ nhanh hơn.`,
+    ].join('\n'))
   );
+
   container.addSeparatorComponents(
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
+
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(subtext('Nếu không thấy đơn, hãy liên hệ staff để được hỗ trợ.'))
+    new TextDisplayBuilder().setContent([
+      `${E('icon_tip')} **Lưu ý:** Chỉ hiển thị các đơn đã hoàn thành trong 6 tháng gần nhất.`,
+      subtext('Nếu không thấy đơn phù hợp, hãy liên hệ staff để được hỗ trợ trực tiếp.'),
+    ].join('\n'))
   );
+
   return { container, flags: MessageFlags.IsComponentsV2 };
 }
 
@@ -506,7 +513,7 @@ export function buildWarrantyProductSelectComponents(orders, guildId = null) {
     new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('warranty:product:select')
-        .setPlaceholder('Chon san pham can bao hanh...')
+        .setPlaceholder('Chọn đơn hàng cần bảo hành...')
         .addOptions(options),
     ),
   ];
@@ -1566,12 +1573,12 @@ export function buildWarrantyOpenedEmbed(order, reason, channel) {
   return applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorWarning)
-      .setTitle('Ticket Bao Hanh Da Mo')
+      .setTitle('Ticket Bảo Hành Đã Mở')
       .addFields(
-        { name: 'Ma Don', value: `\`${order.order_code}\``, inline: true },
-        { name: 'San Pham', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
+        { name: 'Mã Đơn', value: `\`${order.order_code}\``, inline: true },
+        { name: 'Sản Phẩm', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
         { name: 'Ticket', value: `${channel}`, inline: true },
-        ...(reason ? [{ name: 'Mo Ta Loi', value: reason, inline: false }] : []),
+        ...(reason ? [{ name: 'Mô Tả Lỗi', value: reason, inline: false }] : []),
       )
       .setTimestamp(),
   );

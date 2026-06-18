@@ -473,6 +473,8 @@ export function initDatabase() {
   ensureColumn('guild_settings', 'sale_message_id', 'TEXT');
   ensureColumn('guild_settings', 'sale_percent', 'INTEGER DEFAULT 0');
 
+  ensureColumn('guild_settings', 'warranty_log_channel_id', 'TEXT');
+
   ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
 
   // Seed product catalog data

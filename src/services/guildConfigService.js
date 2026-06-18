@@ -40,6 +40,7 @@ function upsertGuildConfigStmt() {
       sale_channel_id,
       sale_message_id,
       sale_percent,
+      warranty_log_channel_id,
       updated_by,
       updated_at
     ) VALUES (
@@ -80,6 +81,7 @@ function upsertGuildConfigStmt() {
       @sale_channel_id,
       @sale_message_id,
       @sale_percent,
+      @warranty_log_channel_id,
       @updated_by,
       @updated_at
     )
@@ -120,6 +122,7 @@ function upsertGuildConfigStmt() {
       sale_channel_id = COALESCE(excluded.sale_channel_id, guild_settings.sale_channel_id),
       sale_message_id = COALESCE(excluded.sale_message_id, guild_settings.sale_message_id),
       sale_percent = COALESCE(excluded.sale_percent, guild_settings.sale_percent),
+      warranty_log_channel_id = COALESCE(excluded.warranty_log_channel_id, guild_settings.warranty_log_channel_id),
       updated_by = excluded.updated_by,
       updated_at = excluded.updated_at
   `);
@@ -169,6 +172,7 @@ export function upsertGuildConfig(payload) {
     sale_channel_id: payload.sale_channel_id ?? existing?.sale_channel_id ?? null,
     sale_message_id: payload.sale_message_id ?? existing?.sale_message_id ?? null,
     sale_percent: payload.sale_percent !== undefined ? payload.sale_percent : (existing?.sale_percent ?? 0),
+    warranty_log_channel_id: payload.warranty_log_channel_id ?? existing?.warranty_log_channel_id ?? null,
     updated_by: payload.updated_by ?? existing?.updated_by ?? null,
     updated_at: nowIso(),
   };
