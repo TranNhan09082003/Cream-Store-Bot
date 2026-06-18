@@ -15,8 +15,8 @@ const SERVER1_ID = '1282637033340403754';
 const SERVER2_ID = '1070676180103086132';
 
 const WELCOME_BANNER = {
-  s1: 'https://i.pinimg.com/originals/f4/8c/17/f48c175f88f9576f0f3ff7b36e9c9e7f.gif',
-  s2: 'https://i.pinimg.com/originals/ab/c7/1e/abc71e5a3a7bce163db86cbfae2a82bf.gif',
+  s1: 'https://i.pinimg.com/originals/68/ae/bf/68aebf3739f455687a90e871bdc04a98.gif',
+  s2: 'https://i.pinimg.com/originals/68/ae/bf/68aebf3739f455687a90e871bdc04a98.gif',
 };
 
 // Chống lặp welcome (throttle 60 giây per user)
@@ -165,19 +165,40 @@ export async function execute(member) {
       }).catch(e => console.error('[WELCOME] Thất bại:', e.message));
     }
 
-    // 3. Thông báo ngắn vào kênh #thảo-luận
+    // 3. Thông báo vào kênh #thảo-luận — Components V2
     const chatChannel = guild.channels.cache.find(
       c => c.name.includes('thảo-luận') && c.type === ChannelType.GuildText
     );
 
     if (chatChannel) {
       const verifyId = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText)?.id;
-      const greeting = isServer1
-        ? `${E('icon_sparkle')} Hân hoan chào đón ${member} gia nhập **Cenar Store**!${verifyId ? ` Ghé <#${verifyId}> để xác minh và mở khóa server nhé! ${E('ticket_claim')}` : ''}`
-        : `${E('icon_sparkle')} Chào mừng ${member} đã đến **Cenar Store 2**! Bạn đã được cấp role **Thành Viên Mới** — hãy xem bảng giá và mở ticket nếu cần hỗ trợ! ${E('status_check')}`;
 
-      await chatChannel.send({ content: greeting, allowedMentions: { users: [user.id] } })
-        .catch(e => console.error('[WELCOME CHAT] Thất bại:', e.message));
+      const chatLines = isServer1
+        ? [
+            `## ${E('payment_success')} Thành Viên Mới Gia Nhập!`,
+            `> ${E('panel_order')} Hân hoan chào đón <@${user.id}> đến với **${brandName}**!`,
+            verifyId ? `> ${E('ticket_claim')} Ghé <#${verifyId}> để xác minh & mở khóa toàn bộ server nhé!` : null,
+            '',
+            `-# ${E('icon_gem')} **${memberCount.toLocaleString('vi-VN')}** thành viên — ${brandName}`,
+          ].filter(Boolean)
+        : [
+            `## ${E('payment_success')} Thành Viên Mới Gia Nhập!`,
+            `> ${E('panel_order')} Chào mừng <@${user.id}> đến với **${brandName} 2**!`,
+            `> ${E('status_check')} Bạn đã được cấp role **Thành Viên Mới** — hãy xem bảng giá và mở ticket nếu cần hỗ trợ!`,
+            '',
+            `-# ${E('icon_gem')} **${memberCount.toLocaleString('vi-VN')}** thành viên — ${brandName}`,
+          ];
+
+      const chatContainer = new ContainerBuilder().setAccentColor(isServer1 ? 0x7C3AED : 0xF472B6);
+      chatContainer.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(chatLines.join('\n'))
+      );
+
+      await chatChannel.send({
+        components: [chatContainer],
+        flags: MessageFlags.IsComponentsV2,
+        allowedMentions: { users: [user.id] },
+      }).catch(e => console.error('[WELCOME CHAT] Thất bại:', e.message));
     }
 
     // 4. DM chào mừng kèm hướng dẫn verify (Server 1 only)

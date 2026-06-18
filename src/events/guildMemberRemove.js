@@ -1,6 +1,7 @@
 import {
   Events, ChannelType,
   ContainerBuilder, TextDisplayBuilder, SectionBuilder, ThumbnailBuilder,
+  MediaGalleryBuilder, MediaGalleryItemBuilder,
   SeparatorBuilder, SeparatorSpacingSize, MessageFlags,
 } from 'discord.js';
 import { config } from '../config.js';
@@ -10,6 +11,7 @@ export const name = Events.GuildMemberRemove;
 export const once = false;
 
 const SERVER1_ID = '1282637033340403754';
+const GOODBYE_BANNER = 'https://i.pinimg.com/originals/6e/d3/35/6ed335a6e5b40c9e346d09d24cf1668f.gif';
 
 export async function execute(member) {
   try {
@@ -65,6 +67,13 @@ export async function execute(member) {
       new SectionBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
         .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar))
+    );
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+    );
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(GOODBYE_BANNER))
     );
 
     await goodbyeChannel.send({ components: [container], flags: MessageFlags.IsComponentsV2 })
