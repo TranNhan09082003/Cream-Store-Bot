@@ -311,11 +311,11 @@ export function registerDashboardRoutes(app) {
       // Prepare Embed
       const serviceName = (order.service_type || 'Dịch Vụ').toUpperCase();
       const embed = {
-        title: `Giao Hang Thanh Cong: ${serviceName}`,
-        description: `Cam on ban da mua hang. Duoi day la thong tin tai khoan cho don hang **${order.order_code}**:`,
+        title: `Giao Hàng Thành Công: ${serviceName}`,
+        description: `Cảm ơn bạn đã mua hàng. Dưới đây là thông tin tài khoản cho đơn hàng **${order.order_code}**:`,
         color: 0x9333ea,
         fields: [],
-        footer: { text: 'Cenar Store - Quan Ly Tu Dong' },
+        footer: { text: 'Cenar Store - Quản Lý Tự Động' },
         timestamp: new Date().toISOString()
       };
 
@@ -324,10 +324,10 @@ export function registerDashboardRoutes(app) {
       const _profile = decrypt(order.credential_profile);
       const _pin = decrypt(order.credential_pin);
       if (_email) embed.fields.push({ name: 'Email', value: `\`${_email}\``, inline: true });
-      if (_password) embed.fields.push({ name: 'Mat Khau', value: `\`${_password}\``, inline: true });
+      if (_password) embed.fields.push({ name: 'Mật Khẩu', value: `\`${_password}\``, inline: true });
       if (_profile) embed.fields.push({ name: 'Profile', value: `\`${_profile}\``, inline: true });
-      if (_pin) embed.fields.push({ name: 'Ma PIN', value: `\`${_pin}\``, inline: true });
-      if (order.expiry_at) embed.fields.push({ name: 'Ngay Het Han', value: `<t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:D>`, inline: false });
+      if (_pin) embed.fields.push({ name: 'Mã PIN', value: `\`${_pin}\``, inline: true });
+      if (order.expiry_at) embed.fields.push({ name: 'Ngày Hết Hạn', value: `<t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:D>`, inline: false });
 
       await targetUser.send({ embeds: [embed] });
 

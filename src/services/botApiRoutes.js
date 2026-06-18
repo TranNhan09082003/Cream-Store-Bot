@@ -995,7 +995,7 @@ export function registerBotApiRoutes(app) {
 
                     const E2 = createEmojiResolver(guildId);
                     await discordChannel.send({
-                        content: `${E2('panel_order')} **YEU CAU HO TRO TRUC TUYEN TU WEB**\nLien he: **${contact}**\nDiscord: ${customerId === 'web_user' ? 'Khach vang lai' : `<@${customerId}>`}`
+                        content: `${E2('panel_order')} **YÊU CẦU HỖ TRỢ TRỰC TUYẾN TỪ WEB**\nLiên hệ: **${contact}**\nDiscord: ${customerId === 'web_user' ? 'Khách vãng lai' : `<@${customerId}>`}`
                     }).catch(() => null);
                 } catch (err) {
                     console.error('[LIVE CHAT START] Lỗi gửi welcome embed:', err);

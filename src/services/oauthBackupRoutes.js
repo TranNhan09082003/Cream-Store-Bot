@@ -143,23 +143,23 @@ export function registerOauthRoutes(app) {
                   const E = createEmojiResolver(guildId);
                   const dmEmbed = new EmbedBuilder()
                     .setColor(0x7C3AED)
-                    .setTitle(`${E('status_check')} Xac Minh Thanh Cong — ${guild.name}`.trim())
+                    .setTitle(`${E('status_check')} Xác Minh Thành Công — ${guild.name}`.trim())
                     .setDescription([
-                      `Xin chao **${member.user.username}**!`,
+                      `Xin chào **${member.user.username}**!`,
                       '',
-                      `Tai khoan Discord cua ban da duoc **xac minh thanh cong** tai **${guild.name}**.`,
+                      `Tài khoản Discord của bạn đã được **xác minh thành công** tại **${guild.name}**.`,
                       '',
-                      '**Ban da nhan duoc:**',
-                      `> ${E('order_product')} Vai tro: **${role.name}**`,
-                      `> ${E('status_check')} Quyen xem toan bo kenh cua server`,
-                      `> ${E('icon_sparkle')} Tai khoan duoc sao luu bao mat (backup)`,
+                      '**Bạn đã nhận được:**',
+                      `> ${E('order_product')} Vai trò: **${role.name}**`,
+                      `> ${E('status_check')} Quyền xem toàn bộ kênh của server`,
+                      `> ${E('icon_sparkle')} Tài khoản được sao lưu bảo mật (backup)`,
                       '',
-                      '**Buoc tiep theo:**',
-                      `> ${E('payment_money')} Xem bang gia san pham trong kenh \`bang-gia\``,
-                      `> ${E('panel_order')} Mo ticket mua hang trong kenh \`ho-tro\``,
-                      `> ${E('brand_discord')} Tham gia tro chuyen trong \`thao-luan\``,
+                      '**Bước tiếp theo:**',
+                      `> ${E('payment_money')} Xem bảng giá sản phẩm trong kênh \`bang-gia\``,
+                      `> ${E('panel_order')} Mở ticket mua hàng trong kênh \`ho-tro\``,
+                      `> ${E('brand_discord')} Tham gia trò chuyện trong \`thao-luan\``,
                       '',
-                      '*Neu co van de, hay mo ticket ho tro trong server.*'
+                      '*Nếu có vấn đề, hãy mở ticket hỗ trợ trong server.*'
                     ].join('\n'))
                     .setThumbnail(guild.iconURL({ forceStatic: false }) || undefined)
                     .setFooter({ text: `${guild.name} — Uy Tin & Chat Luong` })

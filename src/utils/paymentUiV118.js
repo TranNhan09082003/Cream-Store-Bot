@@ -71,7 +71,7 @@ export function buildOrderPaymentCreatedView({
   const qr = new EmbedBuilder()
     .setColor(0xED4245)
     .setAuthor({ name: storeName })
-    .setTitle('Thong Tin Thanh Toan Don Hang')
+    .setTitle('Thông Tin Thanh Toán Đơn Hàng')
     .setDescription(
       [
         'Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động ghi nhận đơn hàng.',

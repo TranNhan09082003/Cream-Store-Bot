@@ -138,7 +138,7 @@ export async function execute(member) {
 
       if (verifyChannel) {
         const verifyBtn = new ButtonBuilder()
-          .setLabel('Xac Minh Ngay')
+          .setLabel('Xác Minh Ngay')
           .setStyle(ButtonStyle.Link)
           .setURL(`https://discord.com/channels/${guild.id}/${verifyChannel.id}`);
         const emo = E.component('ticket_claim');
@@ -148,7 +148,7 @@ export async function execute(member) {
 
       if (bangGiaChan) {
         const priceBtn = new ButtonBuilder()
-          .setLabel('Xem Bang Gia')
+          .setLabel('Xem Bảng Giá')
           .setStyle(ButtonStyle.Link)
           .setURL(`https://discord.com/channels/${guild.id}/${bangGiaChan.id}`);
         const emo = E.component('payment_money');
@@ -192,7 +192,7 @@ export async function execute(member) {
         '',
         '**Để truy cập đầy đủ server, bạn cần xác minh tài khoản:**',
         `> 1. Vào kênh ${verifyChannel ? `**#${verifyChannel.name}**` : '**#xac-minh**'}`,
-        `> 2. Bấm nút **Xac Minh Ngay**`,
+        `> 2. Bấm nút **Xác Minh Ngay**`,
         `> 3. Xác nhận qua Discord OAuth2 (chỉ 5 giây)`,
         '',
         '**Sau khi xác minh bạn sẽ thấy:**',
@@ -215,7 +215,7 @@ export async function execute(member) {
       const dmComponents = [dmContainer];
       if (verifyChannel) {
         const btn = new ButtonBuilder()
-          .setLabel('Xac Minh Ngay')
+          .setLabel('Xác Minh Ngay')
           .setStyle(ButtonStyle.Link)
           .setURL(`https://discord.com/channels/${guild.id}/${verifyChannel.id}`);
         const emo = E.component('ticket_claim');

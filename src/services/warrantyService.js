@@ -104,7 +104,7 @@ export async function openWarrantyTicket({ guild, customerId, actorId, orderCode
   }).catch(() => null);
 
   const E = createEmojiResolver(guild.id);
-  await channel.send(`${E('order_processing')} **Tien trinh don: Dang xu ly.**\n${E('status_warn')} *Vui long khong tag staff, he thong da ghi nhan va staff se tu dong check don va bao hanh cho ban trong thoi gian som nhat.*`).catch(() => null);
+  await channel.send(`${E('order_processing')} **Tiến trình đơn: Đang xử lý.**\n${E('status_warn')} *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`).catch(() => null);
 
   return { ticket, channel, order: updatedOrder ?? order, reused: false };
 }

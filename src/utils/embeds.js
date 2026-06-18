@@ -144,8 +144,8 @@ export function buildTicketPanelV2(customConfig = {}) {
   const row1 = new ActionRowBuilder().addComponents(btnOrder, btnSupport, btnComplaint, btnPartnership);
 
   // Buttons row 2
-  const btnWarranty = new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bao Hanh San Pham').setStyle(ButtonStyle.Secondary);
-  const btnEdit = new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sua Panel').setStyle(ButtonStyle.Secondary);
+  const btnWarranty = new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary);
+  const btnEdit = new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sửa Panel').setStyle(ButtonStyle.Secondary);
   const e5 = ec(em, 'panel_warranty'); if (e5) btnWarranty.setEmoji(e5);
   const e6 = ec(em, 'panel_edit'); if (e6) btnEdit.setEmoji(e6);
   const row2 = new ActionRowBuilder().addComponents(btnWarranty, btnEdit);
@@ -401,15 +401,15 @@ export function buildCloseConfirmEmbed(ticketCode, reason = null, guildId = null
   const warnRaw = em['status_cross'] || '';
   return new EmbedBuilder()
     .setColor(config.accentColorDanger)
-    .setTitle(`${lockRaw} Xac Nhan Dong Ticket?`.trim())
+    .setTitle(`${lockRaw} Xác Nhận Đóng Ticket?`.trim())
     .setDescription([
       `> **Ticket:** \`${ticketCode}\``,
-      reason ? `> **Ly do:** ${reason}` : null,
+      reason ? `> **Lý do:** ${reason}` : null,
       '',
-      `${warnRaw} **Sau khi xac nhan:**`.trim(),
-      '> - Ticket bi khoa, **chi Admin** moi chat duoc',
-      '> - Channel se **tu xoa sau 2 phut**',
-      '> - Transcript se duoc luu va gui cho khach',
+      `${warnRaw} **Sau khi xác nhận:**`.trim(),
+      '> - Ticket bị khóa, **chỉ Admin** mới chat được',
+      '> - Channel sẽ **tự xóa sau 2 phút**',
+      '> - Transcript sẽ được lưu và gửi cho khách',
     ].filter(Boolean).join('\n'))
     .setTimestamp();
 }
@@ -421,13 +421,13 @@ export function buildCloseConfirmComponents(ticketId, guildId = null) {
 
   const confirmBtn = new ButtonBuilder()
     .setCustomId(`ticket:close:confirm:${ticketId}`)
-    .setLabel('Xac Nhan Dong')
+    .setLabel('Xác Nhận Đóng')
     .setStyle(ButtonStyle.Danger);
   if (confirmEmoji) confirmBtn.setEmoji(confirmEmoji);
 
   const cancelBtn = new ButtonBuilder()
     .setCustomId('ticket:close:cancel')
-    .setLabel('Huy')
+    .setLabel('Hủy')
     .setStyle(ButtonStyle.Secondary);
   if (cancelEmoji) cancelBtn.setEmoji(cancelEmoji);
 
@@ -440,7 +440,7 @@ export function buildCloseConfirmComponents(ticketId, guildId = null) {
 export function buildMuteTicketEmbed(user, isMuted, reason = null, actorId = null) {
   return new EmbedBuilder()
     .setColor(isMuted ? config.accentColorDanger : config.accentColorSuccess)
-    .setTitle(isMuted ? 'Da Khoa Tao Ticket' : 'Da Mo Khoa Tao Ticket')
+    .setTitle(isMuted ? 'Đã Khóa Tạo Ticket' : 'Đã Mở Khóa Tạo Ticket')
     .setDescription([
       `> **Người dùng:** <@${user.id}> \`(${user.tag ?? user.username})\``,
       actorId ? `> **Thực hiện bởi:** <@${actorId}>` : null,
@@ -913,12 +913,12 @@ export function buildCompletionDmEmbed(order) {
   return applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle('Don Hang Da Hoan Thanh')
+      .setTitle('Đơn Hàng Đã Hoàn Thành')
       .setDescription('> Cảm ơn bạn đã ủng hộ Cream Store!')
       .addFields(
-        { name: 'Ma Don', value: `\`${order.order_code}\``, inline: true },
-        { name: 'San Pham', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
-        ...(order.expiry_at ? [{ name: 'Het Han', value: `<t:${unixTs(order.expiry_at)}:D>`, inline: false }] : []),
+        { name: 'Mã Đơn', value: `\`${order.order_code}\``, inline: true },
+        { name: 'Sản Phẩm', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
+        ...(order.expiry_at ? [{ name: 'Hết Hạn', value: `<t:${unixTs(order.expiry_at)}:D>`, inline: false }] : []),
       )
       .setTimestamp(),
   );
@@ -1087,7 +1087,7 @@ export function buildQuickFeedbackAckEmbed(order, stars) {
   return applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle('Cam On Ban Da Feedback!')
+      .setTitle('Cảm Ơn Bạn Đã Feedback!')
       .setDescription([
         `> Bạn đã đánh giá đơn **\`${order.order_code}\`** với mức **${stars} sao**`,
         '> Feedback của bạn rất quan trọng với chúng tôi!',
@@ -1100,16 +1100,24 @@ export function buildQuickFeedbackAckV2(order, stars) {
   const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
   const E = (slot, fallback = '') => em[slot] || fallback;
   const starEmoji = E('icon_star');
-  const starBar = starEmoji ? starEmoji.repeat(stars) : String(stars);
-  const container = new ContainerBuilder().setAccentColor(accentFor('success'));
+  const starBar = starEmoji ? starEmoji.repeat(Math.max(1, Math.min(5, stars))) : `${stars}/5`;
+  const accent = stars >= 4 ? 'success' : stars >= 3 ? 'warning' : 'danger';
+  const container = new ContainerBuilder().setAccentColor(accentFor(accent));
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(joinLines(
-      h2(`${E('status_check')}  Cam On Ban Da Feedback!`),
-      `> Bạn đã đánh giá đơn ${fmt.code(order.order_code)} với mức ${fmt.b(`${stars} sao`)}`,
+      h2(`${E('payment_success')}  Cảm Ơn Bạn Đã Feedback!`),
+      `> ${E('order_id')} ${fmt.b('Mã đơn:')} ${fmt.code(order.order_code)}`.trim(),
+      `> ${E('icon_star')} ${fmt.b('Đánh giá:')} ${fmt.b(`${stars}/5 sao`)}`.trim(),
       `> ${starBar}`,
-      '',
-      subtext('Feedback của bạn rất quan trọng với chúng tôi!'),
     ))
+  );
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      subtext(`${E('icon_heart_purple')} Cảm ơn bạn! Feedback giúp shop ngày càng hoàn thiện hơn.`.trim())
+    )
   );
   return { container, flags: MessageFlags.IsComponentsV2 };
 }
@@ -1145,7 +1153,7 @@ export function buildFeedbackV2({ member, order, stars, content }) {
 }
 
 export function buildFeedbackModalPrompt(stars) {
-  const titles = ['', 'Khong Hai Long', 'Can Cai Thien', 'Tam On', 'Kha Hai Long', 'Rat Hai Long!'];
+  const titles = ['', 'Không Hài Lòng', 'Cần Cải Thiện', 'Tạm Ổn', 'Khá Hài Lòng', 'Rất Hài Lòng!'];
   return {
     title: titles[stars] || `Đánh Giá ${stars} Sao`,
     label: 'Ý kiến của bạn về đơn hàng',
@@ -1169,12 +1177,12 @@ export function buildWarrantyPanelModalPrompt() {
 export function buildDeliveryNoticeEmbed(order) {
   const embed = new EmbedBuilder()
     .setColor(config.accentColorPrimary)
-    .setTitle('Don Hang Da Duoc Giao!')
+    .setTitle('Đơn Hàng Đã Được Giao!')
     .setDescription('> Nếu đơn có tài khoản, bấm nút bên dưới để nhận thông tin đăng nhập.')
     .addFields(
-      { name: 'Ma Don', value: `\`${order.order_code}\``, inline: true },
-      { name: 'San Pham', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
-      ...(order.expiry_at ? [{ name: 'Het Han', value: `<t:${unixTs(order.expiry_at)}:D>`, inline: true }] : []),
+      { name: 'Mã Đơn', value: `\`${order.order_code}\``, inline: true },
+      { name: 'Sản Phẩm', value: formatOrderProduct(order.quantity, order.product_name), inline: true },
+      ...(order.expiry_at ? [{ name: 'Hết Hạn', value: `<t:${unixTs(order.expiry_at)}:D>`, inline: true }] : []),
     )
     .setTimestamp();
   if (config.deliveryBannerUrl) embed.setImage(config.deliveryBannerUrl);
@@ -1286,16 +1294,16 @@ export function buildCredentialEmbeds(order) {
       .setColor(config.accentColorInfo)
       .setTitle('Thong Tin Tai Khoan Nhan Hang')
       .addFields(
-        { name: 'Ma Don', value: `\`${order.order_code}\`` },
+        { name: 'Mã Đơn', value: `\`${order.order_code}\`` },
         { name: 'Gmail', value: `\`${credEmail}\`` },
-        { name: 'Mat Khau', value: `\`${credPassword}\`` },
+        { name: 'Mật Khẩu', value: `\`${credPassword}\`` },
       )
       .setTimestamp(),
   );
   const noteEmbed = applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorDanger)
-      .setTitle('Luu Y Quan Trong')
+      .setTitle('Lưu Ý Quan Trọng')
       .setDescription(order.claim_notes ?? config.defaultDeliveryNotes)
       .setTimestamp(),
   );
@@ -1308,18 +1316,18 @@ export function buildCredentialEmbeds(order) {
 export function buildTranscriptSummaryEmbed(ticket, closedById, messageCount, transcriptUrl) {
   const embed = applyBranding(
     new EmbedBuilder()
-      .setTitle('Ticket Da Dong — Transcript')
+      .setTitle('Ticket Đã Đóng — Transcript')
       .setColor(0x99aab5)
       .addFields(
-        { name: 'Ma Ticket', value: `\`${ticket.ticket_code}\``, inline: true },
-        { name: 'Loai', value: ticket.ticket_type === 'WARRANTY' ? 'Bao Hanh' : ticket.ticket_type, inline: true },
-        { name: 'Khach', value: `<@${ticket.customer_id}>`, inline: true },
-        { name: 'Dong Boi', value: `<@${closedById}>`, inline: true },
-        { name: 'Tin Nhan', value: `${messageCount}`, inline: true },
+        { name: 'Mã Ticket', value: `\`${ticket.ticket_code}\``, inline: true },
+        { name: 'Loại', value: ticket.ticket_type === 'WARRANTY' ? 'Bảo Hành' : ticket.ticket_type, inline: true },
+        { name: 'Khách', value: `<@${ticket.customer_id}>`, inline: true },
+        { name: 'Đóng Bởi', value: `<@${closedById}>`, inline: true },
+        { name: 'Tin Nhắn', value: `${messageCount}`, inline: true },
       )
       .setTimestamp()
   );
-  if (transcriptUrl) embed.setDescription(`[Xem Transcript tren Web](${transcriptUrl})`);
+  if (transcriptUrl) embed.setDescription(`[Xem Transcript trên Web](${transcriptUrl})`);
   return embed;
 }
 
@@ -1332,7 +1340,7 @@ export function buildTranscriptCustomerEmbed(ticket, messageCount, transcriptUrl
       .setTimestamp()
   );
   if (transcriptUrl) {
-    embed.setDescription(embed.data.description + `\n**[Bam vao day de xem noi dung chat tren web](${transcriptUrl})**`);
+    embed.setDescription(embed.data.description + `\n**[Bấm vào đây để xem nội dung chat trên web](${transcriptUrl})**`);
   }
   return embed;
 }
@@ -1351,7 +1359,7 @@ export function buildTranscriptLinkComponents(url) {
 // ═══════════════════════════════════════════════
 export function buildQueueStatusText(order, position, totalInQueue) {
   const claim = order.claimed_by_id ? ` • đang claim bởi <@${order.claimed_by_id}>` : '';
-  return `Don **\`${order.order_code}\`** dang o vi tri **${position} / ${totalInQueue}** — nhom **\`${order.queue_group ?? normalizeQueueGroup(order.product_name) ?? 'mac-dinh'}\`**${claim}`;
+  return `Đơn **\`${order.order_code}\`** đang ở vị trí **${position} / ${totalInQueue}** — nhóm **\`${order.queue_group ?? normalizeQueueGroup(order.product_name) ?? 'mac-dinh'}\`**${claim}`;
 }
 
 // ═══════════════════════════════════════════════
@@ -1361,9 +1369,9 @@ export function buildAutomationGuideEmbed() {
   return applyBranding(
     new EmbedBuilder()
       .setColor(config.accentColorInfo)
-      .setTitle('Co Che Bot Ban Hang Tu Dong')
+      .setTitle('Cơ Chế Bot Bán Hàng Tự Động')
       .setDescription([
-        '**Luong Mua Hang:**',
+        '**Luồng Mua Hàng:**',
         '`1.` Khách bấm **Mua Hàng** → Tạo ticket riêng tư',
         '`2.` Staff dùng `/order` → Tạo đơn, gắn sản phẩm và giá',
         '`3.` Bot tạo QR + link PayOS → Chờ thanh toán',
@@ -1371,12 +1379,12 @@ export function buildAutomationGuideEmbed() {
         '`5.` Staff dùng `/giaohang` → Giao tài khoản qua DM',
         '`6.` Bot nhắc feedback → Lưu lịch sử khách hàng',
         '',
-        '**Bao Hanh:**',
+        '**Bảo Hành:**',
         '`7.` Khách bấm **Bảo Hành** → Chọn sản phẩm → Mở ticket bảo hành',
       ].join('\n'))
       .addFields(
-        { name: 'Lenh Staff', value: '`/order` `/giaohang` `/qr` `/hoanthanh` `/sua-don` `/renew`' },
-        { name: 'Lenh Admin', value: '`/setup-ticket` `/setup-payos` `/blacklist` `/mute-ticket` `/thongke`' },
+        { name: 'Lệnh Staff', value: '`/order` `/giaohang` `/qr` `/hoanthanh` `/sua-don` `/renew`' },
+        { name: 'Lệnh Admin', value: '`/setup-ticket` `/setup-payos` `/blacklist` `/mute-ticket` `/thongke`' },
       )
       .setTimestamp(),
   );
@@ -1384,12 +1392,12 @@ export function buildAutomationGuideEmbed() {
 
 export function buildDoneConfirmationText(order, dmSent) {
   return dmSent
-    ? `Da hoan tat don \`${order.order_code}\` va gui DM cho khach.`
-    : `Da hoan tat don \`${order.order_code}\`, nhung bot chua gui duoc DM cho khach.`;
+    ? `Đã hoàn tất đơn \`${order.order_code}\` và gửi DM cho khách.`
+    : `Đã hoàn tất đơn \`${order.order_code}\`, nhưng bot chưa gửi được DM cho khách.`;
 }
 
 export function buildDeliveryLogText(order) {
-  return `> Da giao tai khoan cho <@${order.customer_id}> — Don \`${order.order_code}\`. Kiem tra DM de xem chi tiet.`;
+  return `> Đã giao tài khoản cho <@${order.customer_id}> — Đơn \`${order.order_code}\`. Kiểm tra DM để xem chi tiết.`;
 }
 
 // ═══════════════════════════════════════════════

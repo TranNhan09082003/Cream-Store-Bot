@@ -1948,9 +1948,34 @@ async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
       const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
       if (channel?.isTextBased()) {
         const E_ch = createEmojiResolver(interaction.guildId);
+        const starEmoji = E_ch('icon_star');
+        const starBar = starEmoji ? starEmoji.repeat(Math.max(1, Math.min(5, stars))) : `${stars}/5 sao`;
+        const fbContainer = new ContainerBuilder().setAccentColor(0xF3A6D7);
+        fbContainer.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent([
+            `## ${E_ch('payment_success')} Feedback Đã Ghi Nhận!`.trim(),
+            `> ${E_ch('order_id')} **Mã đơn:** \`${result.order.order_code}\``.trim(),
+            `> ${E_ch('icon_star')} **Đánh giá:** **${stars}/5 sao**`.trim(),
+            `> ${starBar}`,
+          ].join('\n'))
+        );
+        fbContainer.addSeparatorComponents(
+          new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+        );
+        fbContainer.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `-# ${E_ch('icon_clock')} Ticket sẽ tự đóng sau **${config.autoCloseCompletedTicketMinutes} phút**. Bấm nút bên dưới nếu muốn giữ ticket mở.`.trim()
+          )
+        );
+        const keepOpenBtn = new ButtonBuilder()
+          .setCustomId(`ticket:keepopen:${scheduled.id}`)
+          .setStyle(ButtonStyle.Secondary)
+          .setLabel('Giữ Ticket Mở');
+        const keepOpenBtnEmoji = E_ch.component('icon_lock');
+        if (keepOpenBtnEmoji) keepOpenBtn.setEmoji(keepOpenBtnEmoji);
         await channel.send({
-          content: `${E_ch('status_check')} Đã ghi nhận feedback cho đơn \`${result.order.order_code}\`. Ticket sẽ tự đóng sau **${config.autoCloseCompletedTicketMinutes} phút**. Nếu muốn giữ ticket mở, bấm nút bên dưới.`,
-          components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`ticket:keepopen:${scheduled.id}`).setLabel('Giữ ticket mở').setStyle(ButtonStyle.Secondary))],
+          components: [fbContainer, new ActionRowBuilder().addComponents(keepOpenBtn)],
+          flags: MessageFlags.IsComponentsV2,
         }).catch(() => null);
       }
     }
@@ -3128,17 +3153,17 @@ export function registerInteractionHandler(client, commands) {
 
         const everyoneBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_everyone')
-          .setLabel(cacheData.tagEveryone ? 'Dang Tag @everyone' : 'Khong Tag @everyone')
+          .setLabel(cacheData.tagEveryone ? 'Đang Tag @everyone' : 'Không Tag @everyone')
           .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
 
         const hereBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_here')
-          .setLabel(cacheData.tagHere ? 'Dang Tag @here' : 'Khong Tag @here')
+          .setLabel(cacheData.tagHere ? 'Đang Tag @here' : 'Không Tag @here')
           .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
 
         const confirmBtn = new ButtonBuilder()
           .setCustomId('announcement:confirm')
-          .setLabel('Xac nhan gui')
+          .setLabel('Xác Nhận Gửi')
           .setStyle(ButtonStyle.Success);
 
         const cancelBtn = new ButtonBuilder()
@@ -3200,17 +3225,17 @@ export function registerInteractionHandler(client, commands) {
 
           const everyoneBtn = new ButtonBuilder()
             .setCustomId('announcement:toggle_everyone')
-            .setLabel(cacheData.tagEveryone ? 'Dang Tag @everyone' : 'Khong Tag @everyone')
+            .setLabel(cacheData.tagEveryone ? 'Đang Tag @everyone' : 'Không Tag @everyone')
             .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
 
           const hereBtn = new ButtonBuilder()
             .setCustomId('announcement:toggle_here')
-            .setLabel(cacheData.tagHere ? 'Dang Tag @here' : 'Khong Tag @here')
+            .setLabel(cacheData.tagHere ? 'Đang Tag @here' : 'Không Tag @here')
             .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
 
           const confirmBtn = new ButtonBuilder()
             .setCustomId('announcement:confirm')
-            .setLabel('Xac nhan gui')
+            .setLabel('Xác Nhận Gửi')
             .setStyle(ButtonStyle.Success);
             
           const cancelBtn = new ButtonBuilder()
@@ -3283,7 +3308,7 @@ export function registerInteractionHandler(client, commands) {
         );
 
         const verifyLinkBtn = new ButtonBuilder()
-          .setLabel('Xac Minh Ngay Tai Day')
+          .setLabel('Xác Minh Ngay Tại Đây')
           .setStyle(ButtonStyle.Link)
           .setURL(loginUrl);
         const verifyBtnEmoji = E.component('status_check');
@@ -3331,14 +3356,14 @@ export function registerInteractionHandler(client, commands) {
 
       if (interaction.customId === 'announcement:cancel') {
          announcementCache.delete(interaction.message.id);
-         await interaction.update({ content: 'Da huy dang thong bao.', embeds: [], components: [] }).catch(() => null);
+         await interaction.update({ content: 'Đã huỷ đăng thông báo.', embeds: [], components: [] }).catch(() => null);
          return;
       }
 
       if (interaction.customId === 'announcement:confirm') {
          const cacheData = announcementCache.get(interaction.message.id);
          if (!cacheData) {
-           await interaction.update({ content: 'Phien thao tac nay da het han. Vui long go lai lenh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
+           await interaction.update({ content: 'Phiên thao tác này đã hết hạn. Vui lòng gõ lại lệnh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
            return;
          }
 
@@ -3381,13 +3406,13 @@ export function registerInteractionHandler(client, commands) {
                }
 
                announcementCache.delete(interaction.message.id);
-               await interaction.editReply({ content: 'Da dang thong bao thanh cong!', embeds: [], components: [] }).catch(() => null);
+               await interaction.editReply({ content: 'Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
            } else {
-               await interaction.editReply({ content: 'Khong tim thay kenh tuong ung de dang.', embeds: [], components: [] }).catch(() => null);
+               await interaction.editReply({ content: 'Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
            }
          } catch (err) {
            console.error('[ANNOUNCEMENT_CONFIRM] Lỗi:', err);
-           await interaction.editReply({ content: `Co loi xay ra khi dang thong bao: ${err.message}`, embeds: [], components: [] }).catch(() => null);
+           await interaction.editReply({ content: `Có lỗi xảy ra khi đăng thông báo: ${err.message}`, embeds: [], components: [] }).catch(() => null);
          }
          return;
       }

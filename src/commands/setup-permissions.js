@@ -5,7 +5,7 @@ import { config } from '../config.js';
 
 export const data = new SlashCommandBuilder()
   .setName('setup-permissions')
-  .setDescription('Tu dong phan quyen cac kenh cho role Explorer (Da Xac Minh) va @everyone')
+  .setDescription('Tự động phân quyền các kênh cho role Explorer (Đã Xác Minh) và @everyone')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
@@ -118,7 +118,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle(`${E('status_check')}  Tu Dong Phan Quyen Thanh Cong`)
+      .setTitle(`${E('status_check')}  Tự Động Phân Quyền Thành Công`)
       .setDescription([
         `Đã tự động cập nhật phân quyền hiển thị kênh trên server cho vai trò <@&${verifiedRole.id}>.`,
         '',
@@ -130,7 +130,7 @@ export async function execute(interaction) {
         '> 2️⃣ Kênh **nội bộ staff/log/kpi** -> Ẩn hoàn toàn với unverified và Explorer.',
         '> 3️⃣ Kênh **chat/giá cả/ticket/cửa hàng** -> Ẩn với unverified, Mở toàn bộ cho Explorer.',
       ].filter(Boolean).join('\n'))
-      .setFooter({ text: 'Cenar Store — Tu Dong Hoa Van Hanh' })
+      .setFooter({ text: 'Cenar Store — Tự Động Hóa Vận Hành' })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });

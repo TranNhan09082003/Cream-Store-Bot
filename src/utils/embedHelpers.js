@@ -124,17 +124,17 @@ export function progressBar(current, total, width = 10) {
 export function statusPill(status, customLabels = {}, E = null) {
     const r = E || (() => '');
     const map = {
-        PENDING_PAYMENT: { emoji: r('order_pending'),    text: 'Cho thanh toan' },
-        PROCESSING:      { emoji: r('order_processing'), text: 'Dang xu ly' },
-        COMPLETED:       { emoji: r('order_complete'),   text: 'Hoan thanh' },
-        CANCELLED:       { emoji: r('order_cancel'),     text: 'Da huy' },
-        REFUNDED:        { emoji: r('order_cancel'),     text: 'Da hoan tien' },
-        OPEN:            { emoji: r('order_processing'), text: 'Dang mo' },
-        CLOSED:          { emoji: r('icon_lock'),        text: 'Da dong' },
-        PAID:            { emoji: r('status_check'),     text: 'Da thanh toan' },
-        FREE:            { emoji: r('icon_sparkle'),     text: 'Mien phi' },
-        WARRANTY_OPEN:   { emoji: r('panel_warranty'),   text: 'Dang bao hanh' },
-        DELIVERED:       { emoji: r('order_product'),    text: 'Da giao hang' },
+        PENDING_PAYMENT: { emoji: r('order_pending'),    text: 'Chờ thanh toán' },
+        PROCESSING:      { emoji: r('order_processing'), text: 'Đang xử lý' },
+        COMPLETED:       { emoji: r('order_complete'),   text: 'Hoàn thành' },
+        CANCELLED:       { emoji: r('order_cancel'),     text: 'Đã huỷ' },
+        REFUNDED:        { emoji: r('order_cancel'),     text: 'Đã hoàn tiền' },
+        OPEN:            { emoji: r('order_processing'), text: 'Đang mở' },
+        CLOSED:          { emoji: r('icon_lock'),        text: 'Đã đóng' },
+        PAID:            { emoji: r('status_check'),     text: 'Đã thanh toán' },
+        FREE:            { emoji: r('icon_sparkle'),     text: 'Miễn phí' },
+        WARRANTY_OPEN:   { emoji: r('panel_warranty'),   text: 'Đang bảo hành' },
+        DELIVERED:       { emoji: r('order_product'),    text: 'Đã giao hàng' },
         ...customLabels,
     };
     const item = map[status] || { emoji: '', text: String(status) };

@@ -33,7 +33,7 @@ export function buildCenarStorePaymentQrView({
   const embed = new EmbedBuilder()
     .setColor(accent)
     .setAuthor({ name: storeName })
-    .setTitle('Thong Tin Thanh Toan Don Hang')
+    .setTitle('Thông Tin Thanh Toán Đơn Hàng')
     .setDescription(
       [
         'Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động ghi nhận đơn hàng.',
