@@ -22,7 +22,7 @@ export async function execute(interaction) {
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'MANAGE')) {
-    await interaction.reply({ content: `${E('status_warn', '⚠️')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true });
     return;
   }
   const action = interaction.options.getSubcommand(true);

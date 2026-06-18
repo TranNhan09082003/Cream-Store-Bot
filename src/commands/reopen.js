@@ -27,7 +27,7 @@ export async function execute(interaction) {
 
   const channel = interaction.channel;
   if (!isTicketChannel(channel)) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Lệnh này chỉ dùng trong ticket.`);
+    await interaction.editReply(`${E('status_warn')} Lệnh này chỉ dùng trong ticket.`);
     return;
   }
 
@@ -44,7 +44,7 @@ export async function execute(interaction) {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🔓 Ticket đã được mở lại')
+      .setTitle(`${E('icon_unlock')} Ticket đã được mở lại`)
       .setDescription(`**Người mở lại:** <@${interaction.user.id}>`)
       .setColor(0x57F287)
       .setTimestamp();
@@ -70,9 +70,9 @@ export async function execute(interaction) {
       });
     }
 
-    await interaction.editReply(`${E('status_check', '✅')} Đã mở lại ticket.`);
+    await interaction.editReply(`${E('status_check')} Đã mở lại ticket.`);
   } catch (error) {
     console.error('[TICKET/REOPEN] Lỗi:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Không thể mở lại ticket: ${error.message ?? 'Lỗi không xác định'}`);
+    await interaction.editReply(`${E('status_cross')} Không thể mở lại ticket: ${error.message ?? 'Lỗi không xác định'}`);
   }
 }

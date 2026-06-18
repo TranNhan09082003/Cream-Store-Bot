@@ -63,7 +63,7 @@ export async function publishFeedback({ guild, userId, orderCode, stars, content
 
   const ticketChannel = await guild.channels.fetch(updatedOrder.ticket_channel_id).catch(() => null);
   if (ticketChannel?.isTextBased()) {
-    await ticketChannel.send(`🌟 <@${userId}> đã gửi feedback cho đơn ${updatedOrder.order_code}. Cảm ơn bạn nhé!`).catch(() => null);
+    await ticketChannel.send(`<@${userId}> đã gửi feedback cho đơn ${updatedOrder.order_code}. Cảm ơn bạn nhé!`).catch(() => null);
   }
 
   return {

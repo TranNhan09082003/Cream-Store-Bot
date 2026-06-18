@@ -61,9 +61,9 @@ export async function execute(interaction) {
       features,
     });
 
-    await interaction.editReply(`${E('status_check', '✅')} Panel Shop **${title}** (danh mục: \`${category}\`) đã được thả vào kênh thành công!`);
+    await interaction.editReply(`${E('status_check')} Panel Shop **${title}** (danh mục: \`${category}\`) đã được thả vào kênh thành công!`);
   } catch (error) {
     console.error('[SETUP-SHOP] Error:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }

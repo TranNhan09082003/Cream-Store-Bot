@@ -39,7 +39,7 @@ export async function execute(interaction) {
 
   if (!order) {
     await interaction.reply({
-      content: `${E('status_warn', '⚠️')} Bot không tìm thấy đơn hoàn thành nào để liên kết feedback. Hãy nhập thêm \`ma_don\` nếu cần.`,
+      content: `${E('status_warn')} Bot không tìm thấy đơn hoàn thành nào để liên kết feedback. Hãy nhập thêm \`ma_don\` nếu cần.`,
       ephemeral: true,
     });
     return;
@@ -57,12 +57,12 @@ export async function execute(interaction) {
     order = result.order;
 
     await interaction.reply({
-      content: `${E('status_check', '✅')} Cảm ơn bạn đã feedback. Bot đã đăng feedback vào ${result.feedbackChannel} cho đơn ${order.order_code}.`,
+      content: `${E('status_check')} Cảm ơn bạn đã feedback. Bot đã đăng feedback vào ${result.feedbackChannel} cho đơn ${order.order_code}.`,
       ephemeral: true,
     });
   } catch (error) {
     await interaction.reply({
-      content: `${E('status_warn', '⚠️')} ${error.message}`,
+      content: `${E('status_warn')} ${error.message}`,
       ephemeral: true,
     });
   }

@@ -55,7 +55,7 @@ export async function execute(message) {
         console.error(`[Anti-Scam] Failed to ban user ${message.author.tag}:`, err.message);
       });
       
-      await message.channel.send(`${E('status_warn', '🚨')} **Cảnh báo bảo mật:** Tài khoản của <@${message.author.id}> đã bị cấm khỏi server vì gửi hình ảnh/nội dung lừa đảo giả mạo (MrBeast Scam).`).catch(() => null);
+      await message.channel.send(`${E('status_warn')} **Cảnh báo bảo mật:** Tài khoản của <@${message.author.id}> đã bị cấm khỏi server vì gửi hình ảnh/nội dung lừa đảo giả mạo (MrBeast Scam).`).catch(() => null);
       return;
     }
 
@@ -72,20 +72,20 @@ export async function execute(message) {
       logAbuseEvent(message.guildId, message.author.id, 'LINK_WARNING', `Link: ${message.content}, Lần thứ: ${newCount}`);
 
       if (newCount <= 3) {
-        await message.channel.send(`${E('status_warn', '⚠️')} <@${message.author.id}>, không được phép gửi liên kết quảng cáo tại kênh này! Đây là lần nhắc nhở thứ **${newCount}/3** của bạn.`).catch(() => null);
+        await message.channel.send(`${E('status_warn')} <@${message.author.id}>, không được phép gửi liên kết quảng cáo tại kênh này! Đây là lần nhắc nhở thứ **${newCount}/3** của bạn.`).catch(() => null);
       } else if (newCount === 4) {
         // Mute (timeout) 24h
         const timeoutMs = 24 * 60 * 60 * 1000;
         await message.member.timeout(timeoutMs, 'Gửi liên kết quảng cáo quá 3 lần.').catch(err => {
           console.error(`[Anti-Link] Failed to timeout user ${message.author.tag}:`, err.message);
         });
-        await message.channel.send(`${E('status_cross', '🔇')} <@${message.author.id}> đã bị cấm chat **24 giờ** vì cố tình gửi liên kết quảng cáo quá 3 lần.`).catch(() => null);
+        await message.channel.send(`${E('status_cross')} <@${message.author.id}> đã bị cấm chat **24 giờ** vì cố tình gửi liên kết quảng cáo quá 3 lần.`).catch(() => null);
       } else {
         // Lần 5+ -> Ban
         await message.member.ban({ reason: 'Gửi liên kết quảng cáo liên tục lần thứ 5.' }).catch(err => {
           console.error(`[Anti-Link] Failed to ban user ${message.author.tag}:`, err.message);
         });
-        await message.channel.send(`${E('status_cross', '🔨')} **Trừng phạt:** <@${message.author.id}> đã bị cấm khỏi server vì tiếp tục gửi liên kết quảng cáo (Lần thứ ${newCount}).`).catch(() => null);
+        await message.channel.send(`${E('status_cross')} **Trừng phạt:** <@${message.author.id}> đã bị cấm khỏi server vì tiếp tục gửi liên kết quảng cáo (Lần thứ ${newCount}).`).catch(() => null);
       }
       return;
     }
@@ -106,7 +106,7 @@ export async function execute(message) {
       if (modResult.category === 'INSULT') {
         await message.delete().catch(() => null);
         await message.member.timeout(3 * 24 * 60 * 60 * 1000, modResult.reason || 'Dùng từ ngữ xúc phạm shop').catch(() => null);
-        await message.channel.send(`🚨 <@${message.author.id}> đã bị cấm chat 3 ngày vì vi phạm tiêu chuẩn cộng đồng/xúc phạm cửa hàng.`).catch(() => null);
+        await message.channel.send(`<@${message.author.id}> đã bị cấm chat 3 ngày vì vi phạm tiêu chuẩn cộng đồng/xúc phạm cửa hàng.`).catch(() => null);
         return;
       }
       if (modResult.category === 'SEVERE_COMPLAINT') {

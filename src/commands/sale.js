@@ -43,7 +43,7 @@ export async function execute(interaction) {
       const { refreshSalePanel } = await import('../services/saleService.js');
       await refreshSalePanel(interaction.client, interaction.guildId, interaction.channel);
 
-      return interaction.editReply(`${E('status_check', '✅')} Đã thiết lập kênh <#${interaction.channel.id}> làm kênh Sale và ghim bảng giá Sale!`);
+      return interaction.editReply(`${E('status_check')} Đã thiết lập kênh <#${interaction.channel.id}> làm kênh Sale và ghim bảng giá Sale!`);
     }
 
     if (sub === 'run') {
@@ -60,9 +60,9 @@ export async function execute(interaction) {
               .setCustomId('bulk_data')
               .setLabel('Danh sách (Tên | Giá gốc | Tháng | Mô tả)')
               .setPlaceholder(
-                '🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng\n' +
-                '📺 Spotify Premium | 30k | 1\n' +
-                '✨ Claude Pro | 390k | 1 | Tài khoản chính chủ'
+                'Netflix Premium | 55000 | 1 | Dung 1 thang\n' +
+                'Spotify Premium | 30k | 1\n' +
+                'Claude Pro | 390k | 1 | Tai khoan chinh chu'
               )
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
@@ -78,14 +78,14 @@ export async function execute(interaction) {
       await interaction.deferReply({ flags: 64 });
       const { endSale } = await import('../services/saleService.js');
       await endSale(interaction.client, interaction.guildId);
-      return interaction.editReply(`${E('status_check', '✅')} Đã kết thúc chương trình Sale, tất cả sản phẩm đã được khôi phục về giá gốc!`);
+      return interaction.editReply(`${E('status_check')} Đã kết thúc chương trình Sale, tất cả sản phẩm đã được khôi phục về giá gốc!`);
     }
   } catch (error) {
     console.error('[SALE COMMAND] Error:', error);
     if (interaction.deferred || interaction.replied) {
-      return interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi: ${error.message}`);
+      return interaction.editReply(`${E('status_cross')} Đã xảy ra lỗi: ${error.message}`);
     } else {
-      return interaction.reply({ content: `${E('status_cross', '❌')} Đã xảy ra lỗi: ${error.message}`, ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross')} Đã xảy ra lỗi: ${error.message}`, ephemeral: true });
     }
   }
 }

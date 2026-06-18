@@ -26,6 +26,7 @@ function getLatestOrderByTicketChannelStmt(){return db.prepare('SELECT * FROM or
 function updateOrderLogStmt(){return db.prepare('UPDATE orders SET order_log_message_id=?, updated_at=? WHERE order_code=?');}
 function attachPaymentMessageStmt(){return db.prepare('UPDATE orders SET payment_message_id=?, updated_at=? WHERE order_code=?');}
 function savePaymentLinkStmt(){return db.prepare('UPDATE orders SET payment_link_id=?, payment_checkout_url=?, payment_qr_code=?, payment_qr_url=?, payment_qr_text=?, payment_expired_at=?, updated_at=? WHERE order_code=?');}
+function resetPaymentLinkStmt(){return db.prepare('UPDATE orders SET payment_link_id=NULL, payment_checkout_url=NULL, payment_qr_code=NULL, payment_qr_url=NULL, payment_qr_text=NULL, payment_expired_at=NULL, payment_message_id=NULL, payos_order_code=?, updated_at=? WHERE order_code=?');}
 function completeOrderStmt(){return db.prepare(`UPDATE orders SET status='COMPLETED', status_changed_at=?, completed_by_id=?, completed_at=?, feedback_requested_at=?, feedback_due_at=?, updated_at=? WHERE order_code=?`);}
 function cancelOrderStmt(){return db.prepare(`UPDATE orders SET status='CANCELLED', status_changed_at=?, payment_status = CASE WHEN payment_status IN ('PAID','FREE') THEN payment_status ELSE 'CANCELLED' END, payment_cancel_reason=COALESCE(?, payment_cancel_reason), updated_at=? WHERE order_code=?`);}
 function saveDeliveryStmt(){return db.prepare(`UPDATE orders SET delivered_by_id=?, delivered_at=?, credential_email=?, credential_password=?, credential_profile=?, credential_pin=?, delivery_login_url=?, claim_notes=?, delivery_dm_channel_id=?, delivery_dm_message_id=?, updated_at=? WHERE order_code=?`);}
@@ -65,10 +66,14 @@ function computePriority(guildId, customerId, productName){const profile=getCust
 function detectServiceType(name) {
   if (!name) return 'netflix';
   const l = name.toLowerCase();
+  if (l.includes('setup') || l.includes('bot custom') || l.includes('website custom') || l.includes('duy trì bot')) return 'service';
   if (l.includes('spotify') || l.includes('spot')) return 'spotify';
   if (l.includes('discord') || l.includes('nitro') || l.includes('boost')) return 'discord';
   if (l.includes('youtube') || l.includes('yt') || l.includes('yout') || l.includes('pre')) return 'youtube';
   if (l.includes('netflix') || l.includes('net')) return 'netflix';
+  if (l.includes('chatgpt') || l.includes('gemini') || l.includes('claude') || l.includes('capcut') || l.includes('adobe') || l.includes('office')) return 'ai';
+  if (l.includes('gearup') || l.includes('gear')) return 'gearup';
+  if (l.includes('decor')) return 'decor';
   return 'other';
 }
 
@@ -100,6 +105,10 @@ export const getLatestOrderByTicketChannel = (ticketChannelId) => getLatestOrder
 export function saveOrderLogMessage(orderCode, messageId){updateOrderLogStmt().run(messageId, nowIso(), orderCode); return getOrderByCode(orderCode);}
 export function savePaymentMessage(orderCode, messageId){attachPaymentMessageStmt().run(messageId ?? null, nowIso(), orderCode); return getOrderByCode(orderCode);}
 export function savePaymentLinkData(orderCode,{paymentLinkId,checkoutUrl,qrCode,qrUrl=null,qrText=null,expiredAt=null}){savePaymentLinkStmt().run(paymentLinkId ?? null, checkoutUrl ?? null, qrCode ?? null, qrUrl ?? null, qrText ?? null, expiredAt ?? null, nowIso(), orderCode); return getOrderByCode(orderCode);}
+
+function generateUniquePayosCode(){while(true){const c=Number(randomDigits(6)); if(c>0 && !getOrderByPayOSCodeStmt().get(c)) return c;}}
+// Xoá link PayOS cũ + cấp payos_order_code MỚI để tạo lại hoá đơn (QR đổi theo). Dùng khi đơn hết hạn.
+export function resetPaymentLinkForRegen(orderCode){const order=getOrderByCode(orderCode); if(!order) return null; const newPayosCode=generateUniquePayosCode(); resetPaymentLinkStmt().run(newPayosCode, nowIso(), orderCode); return getOrderByCode(orderCode);}
 
 function addMonthsIso(baseDate, months){ const next = new Date(baseDate); next.setMonth(next.getMonth() + Math.max(1, Number(months || 1))); return next.toISOString(); }
 export function setOrderExpiry(orderCode, expiryAt){ setOrderExpiryStmt().run(expiryAt, nowIso(), orderCode); return getOrderByCode(orderCode); }

@@ -46,7 +46,7 @@ function brandConfig(kind = 'store') {
 /** Dòng footer subtext mô phỏng setFooter() — dùng cuối container. */
 export function brandFooterLine(kind = 'store') {
   const brand = brandConfig(kind);
-  return subtext(`💜 ${brand.footer || brand.name || 'Cenar Store'}`);
+  return subtext(brand.footer || brand.name || 'Cenar Store');
 }
 
 /** Tên brand (đọc từ config, KHÔNG hardcode). */

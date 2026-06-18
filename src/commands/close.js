@@ -15,7 +15,7 @@ export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   if (!interaction.inGuild()) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Lệnh này chỉ dùng được trong server.` });
+    await interaction.editReply({ content: `${E('status_warn')} Lệnh này chỉ dùng được trong server.` });
     return;
   }
 
@@ -23,18 +23,18 @@ export async function execute(interaction) {
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
   if (!isManager(member, guildConfig)) {
-    await interaction.editReply({ content: '⛔ Chỉ **Admin / Manager** mới có thể đóng ticket.' });
+    await interaction.editReply({ content: `${E('icon_block')} Chỉ **Admin / Manager** mới có thể đóng ticket.` });
     return;
   }
 
   const ticket = getTicketByChannelId(interaction.channelId);
   if (!ticket || ticket.status !== 'OPEN') {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Kênh này không phải ticket đang mở.` });
+    await interaction.editReply({ content: `${E('status_warn')} Kênh này không phải ticket đang mở.` });
     return;
   }
 
   await interaction.editReply({
-    embeds: [buildCloseConfirmEmbed(ticket.ticket_code)],
-    components: buildCloseConfirmComponents(ticket.id),
+    embeds: [buildCloseConfirmEmbed(ticket.ticket_code, null, interaction.guildId)],
+    components: buildCloseConfirmComponents(ticket.id, interaction.guildId),
   });
 }

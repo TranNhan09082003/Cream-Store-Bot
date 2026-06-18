@@ -29,7 +29,8 @@ export function buildStockPanelComponents(guildId) {
   if (!products.length) return null;
 
   const em = getEmojiMap(guildId);
-  const E = (slot, fallback) => em[slot] || fallback;
+  const E = (slot, fallback = '') => em[slot] || fallback;
+  const brandName = config.storeName || 'Cenar Store';
 
   // ─── Container ───
   const container = new ContainerBuilder()
@@ -38,8 +39,8 @@ export function buildStockPanelComponents(guildId) {
   // Header với heading h1 (lớn nhất Discord cho phép)
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# ${E('stock_header', '🛍️')}  Cream Store — Bảng Giá\n` +
-      `> ${E('icon_sparkle', '✨')} ${fmt.b('Sản phẩm chính chủ — Giao tự động 24/7')}\n` +
+      `# ${E('stock_header')}  ${brandName} — Bảng Giá\n` +
+      `> ${E('icon_sparkle')} ${fmt.b('Sản phẩm chính chủ — Giao tự động 24/7')}\n` +
       subtext('Chọn sản phẩm bên dưới để đặt hàng ngay!')
     )
   );
@@ -50,11 +51,11 @@ export function buildStockPanelComponents(guildId) {
 
   // Mỗi sản phẩm 1 dòng đẹp, dùng quote + bold
   const productLines = products.map(p => {
-    const priceText = p.price > 0 ? fmt.b(formatCurrency(p.price)) : `${E('icon_gift', '🎁')} ${fmt.b('Miễn phí')}`;
+    const priceText = p.price > 0 ? fmt.b(formatCurrency(p.price)) : `${E('icon_gift')} ${fmt.b('Miễn phí')}`;
     const dur = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
     const desc = p.description ? `\n  ${subtext(p.description)}` : '';
-    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product', '📦');
-    return `${emoji} ${fmt.b(p.name)} ${fmt.b('·')} ${priceText} ${fmt.b('·')} ${E('icon_duration', '⏱️')} ${dur}${desc}`;
+    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product');
+    return `${emoji} ${fmt.b(p.name)} ${fmt.b('·')} ${priceText} ${fmt.b('·')} ${E('icon_duration')} ${dur}${desc}`;
   }).join('\n');
 
   container.addTextDisplayComponents(
@@ -68,7 +69,7 @@ export function buildStockPanelComponents(guildId) {
   // Footer với subtext
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      subtext(`💜 Chọn sản phẩm từ dropdown bên dưới để đặt hàng · Cream Store`)
+      subtext(`${E('icon_heart_purple')} Chọn sản phẩm từ dropdown bên dưới để đặt hàng · Cenar Store`)
     )
   );
 
@@ -77,13 +78,13 @@ export function buildStockPanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: (p.description || `${p.duration_months} tháng — ${formatCurrency(p.price)}`).slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product', '📦')),
+    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('product:select')
-      .setPlaceholder(`${E('order_product', '🛒')} Chọn sản phẩm muốn mua...`)
+      .setPlaceholder('Chọn sản phẩm muốn mua...')
       .addOptions(selectOptions)
   );
 
@@ -131,9 +132,9 @@ export async function execute(interaction) {
       messageId: panelMessage.id,
     });
 
-    await interaction.editReply(`${E('status_check', '✅')} Panel sản phẩm đã được gửi!`);
+    await interaction.editReply(`${E('status_check')} Panel sản phẩm đã được gửi!`);
   } catch (error) {
     console.error('[STOCK] Error:', error);
-    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }

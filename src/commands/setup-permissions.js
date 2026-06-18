@@ -5,7 +5,7 @@ import { config } from '../config.js';
 
 export const data = new SlashCommandBuilder()
   .setName('setup-permissions')
-  .setDescription('⚙️ Tự động phân quyền các kênh cho role Explorer (Đã Xác Minh) và @everyone')
+  .setDescription('Tu dong phan quyen cac kenh cho role Explorer (Da Xac Minh) va @everyone')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
@@ -30,7 +30,7 @@ export async function execute(interaction) {
     }
 
     if (!verifiedRole) {
-      return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy vai trò xác minh (Explorer/Thành Viên). Vui lòng chạy \`/setup-roles\` trước!`);
+      return interaction.editReply(`${E('status_cross')} Không tìm thấy vai trò xác minh (Explorer/Thành Viên). Vui lòng chạy \`/setup-roles\` trước!`);
     }
 
     const everyoneRole = guild.roles.everyone;
@@ -118,7 +118,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(config.accentColorSuccess)
-      .setTitle(`🛡️  Tự Động Phân Quyền Thành Công`)
+      .setTitle(`${E('status_check')}  Tu Dong Phan Quyen Thanh Cong`)
       .setDescription([
         `Đã tự động cập nhật phân quyền hiển thị kênh trên server cho vai trò <@&${verifiedRole.id}>.`,
         '',
@@ -130,13 +130,13 @@ export async function execute(interaction) {
         '> 2️⃣ Kênh **nội bộ staff/log/kpi** -> Ẩn hoàn toàn với unverified và Explorer.',
         '> 3️⃣ Kênh **chat/giá cả/ticket/cửa hàng** -> Ẩn với unverified, Mở toàn bộ cho Explorer.',
       ].filter(Boolean).join('\n'))
-      .setFooter({ text: 'Cenar Store — Tự Động Hóa Vận Hành 💜' })
+      .setFooter({ text: 'Cenar Store — Tu Dong Hoa Van Hanh' })
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
 
   } catch (error) {
     console.error('[SETUP PERMISSIONS] Lỗi:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Lỗi thiết lập quyền: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi thiết lập quyền: ${error.message}`);
   }
 }

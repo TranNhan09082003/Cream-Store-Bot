@@ -29,7 +29,7 @@ export function buildSalePanelComponents(guildId) {
   const salePercent = guildConfig?.sale_percent || 0;
 
   const em = getEmojiMap(guildId);
-  const E = (slot, fallback) => em[slot] || fallback;
+  const E = (slot, fallback = '') => em[slot] || fallback;
 
   // ─── Container ───
   const container = new ContainerBuilder()
@@ -38,7 +38,7 @@ export function buildSalePanelComponents(guildId) {
   if (!products.length || salePercent <= 0) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `# ${E('status_warn', '🚨')}  Cream Store — Khuyến Mãi\n` +
+        `# ${E('status_warn')}  Cream Store — Khuyến Mãi\n` +
         `> Hiện tại cửa hàng chưa diễn ra chương trình sale nào.\n` +
         `> Vui lòng quay lại sau hoặc liên hệ Staff để biết thêm chi tiết!`
       )
@@ -49,9 +49,9 @@ export function buildSalePanelComponents(guildId) {
   // Header
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# ${E('icon_sparkle', '🔥')}  SIÊU SALE HOÀNH TRÁNG — GIẢM GIÁ ${salePercent}%!  ${E('icon_sparkle', '🔥')}\n` +
-      `> ${E('status_check', '✨')} **Toàn bộ sản phẩm bên dưới đang được ưu đãi cực lớn!**\n` +
-      `> ⏱️ *Thời gian khuyến mãi có hạn. Chọn sản phẩm bên dưới để đặt hàng tự động 24/7.*`
+      `# ${E('icon_fire')}  SIÊU SALE HOÀNH TRÁNG — GIẢM GIÁ ${salePercent}%!  ${E('icon_fire')}\n` +
+      `> ${E('icon_sparkle')} **Toàn bộ sản phẩm bên dưới đang được ưu đãi cực lớn!**\n` +
+      `> ${E('icon_clock')} *Thời gian khuyến mãi có hạn. Chọn sản phẩm bên dưới để đặt hàng tự động 24/7.*`
     )
   );
 
@@ -65,11 +65,11 @@ export function buildSalePanelComponents(guildId) {
     const salePriceText = `**${formatCurrency(p.price)}**`;
     const dur = p.duration_months > 1 ? `${p.duration_months} tháng` : '1 tháng';
     const desc = p.description ? `\n  *${p.description}*` : '';
-    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product', '📦');
-    
+    const emoji = resolveProductEmoji(guildId, p.emoji) || E('order_product');
+
     return `${emoji} **${p.name}**\n` +
            `  ➔ Giá cũ: ${originalPriceText} | Giá Sale: ${salePriceText} (Giảm ${salePercent}%)\n` +
-           `  ➔ Hạn: ${E('icon_duration', '⏱️')} ${dur}${desc}`;
+           `  ➔ Hạn: ${E('icon_duration')} ${dur}${desc}`;
   }).join('\n\n');
 
   container.addTextDisplayComponents(
@@ -83,7 +83,7 @@ export function buildSalePanelComponents(guildId) {
   // Footer
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `💜 *Bảng giá sale đã giảm trực tiếp trên sản phẩm · Cream Store*`
+      `${E('icon_heart_purple')} *Bảng giá sale đã giảm trực tiếp trên sản phẩm · Cream Store*`
     )
   );
 
@@ -92,13 +92,13 @@ export function buildSalePanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: `Sale: ${formatCurrency(p.price)} (Gốc: ${formatCurrency(p.original_price)})`.slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product', '📦')),
+    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product')),
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('product:select')
-      .setPlaceholder(`${E('order_product', '🛒')} Chọn sản phẩm khuyến mãi muốn mua...`)
+      .setPlaceholder('Chọn sản phẩm khuyến mãi muốn mua...')
       .addOptions(selectOptions)
   );
 
@@ -172,7 +172,7 @@ export async function runSale(client, guildId, percent, bulkData) {
     if (parts.length < 2) continue;
 
     const firstPart = parts[0];
-    let icon = '📦';
+    let icon = 'order_product'; // slot key → resolveProductEmoji đổi sang custom emoji theo guild
     let name = firstPart;
 
     // Phân tích emoji

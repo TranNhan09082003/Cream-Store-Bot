@@ -16,6 +16,7 @@ import { db, nowIso } from '../database/db.js';
 import { config } from '../config.js';
 import { getAiKnowledge } from './aiKnowledgeService.js';
 import { applyCors } from '../utils/cors.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 /**
  * Middleware xác thực API key
@@ -238,7 +239,7 @@ export function registerBotApiRoutes(app) {
             const feedbacks = db.prepare(sql).all(params);
 
             const client = req.app.locals.discordClient;
-            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = config.guildId;
             let guild = null;
             if (client) {
                 guild = await client.guilds.fetch(guildId).catch(() => null);
@@ -321,7 +322,7 @@ export function registerBotApiRoutes(app) {
             const rows = db.prepare(sql).all(limit);
 
             const client = req.app.locals.discordClient;
-            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = config.guildId;
             let guild = null;
             if (client) {
                 guild = await client.guilds.fetch(guildId).catch(() => null);
@@ -432,7 +433,7 @@ export function registerBotApiRoutes(app) {
     // ── WALLET API — Ví điện tử ───────────────
     app.get('/api/bot/wallet/:customerId', async (req, res) => {
         const customerId = req.params.customerId;
-        const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+        const guildId = config.guildId;
         try {
             const { getWalletBalance, getWalletTransactions } = await import('./walletService.js');
             const balance = getWalletBalance(guildId, customerId);
@@ -449,7 +450,7 @@ export function registerBotApiRoutes(app) {
         if (!customerId || !amount || amount < 10000) {
             return res.status(400).json({ ok: false, error: 'Số tiền tối thiểu 10,000đ' });
         }
-        const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+        const guildId = config.guildId;
         try {
             const { createTopupCheckout } = await import('./walletService.js');
             const data = await createTopupCheckout(guildId, customerId, amount);
@@ -481,7 +482,7 @@ export function registerBotApiRoutes(app) {
                 durationMonths = parseInt(durationMonths, 10);
             }
             
-            const guildId = process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = config.guildId;
             const customerId = discord_id || 'web_user';
             const paymentProvider = req.body.paymentProvider || 'vietqr'; // Lấy từ request nếu có, vd: 'WALLET'
 
@@ -653,7 +654,7 @@ export function registerBotApiRoutes(app) {
                     if (customerId && customerId !== 'web_user') {
                         await discordChannel.send({ content: `<@${customerId}> — Đơn hàng từ Web của bạn đã tạo ticket này!` }).catch(() => null);
                     } else {
-                        await discordChannel.send({ content: `🔔 Có đơn hàng mới từ Web! Đơn hàng: **${orderCode}**.` }).catch(() => null);
+                        await discordChannel.send({ content: `Có đơn hàng mới từ Web! Đơn hàng: **${orderCode}**.` }).catch(() => null);
                     }
                 } catch (welcomeErr) {
                     console.error('[WEB ORDER] Lỗi gửi welcome embed vào kênh Discord:', welcomeErr);
@@ -672,14 +673,17 @@ export function registerBotApiRoutes(app) {
                             const orderLogChannel = await guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null);
                             if (orderLogChannel && orderLogChannel.isTextBased()) {
                                 const { buildOrderCreatedV2 } = await import('../utils/embeds.js');
-                                const { container, actionRow } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
-                                
-                                container.addFields([
-                                    { name: 'Khách hàng Web', value: `👤 Contact: ${contact || 'Không có'}\n🆔 Discord: <@${customerId}>`, inline: true },
-                                    { name: 'Ghi chú đơn', value: `📝 ${note || 'Không có Ghi chú'}`, inline: true }
-                                ]);
-                                
-                                const orderLogMsg = await orderLogChannel.send({ embeds: [container], components: [actionRow] }).catch(() => null);
+                                const { container, actionRow, flags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
+
+                                const { TextDisplayBuilder } = await import('discord.js');
+                                container.addTextDisplayComponents(
+                                    new TextDisplayBuilder().setContent(
+                                        `> **Khách hàng Web** — Contact: ${contact || 'Không có'} · Discord: <@${customerId}>\n` +
+                                        `> **Ghi chú:** ${note || 'Không có'}`
+                                    )
+                                );
+
+                                const orderLogMsg = await orderLogChannel.send({ components: [container, actionRow], flags }).catch(() => null);
                                 if (orderLogMsg) {
                                     saveOrderLogMessage(orderCode, orderLogMsg.id);
                                 }
@@ -708,7 +712,7 @@ export function registerBotApiRoutes(app) {
 
             // Proxy check to route to the correct bot process
             if (order.guild_id && order.guild_id !== config.guildId) {
-                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 2753;
+                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 5000;
                 try {
                     const response = await fetch(`http://127.0.0.1:${targetPort}${req.originalUrl || req.url}`, {
                         method: 'GET',
@@ -734,7 +738,7 @@ export function registerBotApiRoutes(app) {
                 return res.json({ ok: true, messages: [] });
             }
 
-            const guildId = order.guild_id || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = order.guild_id || config.guildId;
             const guild = await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) {
                 return res.json({ ok: true, messages: [] });
@@ -812,7 +816,7 @@ export function registerBotApiRoutes(app) {
 
             // Proxy check to route to the correct bot process
             if (order.guild_id && order.guild_id !== config.guildId) {
-                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 2753;
+                const targetPort = order.guild_id === '1070676180103086132' ? 8080 : 5000;
                 try {
                     const response = await fetch(`http://127.0.0.1:${targetPort}${req.originalUrl || req.url}`, {
                         method: 'POST',
@@ -909,7 +913,7 @@ export function registerBotApiRoutes(app) {
             const { contact, discord_id } = req.body;
             if (!contact) return res.status(400).json({ ok: false, error: 'Thiếu thông tin liên hệ (tên/SĐT)' });
 
-            const guildId = process.env.GUILD_ID || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = config.guildId;
             const customerId = discord_id || 'web_user';
             
             let channelId = `live-${contact.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'guest'}-${Math.random().toString().slice(2, 6)}`;
@@ -989,8 +993,9 @@ export function registerBotApiRoutes(app) {
                         flags: welcomeV2Flags,
                     }).catch(() => null);
 
+                    const E2 = createEmojiResolver(guildId);
                     await discordChannel.send({
-                        content: `🔔 **YÊU CẦU HỖ TRỢ TRỰC TUYẾN TỪ WEB**\n👤 Liên hệ: **${contact}**\n🆔 Discord: ${customerId === 'web_user' ? 'Khách vãng lai' : `<@${customerId}>`}`
+                        content: `${E2('panel_order')} **YEU CAU HO TRO TRUC TUYEN TU WEB**\nLien he: **${contact}**\nDiscord: ${customerId === 'web_user' ? 'Khach vang lai' : `<@${customerId}>`}`
                     }).catch(() => null);
                 } catch (err) {
                     console.error('[LIVE CHAT START] Lỗi gửi welcome embed:', err);
@@ -1024,7 +1029,7 @@ export function registerBotApiRoutes(app) {
                 return res.json({ ok: true, messages: [], status: ticketStatus });
             }
 
-            const guildId = ticket.guild_id || process.env.PRIMARY_GUILD_ID || '1264259885827391629';
+            const guildId = ticket.guild_id || config.guildId;
             const guild = await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) {
                 return res.json({ ok: true, messages: [], status: ticketStatus });

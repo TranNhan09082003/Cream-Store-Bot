@@ -16,19 +16,19 @@ export async function execute(interaction) {
   const before = getOrderByCodeRaw(orderCode);
 
   if (!before) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn.`);
+    await interaction.editReply(`${E('status_warn')} Không tìm thấy mã đơn.`);
     return;
   }
 
   const activeClaim = before.claimed_by_id ?? before.claim_staff_id;
   const activeClaimAt = before.claimed_at ?? before.claim_at;
   if (!activeClaim) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Đơn này chưa được claim.`);
+    await interaction.editReply(`${E('status_warn')} Đơn này chưa được claim.`);
     return;
   }
 
   if (activeClaim !== interaction.user.id) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Đơn này đang do <@${activeClaim}> xử lý.`);
+    await interaction.editReply(`${E('status_warn')} Đơn này đang do <@${activeClaim}> xử lý.`);
     return;
   }
 
@@ -47,5 +47,5 @@ export async function execute(interaction) {
     afterJson: JSON.stringify({ claimed_by_id: nextClaim, claimed_at: nextClaimAt }),
   });
 
-  await interaction.editReply(`${E('status_check', '✅')} Đã release đơn \`${orderCode}\`.`);
+  await interaction.editReply(`${E('status_check')} Đã release đơn \`${orderCode}\`.`);
 }

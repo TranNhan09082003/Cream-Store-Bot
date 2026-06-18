@@ -11,5 +11,5 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   const E = createEmojiResolver(interaction?.guildId);
   const data = getDashboardData(interaction.guildId);
-  await interaction.reply({ embeds: [buildDashboardEmbed(data.summary, data.topProducts, data.recentLogs)], ephemeral: true });
+  await interaction.reply({ embeds: [buildDashboardEmbed(data.summary, data.topProducts, data.recentLogs, interaction.guildId)], ephemeral: true });
 }

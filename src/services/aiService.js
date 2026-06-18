@@ -6,8 +6,9 @@ import { createOrder, getQueuePosition, saveOrderLogMessage } from './orderServi
 import { sendOrRefreshPaymentQr } from './paymentService.js';
 import { emitStaffLog } from './staffLogService.js';
 import { getTicketByChannelId } from './ticketService.js';
-import { buildOrderActionComponents, buildOrderCreatedEmbed, buildQueuePositionEmbed, buildQueueViewComponents } from '../utils/embeds.js';
+import { buildOrderCreatedV2, buildQueuePositionV2 } from '../utils/embeds.js';
 import { buildOrderLogContent } from '../utils/formatters.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 export async function generateSystemPrompt(guild, isStaff) {
   const knowledge = getAiKnowledge(guild.id);
@@ -124,6 +125,7 @@ const createManualWarrantyToolDeclaration = {
 
 export async function processAiMessage(message, isTicket, isStaff = false) {
   if (!config.groqApiKey) return false;
+  const E = createEmojiResolver(message.guildId);
 
   await message.channel.sendTyping();
 
@@ -201,18 +203,19 @@ export async function processAiMessage(message, isTicket, isStaff = false) {
     return false;
   } catch (error) {
     console.error('[AI SERVICE] Error processing message:', error);
-    await message.reply('⚠️ Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!').catch(() => null);
+    await message.reply(`${E('status_warn')} Hệ thống AI hiện đang quá tải yêu cầu. Bạn vui lòng đợi vài giây rồi nhắn lại nhé!`).catch(() => null);
     return false;
   }
 }
 
 async function handleAutoCreateOrder(message, args) {
+  const E = createEmojiResolver(message.guildId);
   const { productName, quantity, amount, durationMonths } = args;
   const ticket = getTicketByChannelId(message.channel.id);
   const guildConfig = getGuildConfig(message.guildId);
 
   if (!ticket) {
-    await message.channel.send('⚠️ Lỗi: Không thể lên đơn vì không tìm thấy thông tin Ticket này.');
+    await message.channel.send(`${E('status_warn')} Lỗi: Không thể lên đơn vì không tìm thấy thông tin Ticket này.`);
     return;
   }
 
@@ -221,7 +224,7 @@ async function handleAutoCreateOrder(message, args) {
     const { getLatestOrderByTicketChannel } = await import('./orderService.js');
     const existingOrder = getLatestOrderByTicketChannel(ticket.channel_id);
     if (existingOrder && !['COMPLETED', 'CANCELLED'].includes(existingOrder.status)) {
-      await message.channel.send(`⚠️ Ticket này đã có đơn hàng \`${existingOrder.order_code}\` đang xử lý rồi. Không tạo thêm.`);
+      await message.channel.send(`${E('status_warn')} Ticket này đã có đơn hàng \`${existingOrder.order_code}\` đang xử lý rồi. Không tạo thêm.`);
       return;
     }
 
@@ -244,16 +247,13 @@ async function handleAutoCreateOrder(message, args) {
     const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
     saveOrderLogMessage(order.order_code, logMessage.id);
 
+    const { container: orderContainer, actionRow: orderActionRow, flags: orderFlags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
+    const { container: queueContainer, actionRow: queueActionRow } = buildQueuePositionV2(order, queue.position, queue.total);
+
     await message.channel.send({
-      content: `<@${ticket.customer_id}> AI đã tạo đơn hàng tự động cho bạn!`,
-      embeds: [
-        buildOrderCreatedEmbed(order, guildConfig.order_log_channel_id),
-        buildQueuePositionEmbed(order, queue.position, queue.total),
-      ],
-      components: [
-        ...buildOrderActionComponents(order.order_code),
-        ...buildQueueViewComponents(order.order_code),
-      ],
+      components: [orderContainer, orderActionRow, queueContainer, queueActionRow],
+      flags: orderFlags,
+      allowedMentions: { users: [ticket.customer_id] },
     });
 
     if (order.total_amount > 0) {
@@ -265,7 +265,7 @@ async function handleAutoCreateOrder(message, args) {
           const { sendVietQRPayment } = await import('./paymentService.js');
           await sendVietQRPayment({ guild: message.guild, orderCode: order.order_code });
         } catch (vietqrError) {
-          await message.channel.send(`⚠️ Không tạo được QR: ${vietqrError.message}`);
+          await message.channel.send(`${E('status_warn')} Không tạo được QR: ${vietqrError.message}`);
         }
       }
     }
@@ -281,11 +281,12 @@ async function handleAutoCreateOrder(message, args) {
     });
   } catch (error) {
     console.error('[AI ORDER] Error:', error);
-    await message.channel.send(`❌ Có lỗi khi AI tự tạo đơn hàng: ${error.message}`);
+    await message.channel.send(`${E('status_cross')} Có lỗi khi AI tự tạo đơn hàng: ${error.message}`);
   }
 }
 
 async function handleAutoOpenWarranty(message, args) {
+  const E = createEmojiResolver(message.guildId);
   const { orderCode, reason } = args;
   const { openWarrantyTicket } = await import('./warrantyService.js');
   try {
@@ -298,22 +299,23 @@ async function handleAutoOpenWarranty(message, args) {
     });
 
     if (result.reused) {
-      await message.channel.send(`ℹ️ Đơn \`${orderCode}\` đã có phiếu bảo hành đang mở tại <#${result.channel.id}> rồi nhé ạ.`);
+      await message.channel.send(`${E('status_info')} Đơn \`${orderCode}\` đã có phiếu bảo hành đang mở tại <#${result.channel.id}> rồi nhé ạ.`);
     } else {
-      await message.channel.send(`✅ Phiếu bảo hành cho đơn \`${orderCode}\` đã được tạo thành công tại <#${result.channel.id}>.\n\n⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
+      await message.channel.send(`${E('status_check')} Phiếu bảo hành cho đơn \`${orderCode}\` đã được tạo thành công tại <#${result.channel.id}>.\n\n${E('order_pending')} **Tiến trình đơn: Đang xử lý.**\n${E('status_warn')} *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
     }
   } catch (error) {
-    await message.channel.send(`❌ Có lỗi khi tạo bảo hành: ${error.message}`);
+    await message.channel.send(`${E('status_cross')} Có lỗi khi tạo bảo hành: ${error.message}`);
   }
 }
 
 async function handleAutoCreateManualWarrantyOrder(message, args) {
+  const E = createEmojiResolver(message.guildId);
   const { productName, purchaseDate, reason } = args;
   const ticket = getTicketByChannelId(message.channel.id);
   const guildConfig = getGuildConfig(message.guildId);
 
   if (!ticket) {
-    await message.channel.send('⚠️ Lỗi: Không thể lên đơn vì không tìm thấy thông tin Ticket này.');
+    await message.channel.send(`${E('status_warn')} Lỗi: Không thể lên đơn vì không tìm thấy thông tin Ticket này.`);
     return;
   }
 
@@ -341,10 +343,10 @@ async function handleAutoCreateManualWarrantyOrder(message, args) {
       reason: reason || `AI tự động tạo bảo hành cho sản phẩm ${productName} (mua ngày ${purchaseDate})`,
     });
 
-    await message.channel.send(`✅ Đã ghi nhận thông tin mua hàng cũ và tạo phiếu bảo hành thành công tại <#${result.channel.id}>.\n\n⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
+    await message.channel.send(`${E('status_check')} Đã ghi nhận thông tin mua hàng cũ và tạo phiếu bảo hành thành công tại <#${result.channel.id}>.\n\n${E('order_processing')} **Tiến trình đơn: Đang xử lý.**\n${E('status_warn')} *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`);
 
   } catch (error) {
     console.error('[AI WARRANTY] Error:', error);
-    await message.channel.send(`❌ Có lỗi khi AI tự tạo bảo hành: ${error.message}`);
+    await message.channel.send(`${E('status_cross')} Có lỗi khi AI tự tạo bảo hành: ${error.message}`);
   }
 }

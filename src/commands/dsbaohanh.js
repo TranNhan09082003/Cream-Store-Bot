@@ -32,11 +32,11 @@ export async function execute(interaction) {
     db.close();
 
     if (!warranties || warranties.length === 0) {
-      return interaction.editReply(`${E('order_complete', '🎉')} Tuyệt vời! Hiện tại không có yêu cầu bảo hành nào đang chờ xử lý.`);
+      return interaction.editReply(`${E('order_complete')} Tuyệt vời! Hiện tại không có yêu cầu bảo hành nào đang chờ xử lý.`);
     }
 
     const embed = new EmbedBuilder()
-      .setTitle(`${E('panel_warranty', '🛠️')} DANH SÁCH BẢO HÀNH ĐANG XỬ LÝ`)
+      .setTitle(`${E('panel_warranty')} DANH SÁCH BẢO HÀNH ĐANG XỬ LÝ`)
       .setColor(config.accentColorWarning)
       .setDescription(`Hiện có **${warranties.length}** yêu cầu bảo hành đang mở:`)
       .setTimestamp();
@@ -50,7 +50,7 @@ export async function execute(interaction) {
       
       embed.addFields({
         name: `#${count} - Đơn: ${orderInfo}`,
-        value: `${E('ticket_user', '👤')} Khách hàng: ${customerInfo}\n${E('order_product', '📦')} Sản phẩm: ${productName}\n${E('icon_link', '🔗')} Kênh: <#${w.channel_id}>`,
+        value: `${E('ticket_user')} Khách hàng: ${customerInfo}\n${E('order_product')} Sản phẩm: ${productName}\n${E('icon_link')} Kênh: <#${w.channel_id}>`,
         inline: false
       });
       count++;
@@ -63,6 +63,6 @@ export async function execute(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[dsbaohanh] Error:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi khi tải danh sách bảo hành.`);
+    await interaction.editReply(`${E('status_cross')} Đã xảy ra lỗi khi tải danh sách bảo hành.`);
   }
 }

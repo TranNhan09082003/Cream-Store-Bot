@@ -7,6 +7,7 @@ import { buildTicketControlComponents, buildTicketWelcomeEmbed, buildWarrantyOpe
 import { buildWarrantyChannelName } from '../utils/formatters.js';
 import { TICKET_MEMBER_PERMISSIONS } from '../utils/permissions.js';
 import { getCenarHub } from './cenarHub.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 export async function openWarrantyTicket({ guild, customerId, actorId, orderCode, reason = null }) {
   const guildConfig = getGuildConfig(guild.id);
@@ -85,7 +86,7 @@ export async function openWarrantyTicket({ guild, customerId, actorId, orderCode
 
 
   if (reason) {
-    await channel.send(`📝 **Mô tả lỗi / yêu cầu bảo hành:**\n${reason}`).catch(() => null);
+    await channel.send(`**Mo ta loi / yeu cau bao hanh:**\n${reason}`).catch(() => null);
   }
 
   const updatedOrder = setOrderStatus(orderCode, 'WARRANTY_OPEN');
@@ -102,7 +103,8 @@ export async function openWarrantyTicket({ guild, customerId, actorId, orderCode
     embeds: [buildWarrantyOpenedEmbed(updatedOrder ?? order, reason, channel)],
   }).catch(() => null);
 
-  await channel.send(`⏳ **Tiến trình đơn: Đang xử lý.**\n⚠️ *Vui lòng không tag staff, hệ thống đã ghi nhận và staff sẽ tự động check đơn và bảo hành cho bạn trong thời gian sớm nhất.*`).catch(() => null);
+  const E = createEmojiResolver(guild.id);
+  await channel.send(`${E('order_processing')} **Tien trinh don: Dang xu ly.**\n${E('status_warn')} *Vui long khong tag staff, he thong da ghi nhan va staff se tu dong check don va bao hanh cho ban trong thoi gian som nhat.*`).catch(() => null);
 
   return { ticket, channel, order: updatedOrder ?? order, reused: false };
 }

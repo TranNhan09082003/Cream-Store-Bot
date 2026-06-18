@@ -25,7 +25,7 @@ export async function execute(interaction) {
     if (!newContent) {
       const currentKnowledge = getAiKnowledge(guildId);
       const embed = new EmbedBuilder()
-        .setTitle('🧠 AI Knowledge Current State')
+        .setTitle(`${E('icon_brain')} AI Knowledge Current State`)
         .setDescription(currentKnowledge ? `\`\`\`\n${currentKnowledge}\n\`\`\`` : '*Chưa có dữ liệu. AI sẽ tư vấn dựa trên system prompt mặc định.*')
         .setColor(config.accentColorInfo);
       
@@ -36,13 +36,13 @@ export async function execute(interaction) {
     updateAiKnowledge(guildId, newContent, interaction.user.id);
     
     const embed = new EmbedBuilder()
-      .setTitle(`${E('status_check', '✅')} AI Knowledge Updated`)
+      .setTitle(`${E('status_check')} AI Knowledge Updated`)
       .setDescription(`Đã cập nhật kiến thức cho AI thành công:\n\`\`\`\n${newContent}\n\`\`\``)
       .setColor(config.accentColorSuccess);
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[AI KNOWLEDGE] Error:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi khi cập nhật AI Knowledge.`);
+    await interaction.editReply(`${E('status_cross')} Đã xảy ra lỗi khi cập nhật AI Knowledge.`);
   }
 }

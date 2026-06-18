@@ -311,11 +311,11 @@ export function registerDashboardRoutes(app) {
       // Prepare Embed
       const serviceName = (order.service_type || 'Dịch Vụ').toUpperCase();
       const embed = {
-        title: `🎉 Giao Hàng Thành Công: ${serviceName}`,
-        description: `Cảm ơn bạn đã mua hàng tại Cream Store. Dưới đây là thông tin tài khoản của bạn cho đơn hàng **${order.order_code}**:`,
-        color: 0x9333ea, // Purple Neon
+        title: `Giao Hang Thanh Cong: ${serviceName}`,
+        description: `Cam on ban da mua hang. Duoi day la thong tin tai khoan cho don hang **${order.order_code}**:`,
+        color: 0x9333ea,
         fields: [],
-        footer: { text: 'Cream Store - Quản Lý Tự Động' },
+        footer: { text: 'Cenar Store - Quan Ly Tu Dong' },
         timestamp: new Date().toISOString()
       };
 
@@ -323,11 +323,11 @@ export function registerDashboardRoutes(app) {
       const _password = decrypt(order.credential_password);
       const _profile = decrypt(order.credential_profile);
       const _pin = decrypt(order.credential_pin);
-      if (_email) embed.fields.push({ name: '📧 Email', value: `\`${_email}\``, inline: true });
-      if (_password) embed.fields.push({ name: '🔑 Mật Khẩu', value: `\`${_password}\``, inline: true });
-      if (_profile) embed.fields.push({ name: '👤 Profile', value: `\`${_profile}\``, inline: true });
-      if (_pin) embed.fields.push({ name: '🔢 Mã PIN', value: `\`${_pin}\``, inline: true });
-      if (order.expiry_at) embed.fields.push({ name: '⏳ Ngày Hết Hạn', value: `<t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:D>`, inline: false });
+      if (_email) embed.fields.push({ name: 'Email', value: `\`${_email}\``, inline: true });
+      if (_password) embed.fields.push({ name: 'Mat Khau', value: `\`${_password}\``, inline: true });
+      if (_profile) embed.fields.push({ name: 'Profile', value: `\`${_profile}\``, inline: true });
+      if (_pin) embed.fields.push({ name: 'Ma PIN', value: `\`${_pin}\``, inline: true });
+      if (order.expiry_at) embed.fields.push({ name: 'Ngay Het Han', value: `<t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:D>`, inline: false });
 
       await targetUser.send({ embeds: [embed] });
 
@@ -352,7 +352,7 @@ export function registerDashboardRoutes(app) {
         if (guildConfig && guildConfig.staff_log_channel_id) {
           const logChan = client.channels.cache.get(guildConfig.staff_log_channel_id);
           if (logChan) {
-            logChan.send(`📦 **Web Admin** vừa giao đơn \`${order.order_code}\` qua DM cho KH <@${order.customer_id}>.`);
+            logChan.send(`[Web Admin] da giao don \`${order.order_code}\` qua DM cho KH <@${order.customer_id}>.`);
           }
         }
       } catch(e){}
@@ -410,7 +410,7 @@ export function registerDashboardRoutes(app) {
       const guilds = cl?.guilds?.cache;
       if (guilds) {
         const firstGuild = guilds.first();
-        if (firstGuild) sendStaffLog(cl, firstGuild.id, `➕ **Web Admin** vừa **THÊM** tài khoản \`${data.email}\` cho KH **${data.customerName}**`);
+        if (firstGuild) sendStaffLog(cl, firstGuild.id, `**Web Admin** vừa **THÊM** tài khoản \`${data.email}\` cho KH **${data.customerName}**`);
       }
     } catch(e) {
       console.error('[DASHBOARD]', e);
@@ -445,7 +445,7 @@ export function registerDashboardRoutes(app) {
       const guilds = cl?.guilds?.cache;
       if (guilds) {
         const firstGuild = guilds.first();
-        if (firstGuild) sendStaffLog(cl, firstGuild.id, `✏️ **Web Admin** vừa **SỬA** tài khoản \`${id}\` (${data.email}) cho KH **${data.customerName}**`);
+        if (firstGuild) sendStaffLog(cl, firstGuild.id, `[Web Admin] **SUA** tai khoan \`${id}\` (${data.email}) cho KH **${data.customerName}**`);
       }
     } catch(e) {
       console.error('[DASHBOARD]', e);
@@ -462,7 +462,7 @@ export function registerDashboardRoutes(app) {
       const guilds = cl?.guilds?.cache;
       if (guilds) {
         const firstGuild = guilds.first();
-        if (firstGuild) sendStaffLog(cl, firstGuild.id, `🗑️ **Web Admin** vừa **XÓA** order \`${req.params.id}\` trên hệ thống.`);
+        if (firstGuild) sendStaffLog(cl, firstGuild.id, `[Web Admin] **XOA** order \`${req.params.id}\` tren he thong.`);
       }
     } catch(e) {
       console.error('[DASHBOARD]', e);
@@ -729,7 +729,7 @@ export function registerDashboardRoutes(app) {
       const guilds = cl?.guilds?.cache;
       if (guilds) {
         const firstGuild = guilds.first();
-        if (firstGuild) sendStaffLog(cl, firstGuild.id, `🔄 **Web Admin** vừa **GIA HẠN** đơn \`${orderCode}\` thêm **${monthsNum} tháng**`);
+        if (firstGuild) sendStaffLog(cl, firstGuild.id, `**Web Admin** vừa **GIA HẠN** đơn \`${orderCode}\` thêm **${monthsNum} tháng**`);
       }
 
       res.json({ ok: true, expiryDate: newExpiry.toISOString() });

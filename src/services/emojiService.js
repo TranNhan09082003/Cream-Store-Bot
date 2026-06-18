@@ -90,6 +90,55 @@ export const EMOJI_SLOTS = {
   icon_settings:      { label: 'Cài đặt',              default: '⚙️' },
   icon_key:           { label: 'Chìa khóa',            default: '🔑' },
   icon_link:          { label: 'Link',                 default: '🔗' },
+
+  // Misc bổ sung (Wave: bỏ unicode sống) — tải từ Twemoji làm application emoji
+  icon_cycle:         { label: 'Định kỳ (vòng lặp)',   default: '🔄' },
+  icon_once:          { label: 'Mua lẻ (một lần)',     default: '🔂' },
+  icon_home:          { label: 'Nhà / Gia đình',       default: '🏠' },
+  icon_trash:         { label: 'Xóa / Thùng rác',      default: '🗑️' },
+  icon_trophy:        { label: 'Cúp / Vinh danh',      default: '🏆' },
+  icon_gold:          { label: 'Huy chương vàng',      default: '🥇' },
+  icon_silver:        { label: 'Huy chương bạc',       default: '🥈' },
+  icon_bronze:        { label: 'Huy chương đồng',      default: '🥉' },
+  icon_empty:         { label: 'Trống / Hộp thư rỗng', default: '📭' },
+  icon_clipboard:     { label: 'Bảng / Danh sách',     default: '📋' },
+  icon_heart:         { label: 'Trái tim',             default: '❤️' },
+  icon_heart_purple:  { label: 'Trái tim tím (brand)', default: '💜' },
+  icon_cart:          { label: 'Giỏ hàng',             default: '🛒' },
+  icon_block:         { label: 'Chặn / Cấm',           default: '🚫' },
+  icon_wallet:        { label: 'Ví điện tử',           default: '💳' },
+  icon_unlock:        { label: 'Mở khóa',              default: '🔓' },
+  icon_brain:         { label: 'Bộ não / AI',          default: '🧠' },
+  icon_web:           { label: 'Web / Internet',       default: '🌐' },
+  icon_announce:      { label: 'Loa thông báo',        default: '📢' },
+  icon_group:         { label: 'Nhóm người',           default: '👥' },
+  icon_search:        { label: 'Tìm kiếm',             default: '🔍' },
+  icon_up:            { label: 'Mũi tên lên',          default: '🔼' },
+  icon_target:        { label: 'Mục tiêu',             default: '🎯' },
+  icon_tip:           { label: 'Mẹo / Bóng đèn',       default: '💡' },
+  icon_tag:           { label: 'Nhãn giá',             default: '🏷️' },
+  icon_number:        { label: 'Số / Đếm',             default: '🔢' },
+  icon_ticket:        { label: 'Vé / Mã giảm giá',     default: '🎟️' },
+  icon_folder:        { label: 'Thư mục',              default: '🗂️' },
+  icon_doc:           { label: 'Tài liệu',             default: '📄' },
+  icon_edit:          { label: 'Ghi chú / Sửa',        default: '📝' },
+  icon_book:          { label: 'Sách / Sổ',            default: '📚' },
+  icon_art:           { label: 'Bảng màu',             default: '🎨' },
+  icon_money_wings:   { label: 'Tiền bay (hoàn tiền)', default: '💸' },
+  icon_green:         { label: 'Chấm xanh lá',         default: '🟢' },
+  icon_red:           { label: 'Chấm đỏ',              default: '🔴' },
+  icon_prev:          { label: 'Trang trước',          default: '⬅️' },
+  icon_next:          { label: 'Trang sau',            default: '➡️' },
+  icon_num1:          { label: 'Số 1',                 default: '1️⃣' },
+  icon_num2:          { label: 'Số 2',                 default: '2️⃣' },
+  icon_num3:          { label: 'Số 3',                 default: '3️⃣' },
+  icon_num4:          { label: 'Số 4',                 default: '4️⃣' },
+  icon_num5:          { label: 'Số 5',                 default: '5️⃣' },
+  icon_num6:          { label: 'Số 6',                 default: '6️⃣' },
+  icon_num7:          { label: 'Số 7',                 default: '7️⃣' },
+  icon_num8:          { label: 'Số 8',                 default: '8️⃣' },
+  icon_num9:          { label: 'Số 9',                 default: '9️⃣' },
+  icon_num10:         { label: 'Số 10',                default: '🔟' },
 };
 
 // ═══════════════════════════════════════════════
@@ -284,26 +333,27 @@ function refreshCache(guildId) {
 // ═══════════════════════════════════════════════
 
 /**
- * Lấy emoji cho một slot, ưu tiên custom → fallback unicode
+ * Lấy emoji cho một slot. CHỈ trả về custom emoji của server/application.
+ * KHÔNG fallback unicode (yêu cầu bắt buộc của dự án). Slot trống → chuỗi rỗng.
  * @param {string} guildId
  * @param {string} slot  — key từ EMOJI_SLOTS
- * @returns {string}  ví dụ: '<:mua_hang:1234567890>' hoặc '🛍️'
+ * @returns {string}  ví dụ: '<:mua_hang:1234567890>' hoặc ''
  */
 export function getEmoji(guildId, slot) {
   if (!emojiCache.has(guildId)) refreshCache(guildId);
-  const custom = emojiCache.get(guildId)?.[slot];
-  return custom || EMOJI_SLOTS[slot]?.default || '❓';
+  return emojiCache.get(guildId)?.[slot] || '';
 }
 
 /**
- * Lấy toàn bộ emoji map cho một guild (để truyền vào builders)
+ * Lấy toàn bộ emoji map cho một guild (để truyền vào builders).
+ * CHỈ custom emoji — slot chưa cấu hình trả về chuỗi rỗng, không unicode.
  */
 export function getEmojiMap(guildId) {
   if (!emojiCache.has(guildId)) refreshCache(guildId);
   const custom = emojiCache.get(guildId) || {};
   const result = {};
-  for (const [slot, meta] of Object.entries(EMOJI_SLOTS)) {
-    result[slot] = custom[slot] || meta.default;
+  for (const slot of Object.keys(EMOJI_SLOTS)) {
+    result[slot] = custom[slot] || '';
   }
   return result;
 }
@@ -437,7 +487,7 @@ export function resolveSelectMenuEmoji(guildId, emojiStr, fallback = null) {
  * @returns {string}
  */
 export function resolveProductEmoji(guildId, emojiStr) {
-  if (!emojiStr) return '📦';
+  if (!emojiStr) return '';
   if (EMOJI_SLOTS[emojiStr]) return getEmoji(guildId, emojiStr);
   return emojiStr;
 }

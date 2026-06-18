@@ -13,10 +13,21 @@ import { config } from '../config.js';
 
 // ═══════════════ Emoji & Color Map ═══════════════
 
-const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺', netflix: '🎬' };
 const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
 const SERVICE_COLOR = { nitro: 0x5865F2, spotify_family: 0x1DB954, youtube: 0xFF0000, netflix: 0xE50914 };
-const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: '✅ Đã trả hết' };
+const SERVICE_SLOT = { nitro: 'brand_nitro', spotify_family: 'brand_spotify', youtube: 'brand_youtube', netflix: 'brand_netflix' };
+
+function serviceEmoji(E, type) {
+  return E(SERVICE_SLOT[type]) || E('order_product');
+}
+
+function modeLabel(E, mode) {
+  return ({
+    auto_cycle: `${E('icon_cycle')} Định kỳ`,
+    one_time: `${E('icon_once')} Mua lẻ`,
+    full_paid: `${E('status_check')} Đã trả hết`,
+  })[mode] || mode;
+}
 
 export const data = new SlashCommandBuilder()
   .setName('subscription')
@@ -48,7 +59,7 @@ export const data = new SlashCommandBuilder()
 // ═══════════════ Modal builders ═══════════════
 
 function buildNitroModal() {
-  const modal = new ModalBuilder().setCustomId('sub:add:nitro:modal').setTitle('🚀 Thêm Gmail Nitro');
+  const modal = new ModalBuilder().setCustomId('sub:add:nitro:modal').setTitle('Thêm Gmail Nitro');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Gmail').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu Gmail').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -60,7 +71,7 @@ function buildNitroModal() {
 }
 
 function buildSpotifyModal() {
-  const modal = new ModalBuilder().setCustomId('sub:add:spotify:modal').setTitle('🎵 Thêm Spotify Family');
+  const modal = new ModalBuilder().setCustomId('sub:add:spotify:modal').setTitle('Thêm Spotify Family');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Gmail Family Owner').setPlaceholder('family@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -72,7 +83,7 @@ function buildSpotifyModal() {
 }
 
 function buildYoutubeModal() {
-  const modal = new ModalBuilder().setCustomId('sub:add:youtube:modal').setTitle('📺 Thêm YouTube Premium');
+  const modal = new ModalBuilder().setCustomId('sub:add:youtube:modal').setTitle('Thêm YouTube Premium');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Gmail').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu Gmail').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -84,7 +95,7 @@ function buildYoutubeModal() {
 }
 
 function buildNetflixModal() {
-  const modal = new ModalBuilder().setCustomId('sub:add:netflix:modal').setTitle('🎬 Thêm Netflix');
+  const modal = new ModalBuilder().setCustomId('sub:add:netflix:modal').setTitle('Thêm Netflix');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('gmail').setLabel('Email Netflix').setPlaceholder('example@gmail.com').setStyle(TextInputStyle.Short).setRequired(true)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('password').setLabel('Mật khẩu').setPlaceholder('abc123').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -99,14 +110,8 @@ function buildNetflixModal() {
 
 function buildListEmbed(subs, filterType, guildId = null) {
   const E = createEmojiResolver(guildId);
-  const serviceEmojis = {
-    nitro: E('icon_star', '🚀'),
-    spotify_family: E('brand_spotify', '🎵'),
-    youtube: E('brand_youtube', '📺'),
-    netflix: E('brand_netflix', '🎬')
-  };
 
-  const title = filterType ? `${serviceEmojis[filterType]} ${SERVICE_LABEL[filterType]}` : `${E('icon_history', '📋')} Tất Cả Subscriptions`;
+  const title = filterType ? `${serviceEmoji(E, filterType)} ${SERVICE_LABEL[filterType]}` : `${E('icon_history')} Tất Cả Subscriptions`;
   const color = filterType ? SERVICE_COLOR[filterType] : config.accentColorInfo;
 
   if (!subs.length) {
@@ -124,14 +129,14 @@ function buildListEmbed(subs, filterType, guildId = null) {
   let desc = '';
 
   for (const [type, items] of Object.entries(grouped)) {
-    desc += `\n### ${serviceEmojis[type]} ${SERVICE_LABEL[type]} (${items.length})\n`;
+    desc += `\n### ${serviceEmoji(E, type)} ${SERVICE_LABEL[type]} (${items.length})\n`;
     for (const s of items.slice(0, 15)) {
       const renewInfo = s.renewal_mode === 'auto_cycle'
-        ? `${E('icon_clock', '🔄')} ${s.times_renewed}/${getTotalRenewalsNeeded(s)} lần | Kỳ tới: <t:${Math.floor(new Date(s.next_renewal_at).getTime() / 1000)}:R>`
-        : s.renewal_mode === 'full_paid' ? `${E('status_check', '✅')} Đã trả hết` : '🔂 Mua lẻ';
+        ? `${E('icon_cycle')} ${s.times_renewed}/${getTotalRenewalsNeeded(s)} lần | Kỳ tới: <t:${Math.floor(new Date(s.next_renewal_at).getTime() / 1000)}:R>`
+        : s.renewal_mode === 'full_paid' ? `${E('status_check')} Đã trả hết` : `${E('icon_once')} Mua lẻ`;
       const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '_Chưa gán_');
-      const noteExtra = (s.service_type === 'netflix' && s.note) ? ` ${E('brand_netflix', '🎬')} ${s.note}` : '';
-      const extra = s.spotify_family_name ? ` 🏠 ${s.spotify_family_name} (${s.spotify_slots_used}/5)` : noteExtra;
+      const noteExtra = (s.service_type === 'netflix' && s.note) ? ` ${E('brand_netflix')} ${s.note}` : '';
+      const extra = s.spotify_family_name ? ` ${E('icon_home')} ${s.spotify_family_name} (${s.spotify_slots_used}/5)` : noteExtra;
       desc += `> **ID ${s.id}** · \`${s.gmail_email}\` · ${customer}${extra}\n> ${renewInfo} · Hết hạn: <t:${Math.floor(new Date(s.expiry_at).getTime() / 1000)}:D>\n`;
     }
     if (items.length > 15) desc += `> _...và ${items.length - 15} mục khác_\n`;
@@ -144,36 +149,25 @@ function buildListEmbed(subs, filterType, guildId = null) {
 
 function buildCheckEmbed(subs, days, guildId = null) {
   const E = createEmojiResolver(guildId);
-  const serviceEmojis = {
-    nitro: E('icon_star', '🚀'),
-    spotify_family: E('brand_spotify', '🎵'),
-    youtube: E('brand_youtube', '📺'),
-    netflix: E('brand_netflix', '🎬')
-  };
 
   const embed = new EmbedBuilder()
-    .setTitle(`${E('icon_clock', '⏰')} Cần Gia Hạn Trong ${days} Ngày Tới`)
+    .setTitle(`${E('icon_clock')} Cần Gia Hạn Trong ${days} Ngày Tới`)
     .setColor(0xE74C3C)
     .setTimestamp();
 
   if (!subs.length) {
-    embed.setDescription(`${E('order_complete', '🎉')} Không có subscription nào cần gia hạn trong khoảng thời gian này.`);
+    embed.setDescription(`${E('order_complete')} Không có subscription nào cần gia hạn trong khoảng thời gian này.`);
     return embed;
   }
 
   let desc = `Tìm thấy **${subs.length}** subscription cần xử lý:\n\n`;
   for (const s of subs.slice(0, 20)) {
-    const emoji = serviceEmojis[s.service_type] || E('order_product', '📦');
-    const modeLabels = {
-      auto_cycle: `${E('icon_clock', '🔄')} Định kỳ`,
-      one_time: '🔂 Mua lẻ',
-      full_paid: `${E('status_check', '✅')} Đã trả hết`
-    };
-    const mode = modeLabels[s.renewal_mode] || s.renewal_mode;
+    const emoji = serviceEmoji(E, s.service_type);
+    const mode = modeLabel(E, s.renewal_mode);
     const dateField = s.renewal_mode === 'auto_cycle' ? s.next_renewal_at : s.expiry_at;
     const ts = Math.floor(new Date(dateField).getTime() / 1000);
     const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '—');
-    const extra = s.spotify_family_name ? ` · 🏠 ${s.spotify_family_name}` : '';
+    const extra = s.spotify_family_name ? ` · ${E('icon_home')} ${s.spotify_family_name}` : '';
     desc += `${emoji} **ID ${s.id}** · \`${s.gmail_email}\` · ${customer}${extra}\n> ${mode} · <t:${ts}:R> (<t:${ts}:f>)\n\n`;
   }
 
@@ -212,18 +206,12 @@ export async function execute(interaction) {
       const id = interaction.options.getInteger('id', true);
       const existing = getSubscriptionById(id);
       if (!existing || existing.guild_id !== interaction.guildId) {
-        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy subscription với ID này.`);
+        return interaction.editReply(`${E('status_cross')} Không tìm thấy subscription với ID này.`);
       }
       const updated = markRenewed(id);
-      if (!updated) return interaction.editReply(`${E('status_cross', '❌')} Lỗi khi gia hạn.`);
+      if (!updated) return interaction.editReply(`${E('status_cross')} Lỗi khi gia hạn.`);
 
-      const serviceEmojis = {
-        nitro: E('icon_star', '🚀'),
-        spotify_family: E('brand_spotify', '🎵'),
-        youtube: E('brand_youtube', '📺'),
-        netflix: E('brand_netflix', '🎬')
-      };
-      const emoji = serviceEmojis[updated.service_type] || E('order_product', '📦');
+      const emoji = serviceEmoji(E, updated.service_type);
       const nextTs = updated.next_renewal_at ? `<t:${Math.floor(new Date(updated.next_renewal_at).getTime() / 1000)}:F>` : '_Đã hết chu kỳ_';
       const embed = new EmbedBuilder()
         .setTitle(`${emoji} Đã Gia Hạn Thành Công`)
@@ -243,10 +231,10 @@ export async function execute(interaction) {
       const id = interaction.options.getInteger('id', true);
       const existing = getSubscriptionById(id);
       if (!existing || existing.guild_id !== interaction.guildId) {
-        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy subscription với ID này.`);
+        return interaction.editReply(`${E('status_cross')} Không tìm thấy subscription với ID này.`);
       }
       deleteSubscription(id);
-      return interaction.editReply(`🗑️ Đã xóa subscription **ID ${id}** — \`${existing.gmail_email}\` (${SERVICE_LABEL[existing.service_type]})`);
+      return interaction.editReply(`${E('icon_trash')} Đã xóa subscription **ID ${id}** — \`${existing.gmail_email}\` (${SERVICE_LABEL[existing.service_type]})`);
     }
 
     if (sub === 'overview') {
@@ -257,16 +245,9 @@ export async function execute(interaction) {
       }
       const dueIn7 = getSubscriptionsDueInDays(interaction.guildId, 7);
 
-      const serviceEmojis = {
-        nitro: E('icon_star', '🚀'),
-        spotify_family: E('brand_spotify', '🎵'),
-        youtube: E('brand_youtube', '📺'),
-        netflix: E('brand_netflix', '🎬')
-      };
-
       let statsText = '';
       for (const [type, count] of Object.entries(counts)) {
-        statsText += `${serviceEmojis[type] || E('order_product', '📦')} **${SERVICE_LABEL[type] || type}:** ${count} tài khoản\n`;
+        statsText += `${serviceEmoji(E, type)} **${SERVICE_LABEL[type] || type}:** ${count} tài khoản\n`;
       }
       if (!statsText) statsText = '_Chưa có subscription nào._\n';
 
@@ -274,16 +255,16 @@ export async function execute(interaction) {
       const subApiUrl = getPublicUrl('/dashboard/api/subscriptions');
 
       const embed = new EmbedBuilder()
-        .setTitle(`${E('icon_chart', '📊')} Tổng Quan Subscriptions`)
+        .setTitle(`${E('icon_chart')} Tổng Quan Subscriptions`)
         .setColor(config.accentColorInfo)
         .setDescription([
-          '### 📈 Thống Kê',
+          `### ${E('icon_chart')} Thống Kê`,
           statsText,
           `**Tổng:** ${allSubs.length} tài khoản active`,
           `**Cần gia hạn trong 7 ngày:** ${dueIn7.length}`,
           '',
-          '### 🌐 Web Dashboard',
-          webUrl ? `Xem tổng quan tài khoản tại:` : `${E('status_warn', '⚠️')} Chưa cấu hình PUBLIC_BASE_URL`,
+          `### ${E('icon_web')} Web Dashboard`,
+          webUrl ? `Xem tổng quan tài khoản tại:` : `${E('status_warn')} Chưa cấu hình PUBLIC_BASE_URL`,
         ].join('\n'))
         .setTimestamp()
         .setFooter({ text: 'Cream Store Subscription Manager' });
@@ -291,8 +272,8 @@ export async function execute(interaction) {
       const components = [];
       if (webUrl) {
         components.push(new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setLabel('🌐 Mở Web Dashboard').setStyle(ButtonStyle.Link).setURL(webUrl),
-          new ButtonBuilder().setLabel('📋 API Subscriptions').setStyle(ButtonStyle.Link).setURL(subApiUrl),
+          new ButtonBuilder().setLabel('Mở Web Dashboard').setStyle(ButtonStyle.Link).setURL(webUrl),
+          new ButtonBuilder().setLabel('API Subscriptions').setStyle(ButtonStyle.Link).setURL(subApiUrl),
         ));
       }
 
@@ -300,10 +281,10 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error('[SUBSCRIPTION] Error:', error);
-    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }
 
 // Re-export modal builders for use in interactionCreate
 export { buildNitroModal, buildSpotifyModal, buildYoutubeModal, buildNetflixModal };
-export { SERVICE_EMOJI, SERVICE_LABEL, SERVICE_COLOR, MODE_LABEL };
+export { SERVICE_LABEL, SERVICE_COLOR };

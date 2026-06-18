@@ -21,7 +21,7 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   const orders = getOutstandingOrders(guildId, customerId, PAGE_SIZE, offset);
   
   if (summary.total_orders === 0) {
-    return { content: `${E('status_check', '✅')} Không có đơn hàng nào còn nợ xử lý.` };
+    return { content: `${E('status_check')} Không có đơn hàng nào còn nợ xử lý.` };
   }
 
   const container = new ContainerBuilder()
@@ -30,8 +30,8 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   const customerText = customerId ? ` cho <@${customerId}>` : '';
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# 📚 Đơn Hàng Còn Xử Lý${customerText}\n` +
-      `> ${E('order_product', '📦')} **Tổng**: ${summary.total_orders} | ${E('order_pending', '⏳')} **Chờ TT**: ${summary.waiting_payment} | 🔄 **Đang xử lý**: ${summary.processing} | ${E('panel_warranty', '🛠️')} **Bảo hành**: ${summary.warranty_open}`
+      `# ${E('icon_book')} Đơn Hàng Còn Xử Lý${customerText}\n` +
+      `> ${E('order_product')} **Tổng**: ${summary.total_orders} | ${E('order_pending')} **Chờ TT**: ${summary.waiting_payment} | ${E('icon_cycle')} **Đang xử lý**: ${summary.processing} | ${E('panel_warranty')} **Bảo hành**: ${summary.warranty_open}`
     )
   );
 
@@ -42,9 +42,9 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
     const ticketLink = o.ticket_channel_id ? `(<#${o.ticket_channel_id}>)` : '';
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `### ${E('order_id', '🆔')} \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
-        `> ${E('ticket_user', '👤')} Khách: <@${o.customer_id}> ${ticketLink}\n` +
-        `> ${E('panel_order', '🛍️')} **${o.quantity}x** ${o.product_name}`
+        `### ${E('order_id')} \`${o.order_code}\` — ${getOrderStatusLabel(o.status)}\n` +
+        `> ${E('ticket_user')} Khách: <@${o.customer_id}> ${ticketLink}\n` +
+        `> ${E('panel_order')} **${o.quantity}x** ${o.product_name}`
       )
     );
 
@@ -60,18 +60,21 @@ export function buildCongnoPanel(guildId, customerId, page = 1) {
   const components = [container];
 
   if (totalPages > 1) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`congno:prev:${customerId || 'all'}:${page}`)
-        .setLabel('⬅️ Trang Trước')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page <= 1),
-      new ButtonBuilder()
-        .setCustomId(`congno:next:${customerId || 'all'}:${page}`)
-        .setLabel('Trang Sau ➡️')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page >= totalPages)
-    );
+    const prevBtn = new ButtonBuilder()
+      .setCustomId(`congno:prev:${customerId || 'all'}:${page}`)
+      .setLabel('Trang Trước')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 1);
+    const nextBtn = new ButtonBuilder()
+      .setCustomId(`congno:next:${customerId || 'all'}:${page}`)
+      .setLabel('Trang Sau')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= totalPages);
+    const prevEmoji = E.component('icon_prev');
+    const nextEmoji = E.component('icon_next');
+    if (prevEmoji) prevBtn.setEmoji(prevEmoji);
+    if (nextEmoji) nextBtn.setEmoji(nextEmoji);
+    const row = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
     components.push(row);
   }
 

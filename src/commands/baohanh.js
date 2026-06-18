@@ -24,7 +24,7 @@ export async function execute(interaction) {
   const order = getOrderByCode(orderCode);
 
   if (!order) {
-    await interaction.reply({ content: `${E('status_warn', '⚠️')} Không tìm thấy đơn hàng.`, ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
@@ -34,7 +34,7 @@ export async function execute(interaction) {
   const isStaff = isStaffMember(member, guildConfig);
 
   if (!isOwner && !isStaff) {
-    await interaction.reply({ content: `${E('status_warn', '⚠️')} Bạn không có quyền mở bảo hành cho đơn này.`, ephemeral: true });
+    await interaction.reply({ content: `${E('status_warn')} Bạn không có quyền mở bảo hành cho đơn này.`, ephemeral: true });
     return;
   }
 
@@ -50,8 +50,8 @@ export async function execute(interaction) {
 
   await interaction.reply({
     content: result.reused
-      ? `${E('status_info', 'ℹ️')} Đơn ${orderCode} đã có ticket bảo hành đang mở tại ${result.channel}.`
-      : `${E('status_check', '✅')} Đã mở ticket bảo hành cho đơn ${orderCode}: ${result.channel}`,
+      ? `${E('status_info')} Đơn ${orderCode} đã có ticket bảo hành đang mở tại ${result.channel}.`
+      : `${E('status_check')} Đã mở ticket bảo hành cho đơn ${orderCode}: ${result.channel}`,
     ephemeral: true,
   });
 }

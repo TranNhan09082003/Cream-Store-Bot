@@ -1,15 +1,16 @@
-import { ChannelType, EmbedBuilder } from 'discord.js';
+import { ChannelType, ContainerBuilder, TextDisplayBuilder, MessageFlags } from 'discord.js';
 import { db } from '../database/db.js';
 import { config } from '../config.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
-// Huy hiệu top
-const MEDALS = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+// Huy hiệu top — slot custom emoji
+const MEDAL_SLOTS = ['icon_gold', 'icon_silver', 'icon_bronze', 'icon_num4', 'icon_num5', 'icon_num6', 'icon_num7', 'icon_num8', 'icon_num9', 'icon_num10'];
 const VIP_TIERS = [
-  { min: 8_000_000, label: '💎 Diamond', color: 0x60A5FA },
-  { min: 5_000_000, label: '❤️ Ruby',    color: 0xF87171 },
-  { min: 3_000_000, label: '👑 Elite',   color: 0xFBBF24 },
-  { min: 1_000_000, label: '⭐ VIP',     color: 0xA78BFA },
-  { min: 0,         label: '🛒 Khách',   color: 0x6B7280 },
+  { min: 8_000_000, label: 'Diamond', emojiSlot: 'icon_gem', color: 0x60A5FA },
+  { min: 5_000_000, label: 'Ruby',    emojiSlot: 'icon_heart', color: 0xF87171 },
+  { min: 3_000_000, label: 'Elite',   emojiSlot: 'icon_crown', color: 0xFBBF24 },
+  { min: 1_000_000, label: 'VIP',     emojiSlot: 'icon_star',  color: 0xA78BFA },
+  { min: 0,         label: 'Khách',   emojiSlot: 'icon_cart', color: 0x6B7280 },
 ];
 
 function getTier(spent) {
@@ -49,35 +50,34 @@ function getLeaderboardRows(guildId, startIso, endIso = null) {
   return db.prepare(query).all(params);
 }
 
-function buildLeaderboardEmbed(title, subtitle, rows, guildIcon) {
+// Trả về { components, flags } — V2 để custom emoji hiển thị ở mọi vị trí
+function buildLeaderboardV2(title, subtitle, rows, guildId) {
+  const E = createEmojiResolver(guildId);
+  const topTier = rows.length ? getTier(rows[0]?.total_spent || 0) : { color: 0x7C3AED };
+  const container = new ContainerBuilder().setAccentColor(topTier.color);
+
   if (!rows.length) {
-    return new EmbedBuilder()
-      .setColor(0x7C3AED)
-      .setTitle(title)
-      .setDescription('> *Chưa có dữ liệu đơn hàng hoàn thành.*')
-      .setTimestamp();
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      `## ${E('icon_trophy')} ${title}\n> *Chưa có dữ liệu đơn hàng hoàn thành.*`
+    ));
+    return { components: [container], flags: MessageFlags.IsComponentsV2 };
   }
 
   const lines = rows.map((r, i) => {
-    const medal  = MEDALS[i] || `${i+1}.`;
-    const tier   = getTier(r.total_spent || 0);
-    const spent  = fmt(r.total_spent || 0);
-    return `${medal} <@${r.customer_id}> ${tier.label}\n` +
-           `> 💳 ${r.orders} đơn | 💰 **${spent}đ**`;
+    const medal = MEDAL_SLOTS[i] ? E(MEDAL_SLOTS[i]) : `${i + 1}.`;
+    const tier  = getTier(r.total_spent || 0);
+    const spent = fmt(r.total_spent || 0);
+    return `${medal} <@${r.customer_id}> ${E(tier.emojiSlot)} **${tier.label}**\n` +
+           `> ${E('payment_payos')} ${r.orders} đơn | ${E('payment_money')} **${spent}đ**`;
   });
 
-  const topTier = getTier(rows[0]?.total_spent || 0);
-
-  return new EmbedBuilder()
-    .setColor(topTier.color)
-    .setTitle(title)
-    .setDescription(
-      `> ${subtitle}\n\n` +
-      lines.join('\n\n')
-    )
-    .setThumbnail(guildIcon || null)
-    .setFooter({ text: 'Cenar Store — Cảm ơn quý khách đã ủng hộ 💜', iconURL: guildIcon || undefined })
-    .setTimestamp();
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+    `## ${E('icon_trophy')} ${title}\n> ${subtitle}\n\n${lines.join('\n\n')}`
+  ));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+    `-# ${E('icon_heart_purple')} Cenar Store — Cảm ơn quý khách đã ủng hộ`
+  ));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
 export async function runAutoVinhDanh(client) {
@@ -103,7 +103,7 @@ export async function runAutoVinhDanh(client) {
       );
       if (!vinhdanhChan) continue;
 
-      const guildIcon = guild.iconURL({ forceStatic: false }) || undefined;
+      const E = createEmojiResolver(guildId);
 
       // 1. Kiểm tra xem đã chốt bảng vinh danh tháng trước chưa
       const prevMonthKey = `final_vinh_danh_posted_${prevYear}_${prevMonth + 1}_${guildId}`;
@@ -113,15 +113,12 @@ export async function runAutoVinhDanh(client) {
         // Query top 10 của tháng trước
         const rowsPrev = getLeaderboardRows(guildId, prevMonthStart, prevMonthEnd);
         if (rowsPrev.length > 0) {
-          const titlePrev = `🏆 BẢNG VINH DANH THÁNG CHUNG CUỘC — THÁNG ${prevMonth + 1}/${prevYear}`;
+          const titlePrev = `BẢNG VINH DANH THÁNG CHUNG CUỘC — THÁNG ${prevMonth + 1}/${prevYear}`;
           const subtitlePrev = `Danh sách vinh danh khách hàng tiêu biểu nhất trong toàn bộ **tháng ${prevMonth + 1}/${prevYear}**`;
-          const embedPrev = buildLeaderboardEmbed(titlePrev, subtitlePrev, rowsPrev, guildIcon);
+          const payloadPrev = buildLeaderboardV2(titlePrev, subtitlePrev, rowsPrev, guildId);
 
-          // Gửi tin nhắn chúc mừng chốt bảng
-          await vinhdanhChan.send({
-            content: `🎉 **CHÚC MỪNG KHÁCH HÀNG TIÊU BIỂU THÁNG ${prevMonth + 1}/${prevYear}!** 🎉`,
-            embeds: [embedPrev]
-          }).catch(() => null);
+          // Gửi bảng chốt tháng (V2 — không kèm content text riêng)
+          await vinhdanhChan.send(payloadPrev).catch(() => null);
 
           // Lưu trạng thái đã post vào DB
           db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(prevMonthKey, '1');
@@ -135,9 +132,9 @@ export async function runAutoVinhDanh(client) {
       let liveMsgId = liveMsgRow?.value || null;
 
       const rowsCurr = getLeaderboardRows(guildId, currentMonthStart);
-      const titleCurr = `🏆  BẢNG XẾP HẠNG TIÊU DÙNG THÁNG ${currentMonth + 1}/${currentYear} (LIVE)`;
+      const titleCurr = `BẢNG XẾP HẠNG TIÊU DÙNG THÁNG ${currentMonth + 1}/${currentYear} (LIVE)`;
       const subtitleCurr = `Bảng xếp hạng cập nhật liên tục các khách hàng chi tiêu nhiều nhất trong **tháng ${currentMonth + 1}/${currentYear}**`;
-      const embedCurr = buildLeaderboardEmbed(titleCurr, subtitleCurr, rowsCurr, guildIcon);
+      const payloadCurr = buildLeaderboardV2(titleCurr, subtitleCurr, rowsCurr, guildId);
 
       let msg = null;
       if (liveMsgId) {
@@ -146,7 +143,7 @@ export async function runAutoVinhDanh(client) {
 
       if (msg) {
         // Edit tin nhắn cũ
-        await msg.edit({ embeds: [embedCurr] }).catch(() => null);
+        await msg.edit(payloadCurr).catch(() => null);
         console.log(`[Vinh Danh] Guild ${guild.name} đã cập nhật bảng vinh danh live`);
       } else {
         // Đăng tin nhắn mới
@@ -154,14 +151,14 @@ export async function runAutoVinhDanh(client) {
         try {
           const old = await vinhdanhChan.messages.fetch({ limit: 15 }).catch(() => null);
           if (old) {
-            for (const m of old.filter(m => m.author.id === client.user.id && m.embeds[0]?.title?.includes('LIVE')).values()) {
+            for (const m of old.filter(m => m.author.id === client.user.id).values()) {
               await m.delete().catch(() => null);
               await new Promise(r => setTimeout(r, 300));
             }
           }
         } catch {}
 
-        const newMsg = await vinhdanhChan.send({ embeds: [embedCurr] }).catch(() => null);
+        const newMsg = await vinhdanhChan.send(payloadCurr).catch(() => null);
         if (newMsg) {
           db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(currentMonthKey, newMsg.id);
           console.log(`[Vinh Danh] Guild ${guild.name} đã tạo bảng vinh danh live mới: ${newMsg.id}`);

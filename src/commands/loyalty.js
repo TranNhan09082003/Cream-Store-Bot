@@ -32,12 +32,12 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
-      .setTitle(`${E('icon_star', '⭐')} Điểm Tích Luỹ`)
+      .setTitle(`${E('icon_star')} Điểm Tích Luỹ`)
       .setDescription([
-        `> 🎯 **Điểm hiện có:** \`${pts.points}\``,
-        `> ${E('icon_chart', '📊')} **Tổng điểm tích luỹ:** \`${pts.lifetime_points}\``,
+        `> ${E('icon_target')} **Điểm hiện có:** \`${pts.points}\``,
+        `> ${E('icon_chart')} **Tổng điểm tích luỹ:** \`${pts.lifetime_points}\``,
         '',
-        '💡 *Mỗi 10,000đ mua hàng = 1 điểm. 1 điểm = 100đ khi đổi.*',
+        `${E('icon_tip')} *Mỗi 10,000đ mua hàng = 1 điểm. 1 điểm = 100đ khi đổi.*`,
       ].join('\n'))
       .setThumbnail(interaction.user.displayAvatarURL())
       .setTimestamp();
@@ -50,16 +50,16 @@ export async function execute(interaction) {
     const result = redeemForCredit(interaction.guildId, interaction.user.id, points);
 
     if (!result.success) {
-      return interaction.reply({ content: `${E('status_cross', '❌')} ${result.error}`, ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross')} ${result.error}`, ephemeral: true });
     }
 
     const embed = new EmbedBuilder()
       .setColor(0x22c55e)
-      .setTitle(`${E('icon_gift', '🎁')} Đổi Điểm Thành Công!`)
+      .setTitle(`${E('icon_gift')} Đổi Điểm Thành Công!`)
       .setDescription([
-        `> ${E('icon_star', '⭐')} **Đã đổi:** ${points} điểm`,
-        `> ${E('payment_money', '💰')} **Nhận:** ${result.creditAmount.toLocaleString('vi-VN')}đ vào ví`,
-        `> ${E('icon_chart', '📊')} **Điểm còn lại:** ${result.remaining}`,
+        `> ${E('icon_star')} **Đã đổi:** ${points} điểm`,
+        `> ${E('payment_money')} **Nhận:** ${result.creditAmount.toLocaleString('vi-VN')}đ vào ví`,
+        `> ${E('icon_chart')} **Điểm còn lại:** ${result.remaining}`,
       ].join('\n'))
       .setTimestamp();
 
@@ -70,18 +70,18 @@ export async function execute(interaction) {
     const history = getPointHistory(interaction.guildId, interaction.user.id, 10);
 
     if (!history.length) {
-      return interaction.reply({ content: '📭 Chưa có lịch sử điểm nào.', ephemeral: true });
+      return interaction.reply({ content: `${E('icon_empty')} Chưa có lịch sử điểm nào.`, ephemeral: true });
     }
 
     const lines = history.map(h => {
       const sign = h.points > 0 ? '+' : '';
-      const emoji = h.points > 0 ? '🟢' : '🔴';
+      const emoji = h.points > 0 ? E('icon_green') : E('icon_red');
       return `${emoji} **${sign}${h.points}** — ${h.description || h.type} — <t:${Math.floor(new Date(h.created_at).getTime() / 1000)}:R>`;
     });
 
     const embed = new EmbedBuilder()
       .setColor(0x6366f1)
-      .setTitle('📋 Lịch Sử Điểm Tích Luỹ')
+      .setTitle(`${E('icon_clipboard')} Lịch Sử Điểm Tích Luỹ`)
       .setDescription(lines.join('\n'))
       .setTimestamp();
 
@@ -92,17 +92,17 @@ export async function execute(interaction) {
     const top = getLoyaltyLeaderboard(interaction.guildId, 10);
 
     if (!top.length) {
-      return interaction.reply({ content: '📭 Chưa có ai tích điểm.', ephemeral: true });
+      return interaction.reply({ content: `${E('icon_empty')} Chưa có ai tích điểm.`, ephemeral: true });
     }
 
     const lines = top.map((r, i) => {
-      const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+      const medal = [E('icon_gold'), E('icon_silver'), E('icon_bronze')][i] || `${i + 1}.`;
       return `${medal} <@${r.customer_id}> — **${r.lifetime_points}** điểm`;
     });
 
     const embed = new EmbedBuilder()
       .setColor(0xf59e0b)
-      .setTitle('🏆 Top Tích Điểm')
+      .setTitle(`${E('icon_trophy')} Top Tích Điểm`)
       .setDescription(lines.join('\n'))
       .setTimestamp();
 

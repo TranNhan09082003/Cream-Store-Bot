@@ -23,7 +23,7 @@ export async function execute(interaction) {
   const current = extractClaimFromTopic(channel.topic);
 
   if (current && current !== interaction.user.id) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Ticket này đang được <@${current}> nhận xử lý.`);
+    await interaction.editReply(`${E('status_warn')} Ticket này đang được <@${current}> nhận xử lý.`);
     return;
   }
 
@@ -31,6 +31,6 @@ export async function execute(interaction) {
   const nextTopic = `${cleanTopic} [CLAIM:${interaction.user.id}]`.trim();
 
   await channel.setTopic(nextTopic.slice(0, 1024)).catch(() => null);
-  await channel.send(`🫡 Ticket đã được **${interaction.user.tag}** nhận xử lý.`);
-  await interaction.editReply(`${E('status_check', '✅')} Đã claim ticket.`);
+  await channel.send(`${E('ticket_staff')} Ticket đã được **${interaction.user.tag}** nhận xử lý.`.trim());
+  await interaction.editReply(`${E('status_check')} Đã claim ticket.`);
 }

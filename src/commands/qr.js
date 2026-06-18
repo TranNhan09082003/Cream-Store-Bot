@@ -12,8 +12,8 @@ export const data = new SlashCommandBuilder()
     option.setName('provider').setDescription('Chọn kênh thanh toán')
       .setRequired(false)
       .addChoices(
-        { name: '💳 PayOS (checkout link)', value: 'payos' },
-        { name: '🏦 VietQR (chuyển khoản → xác nhận tay)', value: 'vietqr' },
+        { name: 'PayOS (checkout link)', value: 'payos' },
+        { name: 'VietQR (chuyển khoản — xác nhận tay)', value: 'vietqr' },
       ),
   )
   .addStringOption((option) =>
@@ -42,27 +42,27 @@ export async function execute(interaction) {
   const orderCode = rawCode?.trim().toUpperCase() || fallbackOrder?.order_code;
 
   if (!orderCode) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không xác định được mã đơn trong kênh này.` });
+    await interaction.editReply({ content: `${E('status_warn')} Không xác định được mã đơn trong kênh này.` });
     return;
   }
 
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không tìm thấy đơn hàng.` });
+    await interaction.editReply({ content: `${E('status_warn')} Không tìm thấy đơn hàng.` });
     return;
   }
 
   // ═══ Xác nhận tay ═══
   if (manual) {
     if (order.payment_status === 'PAID') {
-      await interaction.editReply({ content: `${E('status_info', 'ℹ️')} Đơn này đã thanh toán rồi.` });
+      await interaction.editReply({ content: `${E('status_info')} Đơn này đã thanh toán rồi.` });
       return;
     }
 
     const amount = parseMoneyInput(interaction.options.getString('so_tien')) ?? order.total_amount;
     const updated = await confirmOrderPaidManually(interaction.guild, orderCode, amount);
     await interaction.editReply({
-      content: `${E('status_check', '✅')} Đã xác nhận tay thanh toán cho đơn \`${updated.order_code}\`.`,
+      content: `${E('status_check')} Đã xác nhận tay thanh toán cho đơn \`${updated.order_code}\`.`,
     });
     return;
   }
@@ -72,15 +72,15 @@ export async function execute(interaction) {
     const result = await syncPaymentStatusFromPayOS({ client: interaction.client, orderCode });
     await interaction.editReply({
       content: result.synced
-        ? `${E('status_check', '✅')} Bot đã đồng bộ PayOS và cập nhật đơn \`${result.order.order_code}\` sang trạng thái ${result.state}.`
-        : `${E('status_info', 'ℹ️')} PayOS hiện trả về trạng thái \`${result.state || 'UNKNOWN'}\` cho đơn \`${result.order.order_code}\`.` ,
+        ? `${E('status_check')} Bot đã đồng bộ PayOS và cập nhật đơn \`${result.order.order_code}\` sang trạng thái ${result.state}.`
+        : `${E('status_info')} PayOS hiện trả về trạng thái \`${result.state || 'UNKNOWN'}\` cho đơn \`${result.order.order_code}\`.` ,
     });
     return;
   }
 
   // ═══ Gửi QR ═══
   if (order.payment_status === 'PAID') {
-    await interaction.editReply({ content: `${E('status_info', 'ℹ️')} Đơn này đã thanh toán rồi, không cần gửi lại QR.` });
+    await interaction.editReply({ content: `${E('status_info')} Đơn này đã thanh toán rồi, không cần gửi lại QR.` });
     return;
   }
 
@@ -88,25 +88,25 @@ export async function execute(interaction) {
     if (provider === 'vietqr') {
       // ═══ VietQR (chuyển khoản ngân hàng → xác nhận tay) ═══
       const result = await sendVietQRPayment({ guild: interaction.guild, orderCode });
-      await interaction.editReply(`${E('status_check', '✅')} Đã gửi QR **VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.\n> Sau khi khách chuyển khoản, dùng \`/qr xac_nhan_tay:true\` để xác nhận.`);
+      await interaction.editReply(`${E('status_check')} Đã gửi QR **VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.\n> Sau khi khách chuyển khoản, dùng \`/qr xac_nhan_tay:true\` để xác nhận.`);
     } else {
       // ═══ PayOS (checkout link) ═══
       try {
         await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode });
-        await interaction.editReply(`${E('status_check', '✅')} Đã gửi QR + checkout **PayOS** cho đơn \`${orderCode}\`.`);
+        await interaction.editReply(`${E('status_check')} Đã gửi QR + checkout **PayOS** cho đơn \`${orderCode}\`.`);
       } catch (payosError) {
         // PayOS lỗi → tự động thử VietQR
         console.warn('[QR] PayOS failed, trying VietQR fallback:', payosError.message);
         try {
           await sendVietQRPayment({ guild: interaction.guild, orderCode });
-          await interaction.editReply(`${E('status_warn', '⚠️')} PayOS lỗi: _${payosError.message}_\n${E('status_check', '✅')} Đã **tự động chuyển sang VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.`);
+          await interaction.editReply(`${E('status_warn')} PayOS lỗi: _${payosError.message}_\n${E('status_check')} Đã **tự động chuyển sang VietQR** (chuyển khoản) cho đơn \`${orderCode}\`.`);
         } catch (vietqrError) {
-          await interaction.editReply(`${E('status_cross', '❌')} PayOS lỗi: ${payosError.message}\n${E('status_cross', '❌')} VietQR cũng lỗi: ${vietqrError.message}\n\n💡 Hãy dùng \`/setup-bank\` để cấu hình ngân hàng.`);
+          await interaction.editReply(`${E('status_cross')} PayOS lỗi: ${payosError.message}\n${E('status_cross')} VietQR cũng lỗi: ${vietqrError.message}\n\n💡 Hãy dùng \`/setup-bank\` để cấu hình ngân hàng.`);
         }
       }
     }
   } catch (error) {
     console.error('[QR] Error:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }

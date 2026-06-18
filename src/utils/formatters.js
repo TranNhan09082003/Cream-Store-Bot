@@ -3,12 +3,12 @@ import { createEmojiResolver } from './emojiHelper.js';
 export function getOrderStatusLabel(status, guildId = null) {
   const E = createEmojiResolver(guildId);
   const map = {
-    PENDING_PAYMENT: `${E('order_pending', '⏳')} CHỜ THANH TOÁN`,
-    PROCESSING: `${E('order_processing', '⚙️')} ĐANG XỬ LÝ`,
-    COMPLETED: `${E('order_complete', '🎉')} ĐÃ HOÀN THÀNH`,
-    DELIVERED: `${E('order_product', '📦')} ĐÃ GIAO HÀNG`,
-    CANCELLED: `${E('order_cancel', '❌')} ĐÃ HỦY`,
-    WARRANTY_OPEN: `${E('panel_warranty', '🛠️')} ĐANG BẢO HÀNH`,
+    PENDING_PAYMENT: `${E('order_pending')} CHỜ THANH TOÁN`,
+    PROCESSING: `${E('order_processing')} ĐANG XỬ LÝ`,
+    COMPLETED: `${E('order_complete')} ĐÃ HOÀN THÀNH`,
+    DELIVERED: `${E('order_product')} ĐÃ GIAO HÀNG`,
+    CANCELLED: `${E('order_cancel')} ĐÃ HỦY`,
+    WARRANTY_OPEN: `${E('panel_warranty')} ĐANG BẢO HÀNH`,
   };
   return map[status] ?? String(status ?? 'Không xác định');
 }
@@ -44,19 +44,24 @@ export function buildOrderLogContent(order, guildId = null) {
   const orderCode = `> \`${order.order_code}\``;
   const customer = `<@${order.customer_id}>`;
   const product = `**${formatOrderProduct(order.quantity, order.product_name)}**`;
-  const status = `\`${getOrderStatusLabel(order.status, guildId || order.guild_id || null)}\``;
+  // Không bọc trong backtick vì getOrderStatusLabel trả về custom emoji
+  const status = getOrderStatusLabel(order.status, guildId || order.guild_id || null);
   const ticket = resolveTicketLabel(order);
   return `${orderCode} ${customer} ${product} ${status} | ${ticket}`;
 }
 
 export function toStars(stars, guildId = null) {
   const E = createEmojiResolver(guildId);
-  return E('icon_star', '⭐').repeat(Math.max(1, Math.min(5, Number(stars) || 1)));
+  const star = E('icon_star');
+  const n = Math.max(1, Math.min(5, Number(stars) || 1));
+  return star ? star.repeat(n) : String(n);
 }
 
 export function numericEmoji(stars, guildId = null) {
   const E = createEmojiResolver(guildId);
-  return `${E('icon_star', '⭐')} ${Math.max(1, Math.min(5, Number(stars) || 1))}`;
+  const n = Math.max(1, Math.min(5, Number(stars) || 1));
+  const star = E('icon_star');
+  return star ? `${star} ${n}` : String(n);
 }
 
 export function sanitizeChannelName(input) {

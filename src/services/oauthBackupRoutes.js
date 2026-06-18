@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { db } from '../database/db.js';
 import { EmbedBuilder } from 'discord.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 export function registerOauthRoutes(app) {
   
@@ -139,28 +140,29 @@ export function registerOauthRoutes(app) {
 
                 // ─── Gửi DM chào mừng sau khi verify thành công ───
                 try {
+                  const E = createEmojiResolver(guildId);
                   const dmEmbed = new EmbedBuilder()
                     .setColor(0x7C3AED)
-                    .setTitle('✅ Xác Minh Thành Công — Cenar Store')
+                    .setTitle(`${E('status_check')} Xac Minh Thanh Cong — ${guild.name}`.trim())
                     .setDescription([
-                      `Xin chào **${member.user.username}**! 🎉`,
+                      `Xin chao **${member.user.username}**!`,
                       '',
-                      `Tài khoản Discord của bạn đã được **xác minh thành công** tại **${guild.name}**.`,
+                      `Tai khoan Discord cua ban da duoc **xac minh thanh cong** tai **${guild.name}**.`,
                       '',
-                      '**Bạn đã nhận được:**',
-                      `> 🏷️ Vai trò: **${role.name}**`,
-                      '> 🔓 Quyền xem toàn bộ kênh của server',
-                      '> 💾 Tài khoản được sao lưu bảo mật (backup)',
+                      '**Ban da nhan duoc:**',
+                      `> ${E('order_product')} Vai tro: **${role.name}**`,
+                      `> ${E('status_check')} Quyen xem toan bo kenh cua server`,
+                      `> ${E('icon_sparkle')} Tai khoan duoc sao luu bao mat (backup)`,
                       '',
-                      '**Bước tiếp theo:**',
-                      '> 💰 Xem bảng giá sản phẩm trong kênh `bảng-giá`',
-                      '> 🎫 Mở ticket mua hàng trong kênh `hỗ-trợ`',
-                      '> 💬 Tham gia trò chuyện trong `thảo-luận`',
+                      '**Buoc tiep theo:**',
+                      `> ${E('payment_money')} Xem bang gia san pham trong kenh \`bang-gia\``,
+                      `> ${E('panel_order')} Mo ticket mua hang trong kenh \`ho-tro\``,
+                      `> ${E('brand_discord')} Tham gia tro chuyen trong \`thao-luan\``,
                       '',
-                      '*Nếu có vấn đề, hãy mở ticket hỗ trợ trong server.*'
+                      '*Neu co van de, hay mo ticket ho tro trong server.*'
                     ].join('\n'))
                     .setThumbnail(guild.iconURL({ forceStatic: false }) || undefined)
-                    .setFooter({ text: 'Cenar Store — Uy Tín & Chất Lượng 💜' })
+                    .setFooter({ text: `${guild.name} — Uy Tin & Chat Luong` })
                     .setTimestamp();
 
                   await member.send({ embeds: [dmEmbed] }).catch(() => {

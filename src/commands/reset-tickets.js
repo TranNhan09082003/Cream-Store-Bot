@@ -4,7 +4,7 @@ import { db } from '../database/db.js';
 
 export const data = new SlashCommandBuilder()
   .setName('reset-tickets')
-  .setDescription('🗑️ Xóa các kênh ticket KHÔNG CÓ dữ liệu trong database (kênh orphan/rác)')
+  .setDescription('Xóa các kênh ticket KHÔNG CÓ dữ liệu trong database (kênh orphan/rác)')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(interaction) {
@@ -16,7 +16,7 @@ export async function execute(interaction) {
   // ─── Lấy config guild ───
   const guildConfig = db.prepare('SELECT * FROM guild_settings WHERE guild_id = ?').get(guild.id);
   if (!guildConfig) {
-    return interaction.editReply({ content: `${E('status_cross', '❌')} Chưa setup bot! Dùng \`/setup-ticket\` trước.` });
+    return interaction.editReply({ content: `${E('status_cross')} Chưa setup bot! Dùng \`/setup-ticket\` trước.` });
   }
 
   // ─── Lấy tất cả category ticket ───
@@ -81,7 +81,7 @@ export async function execute(interaction) {
     return interaction.editReply({
       embeds: [new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle(`${E('status_check', '✅')} Không có kênh orphan!`)
+        .setTitle(`${E('status_check')} Không có kênh orphan!`)
         .setDescription('Tất cả kênh ticket đều có dữ liệu trong database. Không cần xóa gì.')
       ],
     });
@@ -93,7 +93,7 @@ export async function execute(interaction) {
 
   const confirmEmbed = new EmbedBuilder()
     .setColor(0xFFA500)
-    .setTitle(`🗑️ Tìm thấy ${orphanChannels.length} kênh orphan`)
+    .setTitle(`${E('status_warn')} Tìm thấy ${orphanChannels.length} kênh orphan`)
     .setDescription([
       `> Đây là các kênh **KHÔNG CÓ** trong database (kênh rác từ hosting cũ)`,
       `> Các kênh **CÓ DỮ LIỆU** sẽ được **GIỮ NGUYÊN**`,
@@ -101,8 +101,8 @@ export async function execute(interaction) {
       '**Danh sách sẽ xóa:**',
       channelList + moreText,
       '',
-      `${E('icon_chart', '📊')} **Giữ lại:** ${dbChannelIds.size} ticket có dữ liệu`,
-      `🗑️ **Sẽ xóa:** ${orphanChannels.length} kênh orphan`,
+      `${E('icon_chart')} **Giữ lại:** ${dbChannelIds.size} ticket có dữ liệu`,
+      `**Sẽ xóa:** ${orphanChannels.length} kênh orphan`,
     ].join('\n'))
     .setFooter({ text: 'Bấm Xác Nhận để xóa. Hết hạn sau 60 giây.' })
     .setTimestamp();
@@ -110,7 +110,7 @@ export async function execute(interaction) {
   const confirmRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('reset_orphan_confirm')
-      .setLabel(`⚠️ Xóa ${orphanChannels.length} kênh orphan`)
+      .setLabel(`Xoa ${orphanChannels.length} kenh orphan`)
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('reset_orphan_cancel')
@@ -130,11 +130,11 @@ export async function execute(interaction) {
     });
 
     if (btn.customId === 'reset_orphan_cancel') {
-      return btn.update({ content: `${E('status_cross', '❌')} Đã hủy.`, embeds: [], components: [] });
+      return btn.update({ content: `${E('status_cross')} Đã hủy.`, embeds: [], components: [] });
     }
 
     await btn.update({
-      content: `${E('order_pending', '⏳')} Đang xóa ${orphanChannels.length} kênh... Vui lòng chờ.`,
+      content: `${E('order_pending')} Đang xóa ${orphanChannels.length} kênh... Vui lòng chờ.`,
       embeds: [],
       components: [],
     });
@@ -156,7 +156,7 @@ export async function execute(interaction) {
       // Cập nhật tiến trình mỗi 10 kênh
       if ((deleted + failed) % 10 === 0) {
         await interaction.editReply({
-          content: `${E('order_pending', '⏳')} Đang xóa... ${deleted + failed}/${orphanChannels.length} (${deleted} thành công, ${failed} lỗi)`,
+          content: `${E('order_pending')} Đang xóa... ${deleted + failed}/${orphanChannels.length} (${deleted} thành công, ${failed} lỗi)`,
         }).catch(() => {});
       }
     }
@@ -164,15 +164,15 @@ export async function execute(interaction) {
     // ─── Kết quả ───
     const resultEmbed = new EmbedBuilder()
       .setColor(0x00FF00)
-      .setTitle(`${E('status_check', '✅')} Xóa Kênh Orphan Hoàn Tất!`)
+      .setTitle(`${E('status_check')} Xóa Kênh Orphan Hoàn Tất!`)
       .setDescription([
         '**Kết quả:**',
         '',
-        `${E('status_check', '✅')} Đã xóa: **${deleted}** kênh`,
-        failed > 0 ? `${E('status_cross', '❌')} Thất bại: **${failed}** kênh` : '',
-        `${E('icon_chart', '📊')} Giữ nguyên: **${dbChannelIds.size}** ticket có dữ liệu`,
+        `${E('status_check')} Đã xóa: **${deleted}** kênh`,
+        failed > 0 ? `${E('status_cross')} Thất bại: **${failed}** kênh` : '',
+        `${E('icon_chart')} Giữ nguyên: **${dbChannelIds.size}** ticket có dữ liệu`,
         '',
-        '> 💡 Các ticket có dữ liệu vẫn hoạt động bình thường!',
+        `> ${E('status_check')} Các ticket có dữ liệu vẫn hoạt động bình thường!`,
       ].filter(Boolean).join('\n'))
       .setFooter({ text: `Thực hiện bởi ${interaction.user.tag}` })
       .setTimestamp();
@@ -185,10 +185,10 @@ export async function execute(interaction) {
 
   } catch (e) {
     if (e.code === 'InteractionCollectorError') {
-      return interaction.editReply({ content: `${E('icon_clock', '⏰')} Hết thời gian.`, embeds: [], components: [] });
+      return interaction.editReply({ content: `${E('icon_clock')} Hết thời gian.`, embeds: [], components: [] });
     }
     console.error('[RESET-TICKETS]', e);
-    return interaction.editReply({ content: `${E('status_cross', '❌')} Lỗi: ${e.message}`, embeds: [], components: [] });
+    return interaction.editReply({ content: `${E('status_cross')} Lỗi: ${e.message}`, embeds: [], components: [] });
   }
 }
 

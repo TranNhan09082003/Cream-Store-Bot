@@ -71,7 +71,7 @@ export function buildOrderPaymentCreatedView({
   const qr = new EmbedBuilder()
     .setColor(0xED4245)
     .setAuthor({ name: storeName })
-    .setTitle('Thông Tin Thanh Toán Đơn Hàng 🛒')
+    .setTitle('Thong Tin Thanh Toan Don Hang')
     .setDescription(
       [
         'Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động ghi nhận đơn hàng.',
@@ -104,7 +104,7 @@ export function buildOrderPaymentCreatedView({
     .setColor(0xFEE75C)
     .setDescription(
       [
-        '⚠️ **Lưu ý**',
+        '**Luu y**',
         '- Giao dịch sẽ hết hạn sau thời gian hệ thống hiển thị nếu chưa thanh toán.',
         '- Bạn có thể tạo lại hóa đơn mới nếu đơn thanh toán cũ đã hết hạn.',
         '- Chuyển đúng nội dung để hệ thống tự xác nhận nhanh nhất.',

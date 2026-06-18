@@ -10,7 +10,7 @@ export function normalizeOrderCode(value) {
 
 export function extractOrderCodesFromText(text) {
   const input = upper(text);
-  const matches = input.match(/(?:CR|VB)_[0-9]{4,8}/g) ?? [];
+  const matches = input.match(/(?:CN|CR|VB)_[0-9]{4,8}/g) ?? [];
   return [...new Set(matches.map(normalizeOrderCode))];
 }
 

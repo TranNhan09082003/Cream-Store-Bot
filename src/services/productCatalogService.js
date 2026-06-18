@@ -45,7 +45,7 @@ export function getProductByName(guildId, name) {
   return product;
 }
 
-export function addProduct({ guildId, name, description, price, durationMonths = 1, serviceType = 'other', emoji = '📦' }) {
+export function addProduct({ guildId, name, description, price, durationMonths = 1, serviceType = 'other', emoji = 'order_product' }) {
   const timestamp = nowIso();
   const maxSort = db.prepare('SELECT MAX(sort_order) AS mx FROM product_catalog WHERE guild_id = ?').get(guildId);
   const sortOrder = (maxSort?.mx ?? 0) + 1;

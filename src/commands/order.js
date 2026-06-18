@@ -32,7 +32,7 @@ export async function execute(interaction) {
   try {
     const guildConfig = getGuildConfig(interaction.guildId);
     if (!guildConfig) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Chưa setup hệ thống. Hãy chạy \`/setup-ticket\` trước.`);
+      await interaction.editReply(`${E('status_warn')} Chưa setup hệ thống. Hãy chạy \`/setup-ticket\` trước.`);
       return;
     }
 
@@ -42,7 +42,7 @@ export async function execute(interaction) {
       action: 'CREATE_ORDER',
       limit: config.orderCreateBurstLimit,
       windowSeconds: config.orderCreateBurstWindowSeconds,
-      message: `${E('status_warn', '⚠️')} Bạn tạo đơn quá nhanh. Vui lòng chờ thêm rồi thử lại.`,
+      message: `${E('status_warn')} Bạn tạo đơn quá nhanh. Vui lòng chờ thêm rồi thử lại.`,
     });
 
     const customer = interaction.options.getUser('khach_hang', true);
@@ -56,34 +56,59 @@ export async function execute(interaction) {
     const ticket = getTicketByChannelId(ticketChannel.id);
     const allowedTicketTypes = ['ORDER', 'SUPPORT', 'COMPLAINT', 'WARRANTY'];
     if (!ticket || ticket.status !== 'OPEN' || !allowedTicketTypes.includes(ticket.ticket_type)) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Ticket này không được phép tạo đơn. Chỉ ticket mua hàng / hỗ trợ / khiếu nại / bảo hành mới được lên đơn.`);
+      await interaction.editReply(`${E('status_warn')} Ticket này không được phép tạo đơn. Chỉ ticket mua hàng / hỗ trợ / khiếu nại / bảo hành mới được lên đơn.`);
       return;
     }
     if (ticket.customer_id !== customer.id) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Khách hàng bạn chọn không trùng với chủ sở hữu của ticket này nên bot từ chối để tránh xung đột dữ liệu.`);
+      await interaction.editReply(`${E('status_warn')} Khách hàng bạn chọn không trùng với chủ sở hữu của ticket này nên bot từ chối để tránh xung đột dữ liệu.`);
       return;
     }
 
-    const order = createOrder({
-      guildId: interaction.guildId,
-      ticketId: ticket.id,
-      ticketChannelId: ticket.channel_id,
-      customerId: customer.id,
-      productName,
-      quantity,
-      note,
-      totalAmount: amount,
-      durationMonths,
-      orderLogChannelId: guildConfig.order_log_channel_id,
-      createdById: interaction.user.id,
-    });
-    const queue = getQueuePosition(order);
-    const orderLogChannel = await interaction.guild.channels.fetch(guildConfig.order_log_channel_id);
-    if (!orderLogChannel || !orderLogChannel.isTextBased()) {
-      throw new Error('Không tìm thấy kênh log order hợp lệ. Hãy chạy lại /setup-ticket.');
+    // ── Tạo đơn (ghi DB) — nếu bước NÀY lỗi thì mới là "lỗi tạo đơn" thực sự ──
+    let order;
+    try {
+      order = createOrder({
+        guildId: interaction.guildId,
+        ticketId: ticket.id,
+        ticketChannelId: ticket.channel_id,
+        customerId: customer.id,
+        productName,
+        quantity,
+        note,
+        totalAmount: amount,
+        durationMonths,
+        orderLogChannelId: guildConfig.order_log_channel_id,
+        createdById: interaction.user.id,
+      });
+    } catch (createError) {
+      console.error('[ORDER] Lỗi ghi đơn vào DB:', createError);
+      await interaction.editReply(`${E('status_cross')} Không ghi được đơn vào hệ thống: ${createError.message ?? 'Lỗi không xác định'}`);
+      return;
     }
-    const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
-    saveOrderLogMessage(order.order_code, logMessage.id);
+
+    // Tới đây đơn ĐÃ nằm trong DB. Mọi bước dưới chỉ là phụ trợ (best-effort) —
+    // dù lỗi gì cũng KHÔNG được giấu mã đơn, để staff luôn /hoanthanh được.
+    const warnings = [];
+
+    let queue = null;
+    try {
+      queue = getQueuePosition(order);
+    } catch (e) {
+      console.error('[ORDER] Lỗi tính vị trí hàng đợi:', e.message);
+    }
+
+    try {
+      const orderLogChannel = await interaction.guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null);
+      if (orderLogChannel?.isTextBased()) {
+        const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order) });
+        saveOrderLogMessage(order.order_code, logMessage.id);
+      } else {
+        warnings.push('không ghi được log đơn (kiểm tra lại `/setup-ticket`)');
+      }
+    } catch (e) {
+      console.error('[ORDER] Lỗi gửi log đơn:', e.message);
+      warnings.push('không ghi được log đơn');
+    }
 
     const hub = getCenarHub();
     if (hub) {
@@ -102,22 +127,33 @@ export async function execute(interaction) {
     }
 
     // Gửi Order Created V2 + Queue V2 trong cùng 1 message
-    const { container: orderContainer, actionRow: orderActionRow, flags: orderFlags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
-    const { container: queueContainer, actionRow: queueActionRow, flags: queueFlags } = buildQueuePositionV2(order, queue.position, queue.total);
-
-    await ticketChannel.send({
-      components: [orderContainer, orderActionRow, queueContainer, queueActionRow],
-      flags: orderFlags,
-      allowedMentions: { users: [customer.id] },
-    });
+    try {
+      const { container: orderContainer, actionRow: orderActionRow, flags: orderFlags } = buildOrderCreatedV2(order, guildConfig.order_log_channel_id);
+      const components = [orderContainer, orderActionRow];
+      if (queue) {
+        const { container: queueContainer, actionRow: queueActionRow } = buildQueuePositionV2(order, queue.position, queue.total);
+        components.push(queueContainer, queueActionRow);
+      }
+      await ticketChannel.send({
+        components,
+        flags: orderFlags,
+        allowedMentions: { users: [customer.id] },
+      });
+    } catch (e) {
+      console.error('[ORDER] Lỗi gửi thông báo đơn vào ticket:', e.message);
+      warnings.push('không gửi được thông báo đơn vào ticket');
+    }
 
     // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
     if (order.total_amount > 0) {
-      const { sendOrRefreshPaymentQr } = await import('../services/paymentService.js');
-      await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
+      try {
+        const { sendOrRefreshPaymentQr } = await import('../services/paymentService.js');
+        await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code });
+      } catch (err) {
         console.error('[ORDER] Lỗi tạo QR PayOS:', err);
-        ticketChannel.send(`${E('status_warn', '⚠️')} Lỗi tạo mã QR thanh toán: ${err.message}`);
-      });
+        ticketChannel.send(`${E('status_warn')} Lỗi tạo mã QR thanh toán: ${err.message}`).catch(() => null);
+        warnings.push('chưa tạo được mã QR thanh toán');
+      }
     }
 
     await emitStaffLog(interaction.client, {
@@ -128,12 +164,14 @@ export async function execute(interaction) {
       detail: `${productName} x${quantity}`,
       relatedOrderCode: order.order_code,
       relatedTicketCode: ticket.ticket_code,
-    });
+    }).catch((e) => console.error('[ORDER] Lỗi ghi staff log:', e.message));
 
-    await interaction.editReply(`${E('status_check', '✅')} Đã tạo đơn \`${order.order_code}\` và ghi log vào ${orderLogChannel}. Khách hàng chọn phương thức thanh toán trong ticket.`);
+    const baseMsg = `${E('status_check')} Đã tạo đơn \`${order.order_code}\` thành công.`;
+    const warnMsg = warnings.length ? `\n${E('status_warn')} Lưu ý: ${warnings.join('; ')}. Mã đơn vẫn dùng được với \`/hoanthanh\`, \`/giaohang\`.` : '';
+    await interaction.editReply(baseMsg + warnMsg).catch(() => null);
   } catch (error) {
     console.error('[ORDER] Lỗi:', error);
-    const message = `${E('status_cross', '❌')} Có lỗi khi tạo đơn hàng: ${error.message ?? 'Lỗi không xác định'}`;
+    const message = `${E('status_cross')} Có lỗi khi tạo đơn hàng: ${error.message ?? 'Lỗi không xác định'}`;
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply(message).catch(() => null);
     } else {

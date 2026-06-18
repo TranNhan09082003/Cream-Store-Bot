@@ -4,9 +4,20 @@ import { runDeepNotifications, runSubscriptionNotifications } from '../services/
 import { getExpiringOrdersRaw } from '../services/v11DbHelpers.js';
 import { getSubscriptionsDueInDays } from '../services/subscriptionService.js';
 
-const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺', netflix: '🎬' };
 const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
-const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: '✅ Đã trả hết' };
+const SERVICE_SLOT = { nitro: 'brand_nitro', spotify_family: 'brand_spotify', youtube: 'brand_youtube', netflix: 'brand_netflix' };
+
+function serviceEmoji(E, type) {
+  return E(SERVICE_SLOT[type]) || E('order_product');
+}
+
+function modeLabel(E, mode) {
+  return ({
+    auto_cycle: `${E('icon_cycle')} Định kỳ`,
+    one_time: `${E('icon_once')} Mua lẻ`,
+    full_paid: `${E('status_check')} Đã trả hết`,
+  })[mode] || mode;
+}
 
 export const data = new SlashCommandBuilder()
   .setName('auto-renew-remind')
@@ -41,12 +52,12 @@ export async function execute(interaction) {
       ]);
 
       const embed = new EmbedBuilder()
-        .setTitle(`${E('status_check', '✅')} Đã Quét Hệ Thống Nhắc Gia Hạn`)
+        .setTitle(`${E('status_check')} Đã Quét Hệ Thống Nhắc Gia Hạn`)
         .setColor(0x3498DB)
         .setDescription('Kết quả quét và gửi tin nhắn:')
         .addFields(
-          { name: `${E('order_product', '📦')} Đơn hàng`, value: `3 ngày: ${orderResult?.sent3d || 0}\n2 ngày: ${orderResult?.sent2d || 0}\n1 ngày: ${orderResult?.sent1d || 0}`, inline: true },
-          { name: '🔄 Subscriptions', value: `Chủ shop: ${subResult?.sentOwner || 0}\nKhách hàng: ${subResult?.sentCustomer || 0}`, inline: true },
+          { name: `${E('order_product')} Đơn hàng`, value: `3 ngày: ${orderResult?.sent3d || 0}\n2 ngày: ${orderResult?.sent2d || 0}\n1 ngày: ${orderResult?.sent1d || 0}`, inline: true },
+          { name: `${E('icon_cycle')} Subscriptions`, value: `Chủ shop: ${subResult?.sentOwner || 0}\nKhách hàng: ${subResult?.sentCustomer || 0}`, inline: true },
         )
         .setTimestamp();
 
@@ -59,7 +70,7 @@ export async function execute(interaction) {
       const expiringOrders = getExpiringOrdersRaw(days);
 
       const embed = new EmbedBuilder()
-        .setTitle(`🕒 Đơn Hàng Tới Hạn Trong ${days} Ngày`)
+        .setTitle(`${E('icon_clock')} Đơn Hàng Tới Hạn Trong ${days} Ngày`)
         .setColor(0xE74C3C)
         .setDescription(expiringOrders.length === 0
           ? 'Hiện tại chưa có đơn hàng nào sắp hết hạn.'
@@ -89,22 +100,22 @@ export async function execute(interaction) {
       const subs = getSubscriptionsDueInDays(interaction.guildId, days);
 
       const embed = new EmbedBuilder()
-        .setTitle(`${E('icon_clock', '⏰')} Subscriptions Cần Gia Hạn Trong ${days} Ngày`)
+        .setTitle(`${E('icon_clock')} Subscriptions Cần Gia Hạn Trong ${days} Ngày`)
         .setColor(0xF39C12)
         .setTimestamp();
 
       if (!subs.length) {
-        embed.setDescription(`${E('order_complete', '🎉')} Không có subscription nào cần gia hạn!`);
+        embed.setDescription(`${E('order_complete')} Không có subscription nào cần gia hạn!`);
       } else {
         let desc = `Tìm thấy **${subs.length}** subscription cần xử lý:\n\n`;
         for (const s of subs.slice(0, 20)) {
-          const emoji = SERVICE_EMOJI[s.service_type] || `${E('order_product', '📦')}`;
-          const mode = MODE_LABEL[s.renewal_mode] || s.renewal_mode;
+          const emoji = serviceEmoji(E, s.service_type);
+          const mode = modeLabel(E, s.renewal_mode);
           const dateField = s.renewal_mode === 'auto_cycle' ? s.next_renewal_at : s.expiry_at;
           const ts = Math.floor(new Date(dateField).getTime() / 1000);
           const customer = s.customer_id ? `<@${s.customer_id}>` : (s.customer_discord_name || '—');
-          const extra = s.spotify_family_name ? ` · 🏠 ${s.spotify_family_name}` : '';
-          desc += `${emoji} **ID ${s.id}** · \`${s.gmail_email}\`${extra}\n> ${E('ticket_user', '👤')} ${customer} · ${mode} · <t:${ts}:R>\n\n`;
+          const extra = s.spotify_family_name ? ` · ${E('icon_home')} ${s.spotify_family_name}` : '';
+          desc += `${emoji} **ID ${s.id}** · \`${s.gmail_email}\`${extra}\n> ${E('ticket_user')} ${customer} · ${mode} · <t:${ts}:R>\n\n`;
         }
         embed.setDescription(desc.slice(0, 4000));
         if (subs.length > 20) embed.setFooter({ text: `Và ${subs.length - 20} mục khác...` });
@@ -114,6 +125,6 @@ export async function execute(interaction) {
     }
   } catch (error) {
     console.error('[AUTO-RENEW] Error:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Đã xảy ra lỗi hệ thống.`);
+    await interaction.editReply(`${E('status_cross')} Đã xảy ra lỗi hệ thống.`);
   }
 }

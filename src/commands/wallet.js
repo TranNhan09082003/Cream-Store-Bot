@@ -41,13 +41,13 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(0x3d5dff)
-      .setTitle(`💳 Ví điện tử của ${targetUser.username}`)
+      .setTitle(`${E('icon_wallet')} Ví điện tử của ${targetUser.username}`)
       .setDescription(`**Số dư hiện tại:** \`${formatCurrency(balance)}\``)
       .setThumbnail(targetUser.displayAvatarURL());
 
     if (txs.length > 0) {
       const history = txs.map(tx => {
-        const icon = tx.amount >= 0 ? '🟢' : '🔴';
+        const icon = tx.amount >= 0 ? E('icon_green') : E('icon_red');
         const sign = tx.amount >= 0 ? '+' : '';
         return `${icon} \`${sign}${formatCurrency(tx.amount)}\` - ${tx.description} (<t:${Math.floor(new Date(tx.created_at).getTime()/1000)}:R>)`;
       }).join('\n');
@@ -60,7 +60,7 @@ export async function execute(interaction) {
   if (subcommand === 'add') {
     // Permission check - require ManageGuild
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      return interaction.reply({ content: `${E('status_cross', '❌')} Bạn không có quyền cộng trừ tiền.`, ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross')} Bạn không có quyền cộng trừ tiền.`, ephemeral: true });
     }
 
     const targetUser = interaction.options.getUser('user');
@@ -68,7 +68,7 @@ export async function execute(interaction) {
     const reason = interaction.options.getString('reason') || 'Admin thay đổi số dư';
 
     if (amount === 0) {
-      return interaction.reply({ content: `${E('status_cross', '❌')} Số tiền không hợp lệ.`, ephemeral: true });
+      return interaction.reply({ content: `${E('status_cross')} Số tiền không hợp lệ.`, ephemeral: true });
     }
 
     const type = amount >= 0 ? 'ADMIN_ADD' : 'ADMIN_SUB';

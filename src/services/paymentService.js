@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { AttachmentBuilder, EmbedBuilder, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import QRCode from 'qrcode';
 import { assertPaymentConfig, config, getPayOSCancelUrl, getPayOSReturnUrl, getWebhookUrl } from '../config.js';
-import { db } from '../database/db.js';
+import { db, nowIso } from '../database/db.js';
 import {
   getLatestOrderByTicketChannel,
   getOrderByCode,
@@ -15,6 +15,7 @@ import {
   setOrderStatus,
   markOrderCompleted,
   saveDelivery,
+  resetPaymentLinkForRegen,
 } from './orderService.js';
 import { findOrderByIncomingPaymentCode, syncPaymentCodeIfPossible } from './paymentOrderMatcher.js';
 import { getTopupByPayOSCode, finalizeTopup } from './walletService.js';
@@ -106,6 +107,9 @@ function buildPayOSRequestPayload(order) {
 
   const description = truncateText(order.payment_code ?? order.order_code, 25);
   const amount = Number(order.total_amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error(`Đơn ${order.order_code} có số tiền không hợp lệ (${order.total_amount}). Không thể tạo QR PayOS.`);
+  }
   const orderCode = Number(order.payos_order_code ?? String(order.order_code ?? '').replace(/^[A-Z]+_/, ''));
   if (!Number.isFinite(orderCode) || orderCode <= 0) {
     throw new Error(`Đơn ${order.order_code} chưa có payos_order_code hợp lệ để tạo checkout PayOS.`);
@@ -260,7 +264,7 @@ export function buildVietQRUrl({ bankBin, accountNo, amount, content, accountNam
 export async function sendVietQRPayment({ guild, orderCode }) {
   const order = getOrderByCode(orderCode);
   if (!order) throw new Error('Không tìm thấy đơn hàng.');
-  if (order.total_amount <= 0) throw new Error('Đơn này không có số tiền cần thanh toán.');
+  if (!(Number(order.total_amount) > 0)) throw new Error('Đơn này không có số tiền cần thanh toán.');
   if (order.payment_status === 'PAID') throw new Error('Đơn này đã thanh toán rồi.');
 
   const bankInfo = getBankInfo(order.guild_id);
@@ -290,7 +294,7 @@ export async function sendVietQRPayment({ guild, orderCode }) {
   const bankName = (bankInfo.bankName || bankInfo.bankBin || 'BANK').toUpperCase();
   const embed = new EmbedBuilder()
     .setColor(0x00b4d8)
-    .setTitle('🏦 Thông Tin Thanh Toán Đơn Hàng')
+    .setTitle('Thong Tin Thanh Toan Don Hang')
     .setDescription(
       `Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động giải phóng key. Trong trường hợp chuyển sai nội dung vui lòng tạo ticket!`
     )
@@ -303,7 +307,7 @@ export async function sendVietQRPayment({ guild, orderCode }) {
       { name: 'Số tiền', value: `\`${formatCurrency(order.total_amount)}\``, inline: true },
     )
     .setImage(`attachment://${attachmentName}`)
-    .setFooter({ text: '⚠️ Lưu ý: Giao dịch sẽ hết hạn sau 10p nếu chưa thanh toán. Bạn có thể tạo lại hóa đơn mới.' });
+    .setFooter({ text: 'Luu y: Giao dich se het han sau 10p neu chua thanh toan. Ban co the tao lai hoa don moi.' });
 
   const sentMessage = await ticketChannel.send({
     content: `<@${order.customer_id}>`,
@@ -323,7 +327,7 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
     throw new Error('Không tìm thấy đơn hàng.');
   }
 
-  if (current.total_amount <= 0) {
+  if (!(Number(current.total_amount) > 0)) {
     throw new Error('Đơn này không có số tiền cần thanh toán.');
   }
 
@@ -374,6 +378,27 @@ export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
     message: sentMessage,
     checkoutUrl: updated.payment_checkout_url,
   };
+}
+
+export async function regeneratePaymentQr({ guild, orderCode }) {
+  assertPaymentConfig();
+
+  const current = getOrderByCode(orderCode);
+  if (!current) throw new Error('Không tìm thấy đơn hàng.');
+  if (!(Number(current.total_amount) > 0)) throw new Error('Đơn này không có số tiền cần thanh toán.');
+  if (current.payment_status === 'PAID') throw new Error('Đơn này đã thanh toán rồi.');
+
+  // Hủy link PayOS cũ (best-effort) để tránh tồn đọng giao dịch chờ
+  if (current.payment_link_id || current.payos_order_code) {
+    await cancelPayOSPaymentLink(current, 'Khách tạo lại hoá đơn mới để gia hạn').catch(() => null);
+  }
+
+  // Xoá field link cũ + cấp payos_order_code mới → PayOS không từ chối trùng,
+  // QR và link checkout sẽ hoàn toàn mới.
+  const reset = resetPaymentLinkForRegen(orderCode);
+  if (!reset) throw new Error('Không reset được hoá đơn cũ.');
+
+  return sendOrRefreshPaymentQr({ guild, orderCode });
 }
 
 function parseWebhookSuccessFlag(value) {
@@ -536,7 +561,7 @@ async function finalizePaidOrder(client, order, paymentData, transactionId, tran
           if (gCfg?.staff_log_channel_id) {
             const chan = await guild.channels.fetch(gCfg.staff_log_channel_id).catch(() => null);
             if (chan?.isTextBased()) {
-              await chan.send(`⚠️ **CẢNH BÁO HẾT KHO:** Đơn hàng \`${finalOrder.order_code}\` (**${finalOrder.product_name}**) đã thanh toán thành công nhưng **KHO HÀNG ĐÃ HẾT**. Vui lòng giao hàng thủ công!`);
+              await chan.send(`**CANH BAO HET KHO:** Don hang \`${finalOrder.order_code}\` (**${finalOrder.product_name}**) da thanh toan thanh cong nhung **KHO HANG DA HET**. Vui long giao hang thu cong!`);
             }
           }
         }

@@ -126,6 +126,8 @@ export const config = {
   paymentThumbnailUrl: getEnv('PAYMENT_THUMBNAIL_URL', ''),
   deliveryBannerUrl: getEnv('DELIVERY_BANNER_URL', ''),
   publicBaseUrl: getEnv('PUBLIC_BASE_URL', ''),
+  // Domain cho link transcript — fallback về PUBLIC_BASE_URL nếu không set riêng
+  transcriptBaseUrl: getEnv('TRANSCRIPT_BASE_URL', '') || getEnv('PUBLIC_BASE_URL', ''),
   httpPort: Number.parseInt(getEnv('HTTP_PORT', '3000'), 10),
   paymentProvider: (getEnv('PAYMENT_PROVIDER', 'PAYOS') ?? 'PAYOS').toUpperCase(),
   payosClientId: getEnv('PAYOS_CLIENT_ID', ''),
@@ -239,6 +241,13 @@ export function assertPaymentConfig() {
 export function getPublicUrl(pathValue = '') {
   if (!config.publicBaseUrl) return null;
   const base = config.publicBaseUrl.replace(/\/$/, '');
+  const safePath = pathValue ? (pathValue.startsWith('/') ? pathValue : `/${pathValue}`) : '';
+  return `${base}${safePath}`;
+}
+
+export function getTranscriptUrl(pathValue = '') {
+  if (!config.transcriptBaseUrl) return null;
+  const base = config.transcriptBaseUrl.replace(/\/$/, '');
   const safePath = pathValue ? (pathValue.startsWith('/') ? pathValue : `/${pathValue}`) : '';
   return `${base}${safePath}`;
 }

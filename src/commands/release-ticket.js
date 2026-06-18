@@ -23,16 +23,16 @@ export async function execute(interaction) {
   const current = extractClaimFromTopic(channel.topic);
 
   if (!current) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Ticket này chưa có ai claim.`);
+    await interaction.editReply(`${E('status_warn')} Ticket này chưa có ai claim.`);
     return;
   }
 
   if (current !== interaction.user.id) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Ticket này đang do <@${current}> claim, bạn không thể release thay.`);
+    await interaction.editReply(`${E('status_warn')} Ticket này đang do <@${current}> claim, bạn không thể release thay.`);
     return;
   }
 
   await channel.setTopic(stripClaimTopic(channel.topic).slice(0, 1024)).catch(() => null);
-  await channel.send(`${E('payment_refund', '↩️')} **${interaction.user.tag}** đã bỏ claim ticket.`);
-  await interaction.editReply(`${E('status_check', '✅')} Đã release ticket.`);
+  await channel.send(`${E('payment_refund')} **${interaction.user.tag}** đã bỏ claim ticket.`);
+  await interaction.editReply(`${E('status_check')} Đã release ticket.`);
 }

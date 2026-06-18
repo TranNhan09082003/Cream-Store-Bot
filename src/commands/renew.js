@@ -26,13 +26,13 @@ export async function execute(interaction) {
   const oldOrder = getOrderByCodeRaw(oldOrderCode);
 
   if (!oldOrder) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn cũ.`);
+    await interaction.editReply(`${E('status_warn')} Không tìm thấy mã đơn cũ.`);
     return;
   }
 
   const ticket = getTicketByChannelIdRaw(interaction.channelId);
   if (!ticket) {
-    await interaction.editReply(`${E('status_warn', '⚠️')} Hãy chạy lệnh này trong ticket gia hạn hoặc ticket hiện tại của khách.`);
+    await interaction.editReply(`${E('status_warn')} Hãy chạy lệnh này trong ticket gia hạn hoặc ticket hiện tại của khách.`);
     return;
   }
 
@@ -78,6 +78,6 @@ export async function execute(interaction) {
   });
 
   await interaction.editReply(
-    `${E('status_check', '✅')} Đã tạo đơn gia hạn mới \`${newOrder.order_code}\` từ đơn cũ \`${oldOrder.order_code}\` với thời hạn **${months} tháng**.`,
+    `${E('status_check')} Đã tạo đơn gia hạn mới \`${newOrder.order_code}\` từ đơn cũ \`${oldOrder.order_code}\` với thời hạn **${months} tháng**.`,
   );
 }

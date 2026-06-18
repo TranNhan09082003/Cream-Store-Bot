@@ -26,7 +26,7 @@ export async function execute(interaction) {
     const orderCode = interaction.options.getString('ma_don', true).trim().toUpperCase();
     const before = getOrderByCodeRaw(orderCode);
     if (!before) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Không tìm thấy mã đơn.`);
+      await interaction.editReply(`${E('status_warn')} Không tìm thấy mã đơn.`);
       return;
     }
 
@@ -37,7 +37,7 @@ export async function execute(interaction) {
     const amount = interaction.options.getInteger('gia_tien');
 
     if (amount !== null && Number(amount) !== Number(before.total_amount ?? 0) && before.payment_status !== 'PAID' && (before.payment_link_id || before.payment_checkout_url || before.payment_qr_code)) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Đơn này đã tạo link/QR PayOS. Hãy giữ nguyên giá hoặc tạo lại flow thanh toán mới để tránh lệch số tiền.`);
+      await interaction.editReply(`${E('status_warn')} Đơn này đã tạo link/QR PayOS. Hãy giữ nguyên giá hoặc tạo lại flow thanh toán mới để tránh lệch số tiền.`);
       return;
     }
 
@@ -47,7 +47,7 @@ export async function execute(interaction) {
     if (amount !== null) payload.total_amount = amount;
 
     if (Object.keys(payload).length === 0) {
-      await interaction.editReply(`${E('status_warn', '⚠️')} Bạn chưa nhập trường nào để sửa.`);
+      await interaction.editReply(`${E('status_warn')} Bạn chưa nhập trường nào để sửa.`);
       return;
     }
 
@@ -90,9 +90,9 @@ export async function execute(interaction) {
     });
 
     const expiryText = after.expiry_at ? `\n🗓️ Hạn mới: <t:${Math.floor(new Date(after.expiry_at).getTime() / 1000)}:F>` : '';
-    await interaction.editReply(`${E('status_check', '✅')} Đã cập nhật đơn \`${after.order_code}\`.${expiryText}`);
+    await interaction.editReply(`${E('status_check')} Đã cập nhật đơn \`${after.order_code}\`.${expiryText}`);
   } catch (error) {
     console.error('[ORDER/EDIT] Lỗi:', error);
-    await interaction.editReply(`${E('status_cross', '❌')} Không thể sửa đơn: ${error.message ?? 'Lỗi không xác định'}`);
+    await interaction.editReply(`${E('status_cross')} Không thể sửa đơn: ${error.message ?? 'Lỗi không xác định'}`);
   }
 }

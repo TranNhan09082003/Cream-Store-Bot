@@ -106,7 +106,7 @@ export async function sendErrorLog(type, error, interaction = null) {
 
     const embed = new EmbedBuilder()
       .setColor(0xED4245) // Danger Red
-      .setTitle(`🚨 Lỗi Hệ Thống: ${type}`)
+      .setTitle(`Loi He Thong: ${type}`)
       .setDescription(`\`\`\`js\n${formattedStack || errMessage}\n\`\`\``)
       .setTimestamp();
 

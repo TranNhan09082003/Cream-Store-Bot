@@ -10,6 +10,9 @@ data/
 .cache/
 npm-debug.log*
 
+# PM2 log files (keep directory, ignore log content)
+logs/*.log
+
 # OS
 .DS_Store
 Thumbs.db
@@ -40,5 +43,7 @@ scripts/*
 !scripts/resyncCustomerStats.js
 !scripts/send-announcement.js
 !scripts/smoke-test.js
+!scripts/send-combo-announcement.js
+!scripts/send-service-panel.js
 
 

@@ -3,11 +3,15 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
+  ContainerBuilder,
   Events,
   GatewayIntentBits,
   ModalBuilder,
   Partials,
   PermissionFlagsBits,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
   TextInputBuilder,
   TextInputStyle,
   EmbedBuilder,
@@ -297,6 +301,7 @@ function getTicketCategoryId(guildConfig, ticketType) {
 }
 
 async function handleTicketCreate(interaction, ticketType = 'ORDER') {
+  const E = createEmojiResolver(interaction.guildId);
   if (!interaction.inGuild()) {
     await safeReply(interaction, { content: 'Ticket chỉ tạo được trong server.', ephemeral: true });
     return;
@@ -304,7 +309,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
 
   const guildConfig = getGuildConfig(interaction.guildId);
   if (!guildConfig) {
-    await safeReply(interaction, { content: '⚠️ Server chưa setup ticket.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Server chưa setup ticket.`, ephemeral: true });
     return;
   }
 
@@ -312,7 +317,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
   if (Number(flag.is_blacklisted) === 1) {
     await safeReply(interaction, {
-      content: `⛔ Bạn đang bị chặn mở ticket. Lý do: **${flag.blacklist_reason ?? 'Không rõ lý do'}**`,
+      content: `${E('status_cross')} Bạn đang bị chặn mở ticket. Lý do: **${flag.blacklist_reason ?? 'Không rõ lý do'}**`,
       ephemeral: true,
     });
     return;
@@ -322,7 +327,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   const muteStatus = getTicketMuteStatus(interaction.guildId, interaction.user.id);
   if (muteStatus.is_ticket_muted) {
     await safeReply(interaction, {
-      content: `🔇 Bạn đã bị admin ngăn tạo ticket.\n> **Lý do:** ${muteStatus.ticket_mute_reason ?? 'Không rõ lý do'}`,
+      content: `${E('status_cross')} Bạn đã bị admin ngăn tạo ticket.\n> **Lý do:** ${muteStatus.ticket_mute_reason ?? 'Không rõ lý do'}`,
       ephemeral: true,
     });
     return;
@@ -333,7 +338,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
   // Khóa chống click đúp tạo 2 ticket
   const lockKey = `${interaction.guildId}:${interaction.user.id}:${normalizedType}`;
   if (activeTicketCreations.has(lockKey)) {
-    await safeReply(interaction, { content: '⚠️ Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.`, ephemeral: true });
     return;
   }
   activeTicketCreations.add(lockKey);
@@ -346,7 +351,7 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
       const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
       if (existingChannel) {
         await safeReply(interaction, {
-          content: `⚠️ Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
+          content: `${E('status_warn')} Bạn đã có ticket ${normalizedType.toLowerCase()} đang mở tại <#${existingTicket.channel_id}>.`,
           ephemeral: true,
         });
         return;
@@ -414,15 +419,15 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
     });
 
     await safeReply(interaction, {
-      content: `✅ Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
+      content: `${E('status_check')} Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
       ephemeral: true,
     });
   } catch (error) {
     if (error.code === 'RATE_LIMITED') {
-      await safeReply(interaction, { content: `⚠️ ${error.message}`, ephemeral: true });
+      await safeReply(interaction, { content: `${E('status_warn')} ${error.message}`, ephemeral: true });
     } else {
       console.error('[TICKET_CREATE] Lỗi:', error);
-      await safeReply(interaction, { content: `❌ Đã có lỗi xảy ra khi tạo ticket.`, ephemeral: true });
+      await safeReply(interaction, { content: `${E('status_cross')} Đã có lỗi xảy ra khi tạo ticket.`, ephemeral: true });
     }
   } finally {
     activeTicketCreations.delete(lockKey);
@@ -431,21 +436,22 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
 
 
 async function handleProductSelect(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const productId = interaction.values[0];
   const product = getProductById(Number(productId));
   if (!product) {
-    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Sản phẩm không còn tồn tại.`, ephemeral: true });
     return;
   }
 
   const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
   if (Number(flag.is_blacklisted) === 1) {
-    await safeReply(interaction, { content: `⛔ Bạn đang bị chặn.`, ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Bạn đang bị chặn.`, ephemeral: true });
     return;
   }
   const muteStatus = getTicketMuteStatus(interaction.guildId, interaction.user.id);
   if (muteStatus.is_ticket_muted) {
-    await safeReply(interaction, { content: `🔇 Bạn đã bị admin ngăn tạo ticket.`, ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Bạn đã bị admin ngăn tạo ticket.`, ephemeral: true });
     return;
   }
 
@@ -494,6 +500,7 @@ function parsePrice(raw) {
 }
 
 async function handlePriceListSelect(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const category = interaction.values[0];
   const products = getActiveProducts(interaction.guildId).filter(
     p => p.service_type && p.service_type.toLowerCase() === category.toLowerCase()
@@ -611,8 +618,8 @@ async function handlePriceListSelect(interaction) {
           if (secondaryPrice) {
             desc += `• **\`${mainPrice}\`** — **\`${secondaryPrice}\`**\n`;
           } else {
-            const emoji = resolveProductEmoji(interaction.guildId, p.emoji) || '📦';
-            desc += `• ${emoji} **\`${p.name}\`** — **\`${mainPrice}\`**\n`;
+            const emoji = resolveProductEmoji(interaction.guildId, p.emoji);
+            desc += emoji ? `• ${emoji} **\`${p.name}\`** — **\`${mainPrice}\`**\n` : `• **\`${p.name}\`** — **\`${mainPrice}\`**\n`;
           }
         }
       }
@@ -633,7 +640,7 @@ async function handlePriceListSelect(interaction) {
     if (catConfig.description) {
       desc = catConfig.description + '\n\n';
     } else {
-      desc = `### 🌟 Danh sách gói dịch vụ [${categoryName}] đang mở bán:\n\n`;
+      desc = `### ${E('icon_star')} Danh sách gói dịch vụ [${categoryName}] đang mở bán:\n\n`.trimStart();
     }
 
     if (products.length === 0) {
@@ -643,21 +650,21 @@ async function handlePriceListSelect(interaction) {
     } else {
       for (const p of products) {
         const priceText = Number(p.price).toLocaleString('vi-VN') + 'đ';
-        let statusText = '`Sẵn hàng ✨`';
-        if (p.description && p.description.includes('Hot')) statusText = '`Hot 🔥`';
-        else if (p.description && p.description.includes('Bán chạy')) statusText = '`Bán chạy ⚡`';
-        else if (p.description && p.description.includes('Mới')) statusText = '`Mới 🌟`';
-        else if (p.description && p.description.includes('Ưu đãi')) statusText = '`Ưu đãi 💥`';
+        let statusText = `${E('icon_sparkle')} **Sẵn hàng**`.trim();
+        if (p.description && p.description.includes('Hot')) statusText = `${E('order_pending')} **Hot**`.trim();
+        else if (p.description && p.description.includes('Bán chạy')) statusText = `${E('order_processing')} **Bán chạy**`.trim();
+        else if (p.description && p.description.includes('Mới')) statusText = `${E('icon_star')} **Mới**`.trim();
+        else if (p.description && p.description.includes('Ưu đãi')) statusText = `${E('status_check')} **Ưu đãi**`.trim();
 
-        const emoji = resolveProductEmoji(interaction.guildId, p.emoji) || '📦';
-        let productDesc = `### ${emoji} ${p.name}\n`;
-        productDesc += `> 💰 **Giá:** \`${priceText}\` | ⏱️ **Thời hạn:** \`${p.duration_months} tháng\`\n`;
+        const emoji = resolveProductEmoji(interaction.guildId, p.emoji);
+        let productDesc = emoji ? `### ${emoji} ${p.name}\n` : `### ${p.name}\n`;
+        productDesc += `> ${E('payment_money')} **Giá:** \`${priceText}\` | ${E('icon_clock')} **Thời hạn:** \`${p.duration_months} tháng\`\n`.trimStart();
         if (p.description) {
-          productDesc += `> ℹ️ **Chi tiết:** *${p.description}*\n`;
+          productDesc += `> **Chi tiết:** *${p.description}*\n`;
         } else {
-          productDesc += `> ℹ️ **Chi tiết:** *Đang mở bán*\n`;
+          productDesc += `> **Chi tiết:** *Đang mở bán*\n`;
         }
-        productDesc += `> ⚡ **Trạng thái:** ${statusText}\n\n`;
+        productDesc += `> **Trạng thái:** ${statusText}\n\n`;
 
         if (desc.length + productDesc.length > 2200) {
           currentEmbed.setDescription(desc);
@@ -684,12 +691,18 @@ async function handlePriceListSelect(interaction) {
 
   // Dropdown mua hàng
   if (products.length > 0) {
-    const selectOptions = products.slice(0, 25).map(p => ({
-      label: `${p.name}`.slice(0, 100),
-      description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
-      value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(interaction.guildId, p.emoji, '🛒')
-    }));
+    const selectOptions = products.slice(0, 25).map(p => {
+      const opt = {
+        label: `${p.name}`.slice(0, 100),
+        description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T`.slice(0, 100),
+        value: `${p.id}`,
+      };
+      const emoji = resolveSelectMenuEmoji(interaction.guildId, p.emoji, '🛒');
+      if (emoji) {
+        opt.emoji = emoji;
+      }
+      return opt;
+    });
 
     const purchaseRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
@@ -704,19 +717,16 @@ async function handlePriceListSelect(interaction) {
   const adminRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`price_list:admin:add_product:${category}`)
-      .setLabel('Thêm Gói')
-      .setStyle(ButtonStyle.Success)
-      .setEmoji('➕'),
+      .setLabel('Them Goi')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`price_list:admin:edit_product:${category}`)
-      .setLabel('Sửa Gói')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('✏️'),
+      .setLabel('Sua Goi')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`price_list:admin:edit_category:${category}`)
-      .setLabel('Sửa Chi Tiết')
+      .setLabel('Sua Chi Tiet')
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji('⚙️')
   );
   rows.push(adminRow);
 
@@ -788,13 +798,14 @@ function parseCompactSecondaryPrice(description) {
 }
 
 async function handlePriceListAdminEditPortalButton(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền chỉnh sửa bảng giá này!`,
       ephemeral: true
     });
     return;
@@ -864,13 +875,14 @@ async function handlePriceListAdminEditPortalButton(interaction) {
 }
 
 async function handlePriceListAdminEditPortalModal(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền chỉnh sửa bảng giá này!`,
       ephemeral: true
     });
     return;
@@ -917,18 +929,19 @@ async function handlePriceListAdminEditPortalModal(interaction) {
   }
 
   await interaction.editReply({
-    content: '✅ Đã chỉnh sửa bảng giá chính thành công! Tin nhắn bảng giá đã được cập nhật ngay lập tức.'
+    content: `${E('status_check')} Đã chỉnh sửa bảng giá chính thành công! Tin nhắn bảng giá đã được cập nhật ngay lập tức.`
   });
 }
 
 async function handlePriceListAdminAddButton(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền quản lý bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -999,13 +1012,14 @@ async function handlePriceListAdminAddButton(interaction, category) {
 }
 
 async function handlePriceListAdminAddModal(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền quản lý bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1021,13 +1035,13 @@ async function handlePriceListAdminAddModal(interaction, category) {
 
   const price = parsePrice(rawPrice);
   if (price === null) {
-    await interaction.editReply('❌ Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).');
+    await interaction.editReply(`${E('status_cross')} Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).`);
     return;
   }
 
   const duration = Number.parseInt(rawDuration, 10);
   if (Number.isNaN(duration) || duration <= 0) {
-    await interaction.editReply('❌ Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.');
+    await interaction.editReply(`${E('status_cross')} Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.`);
     return;
   }
 
@@ -1042,10 +1056,10 @@ async function handlePriceListAdminAddModal(interaction, category) {
       emoji
     });
 
-    await interaction.editReply(`✅ Đã thêm thành công sản phẩm **${name}** vào danh mục \`${category}\`!\nHãy chọn lại danh mục để tải lại bảng giá mới.`);
+    await interaction.editReply(`${E('status_check')} Đã thêm thành công sản phẩm **${name}** vào danh mục \`${category}\`!\nHãy chọn lại danh mục để tải lại bảng giá mới.`);
   } catch (error) {
     console.error('[PRICE LIST ADD PRODUCT]', error);
-    await interaction.editReply(`❌ Lỗi thêm sản phẩm: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi thêm sản phẩm: ${error.message}`);
   }
 }
 
@@ -1075,17 +1089,21 @@ function getDefaultCategoryDetails(category) {
   if (cat === 'gearup') {
     return { title: '🎮 BẢNG GIÁ GEARUP BOOSTER', color: '00E6FF', name: 'Gearup Booster' };
   }
+  if (cat === 'service') {
+    return { title: '🛠️ DỊCH VỤ SETUP DISCORD & BOT CUSTOM & WEBSITE', color: '5865F2', name: 'Dịch Vụ Setup & Custom' };
+  }
   return { title: `BẢNG GIÁ ${category.toUpperCase()}`, color: 'F3A6D7', name: category.toUpperCase() };
 }
 
 async function handlePriceListAdminEditCategoryButton(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền chỉnh sửa bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1168,13 +1186,14 @@ async function handlePriceListAdminEditCategoryButton(interaction, category) {
 }
 
 async function handlePriceListAdminEditCategoryModal(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền chỉnh sửa bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền chỉnh sửa bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1190,7 +1209,7 @@ async function handlePriceListAdminEditCategoryModal(interaction, category) {
 
   const parsedColor = Number.parseInt(color, 16);
   if (color && (Number.isNaN(parsedColor) || color.length < 3 || color.length > 6)) {
-    await interaction.editReply('❌ Mã màu Hex không hợp lệ. Vui lòng nhập mã Hex hợp lệ (VD: ED4245).');
+    await interaction.editReply(`${E('status_cross')} Mã màu Hex không hợp lệ. Vui lòng nhập mã Hex hợp lệ (VD: ED4245).`);
     return;
   }
 
@@ -1248,21 +1267,22 @@ async function handlePriceListAdminEditCategoryModal(interaction, category) {
       });
     }
 
-    await interaction.editReply(`✅ Đã cập nhật chi tiết danh mục **${category.toUpperCase()}** thành công!\nHãy chọn lại danh mục để xem thay đổi.`);
+    await interaction.editReply(`${E('status_check')} Đã cập nhật chi tiết danh mục **${category.toUpperCase()}** thành công!\nHãy chọn lại danh mục để xem thay đổi.`);
   } catch (error) {
     console.error('[PRICE LIST EDIT CATEGORY]', error);
-    await interaction.editReply(`❌ Lỗi cập nhật chi tiết danh mục: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi cập nhật chi tiết danh mục: ${error.message}`);
   }
 }
 
 async function handlePriceListAdminEditButton(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền quản lý bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1274,7 +1294,7 @@ async function handlePriceListAdminEditButton(interaction, category) {
 
   if (products.length === 0) {
     await safeReply(interaction, {
-      content: `❌ Không tìm thấy sản phẩm nào trong danh mục \`${category}\` để chỉnh sửa.`,
+      content: `${E('status_cross')} Không tìm thấy sản phẩm nào trong danh mục \`${category}\` để chỉnh sửa.`,
       ephemeral: true
     });
     return;
@@ -1298,20 +1318,21 @@ async function handlePriceListAdminEditButton(interaction, category) {
   );
 
   await safeReply(interaction, {
-    content: `🔧 Vui lòng chọn sản phẩm trong danh mục \`${category}\` để bắt đầu chỉnh sửa:`,
+    content: `${E('icon_settings')} Vui lòng chọn sản phẩm trong danh mục \`${category}\` để bắt đầu chỉnh sửa:`,
     components: [row],
     ephemeral: true
   });
 }
 
 async function handlePriceListAdminSelectProductToEdit(interaction, category) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền quản lý bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1320,7 +1341,7 @@ async function handlePriceListAdminSelectProductToEdit(interaction, category) {
   const productId = interaction.values[0];
   const product = getProductById(Number(productId));
   if (!product) {
-    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Sản phẩm không còn tồn tại.`, ephemeral: true });
     return;
   }
 
@@ -1377,13 +1398,14 @@ async function handlePriceListAdminSelectProductToEdit(interaction, category) {
 }
 
 async function handlePriceListAdminEditModal(interaction, productId) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
     await interaction.reply({
-      content: '❌ Bạn không có quyền quản lý bảng giá này!',
+      content: `${E('status_cross')} Bạn không có quyền quản lý bảng giá này!`,
       ephemeral: true
     }).catch(() => null);
     return;
@@ -1399,13 +1421,13 @@ async function handlePriceListAdminEditModal(interaction, productId) {
 
   const price = parsePrice(rawPrice);
   if (price === null) {
-    await interaction.editReply('❌ Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).');
+    await interaction.editReply(`${E('status_cross')} Giá tiền không hợp lệ. Vui lòng nhập số (VD: 180000 hoặc 180k).`);
     return;
   }
 
   const duration = Number.parseInt(rawDuration, 10);
   if (Number.isNaN(duration) || duration <= 0) {
-    await interaction.editReply('❌ Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.');
+    await interaction.editReply(`${E('status_cross')} Thời hạn không hợp lệ. Vui lòng nhập số tháng lớn hơn 0.`);
     return;
   }
 
@@ -1420,17 +1442,18 @@ async function handlePriceListAdminEditModal(interaction, productId) {
       isActive: isActive === 1
     });
 
-    await interaction.editReply(`✅ Đã cập nhật thành công sản phẩm **${name}**!\nHãy chọn lại danh mục để xem bảng giá mới.`);
+    await interaction.editReply(`${E('status_check')} Đã cập nhật thành công sản phẩm **${name}**!\nHãy chọn lại danh mục để xem bảng giá mới.`);
   } catch (error) {
     console.error('[PRICE LIST EDIT PRODUCT]', error);
-    await interaction.editReply(`❌ Lỗi cập nhật sản phẩm: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi cập nhật sản phẩm: ${error.message}`);
   }
 }
 
 async function handleProductPurchaseFlow(interaction, productId) {
+  const E = createEmojiResolver(interaction.guildId);
   const product = getProductById(Number(productId));
   if (!product) {
-    await safeReply(interaction, { content: '❌ Sản phẩm không còn tồn tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Sản phẩm không còn tồn tại.`, ephemeral: true });
     return;
   }
 
@@ -1439,7 +1462,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
 
   const quantity = Number.parseInt(rawQty, 10);
   if (Number.isNaN(quantity) || quantity <= 0) {
-    await safeReply(interaction, { content: '❌ Số lượng không hợp lệ.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Số lượng không hợp lệ.`, ephemeral: true });
     return;
   }
 
@@ -1447,7 +1470,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
 
   const guildConfig = getGuildConfig(interaction.guildId);
   if (!guildConfig) {
-    await interaction.editReply('⚠️ Server chưa setup ticket.');
+    await interaction.editReply(`${E('status_warn')} Server chưa setup ticket.`);
     return;
   }
 
@@ -1456,7 +1479,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
   // Khóa chống click đúp tạo 2 ticket
   const lockKey = `${interaction.guildId}:${interaction.user.id}:${normalizedType}`;
   if (activeTicketCreations.has(lockKey)) {
-    await interaction.editReply('⚠️ Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.');
+    await interaction.editReply(`${E('status_warn')} Yêu cầu tạo ticket của bạn đang được xử lý, vui lòng không bấm liên tục.`);
     return;
   }
   activeTicketCreations.add(lockKey);
@@ -1469,7 +1492,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
       // Kiểm tra channel còn tồn tại không
       const existingChannel = await interaction.guild.channels.fetch(existingTicket.channel_id).catch(() => null);
       if (existingChannel) {
-        await interaction.editReply(`⚠️ Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
+        await interaction.editReply(`${E('status_warn')} Bạn đã có đơn hàng đang xử lý tại <#${existingTicket.channel_id}>.`);
         activeTicketCreations.delete(lockKey);
         return;
       }
@@ -1511,7 +1534,7 @@ async function handleProductPurchaseFlow(interaction, productId) {
           }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
         }
 
-        const prefix = product.service_type.toLowerCase();
+        const prefix = (product.service_type || 'ticket').toLowerCase();
         await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
 
         const price = product.price * quantity;
@@ -1527,6 +1550,19 @@ async function handleProductPurchaseFlow(interaction, productId) {
           orderLogChannelId: guildConfig.order_log_channel_id ?? null,
           createdById: interaction.client.user.id,
         });
+
+        // Gửi log đơn hàng vào kênh order log
+        try {
+          const orderLogChannel = guildConfig.order_log_channel_id
+            ? await interaction.guild.channels.fetch(guildConfig.order_log_channel_id).catch(() => null)
+            : null;
+          if (orderLogChannel?.isTextBased()) {
+            const logMessage = await orderLogChannel.send({ content: buildOrderLogContent(order, interaction.guildId) });
+            saveOrderLogMessage(order.order_code, logMessage.id);
+          }
+        } catch (logErr) {
+          console.error('[PANEL ORDER] Lỗi gửi log đơn:', logErr.message);
+        }
 
         // Gửi welcome ticket V2 (không dùng content với IsComponentsV2)
         const { container: welcomeContainer, flags: welcomeFlags } = buildTicketWelcomeV2(
@@ -1549,15 +1585,15 @@ async function handleProductPurchaseFlow(interaction, productId) {
           import('../services/paymentService.js').then(async ({ sendOrRefreshPaymentQr }) => {
             await sendOrRefreshPaymentQr({ guild: interaction.guild, orderCode: order.order_code }).catch(err => {
               console.error('[ORDER] Lỗi tạo QR PayOS:', err);
-              channel.send(`⚠️ Lỗi tạo mã QR thanh toán: ${err.message}`);
+              channel.send(`${E('status_warn')} Lỗi tạo mã QR thanh toán: ${err.message}`);
             });
           });
         }
 
-        await interaction.editReply(`✅ Đã tạo đơn hàng tại <#${channel.id}>`);
+        await interaction.editReply(`${E('status_check')} Đã tạo đơn hàng tại <#${channel.id}>`);
       } catch (err) {
         console.error('[ORDER_TICKET_CREATE_ASYNC] Lỗi:', err);
-        await interaction.editReply('❌ Đã có lỗi xảy ra khi tạo ticket đơn hàng.');
+        await interaction.editReply(`${E('status_cross')} Đã có lỗi xảy ra khi tạo ticket đơn hàng.`);
       } finally {
         activeTicketCreations.delete(lockKey);
       }
@@ -1569,44 +1605,46 @@ async function handleProductPurchaseFlow(interaction, productId) {
   } catch (error) {
     activeTicketCreations.delete(lockKey);
     if (error.code === 'RATE_LIMITED') {
-      await interaction.editReply(`⚠️ ${error.message}`);
+      await interaction.editReply(`${E('status_warn')} ${error.message}`);
     } else {
       console.error('[ORDER_TICKET_FLOW] Lỗi:', error);
-      await interaction.editReply('❌ Đã có lỗi xảy ra khi xử lý yêu cầu.');
+      await interaction.editReply(`${E('status_cross')} Đã có lỗi xảy ra khi xử lý yêu cầu.`);
     }
   }
 }
 
 // Bước 1: Hiện confirmation embed (chỉ admin/manager)
 async function handleTicketCloseRequest(interaction, ticketId) {
+  const E = createEmojiResolver(interaction.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
   // Tìm ticket trước để đảm bảo tồn tại
   const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
   if (!ticket) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy thông tin ticket này. Có thể đã bị xóa khỏi hệ thống.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy thông tin ticket này. Có thể đã bị xóa khỏi hệ thống.`, ephemeral: true });
     return;
   }
   if (ticket.status !== 'OPEN') {
-    await safeReply(interaction, { content: `🔒 Ticket \`${ticket.ticket_code}\` đã được đóng trước đó rồi.`, ephemeral: true });
+    await safeReply(interaction, { content: `${E('icon_lock')} Ticket \`${ticket.ticket_code}\` đã được đóng trước đó rồi.`, ephemeral: true });
     return;
   }
 
   // Sau khi xác nhận ticket tồn tại và OPEN mới check quyền
   if (!isManager(member, guildConfig)) {
-    await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể đóng ticket.\n> Nếu bạn muốn yêu cầu staff đóng hộ, hãy nhắn vào ticket.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Chỉ **Admin / Manager** mới có thể đóng ticket.\n> Nếu bạn muốn yêu cầu staff đóng hộ, hãy nhắn vào ticket.`, ephemeral: true });
     return;
   }
   await safeReply(interaction, {
-    embeds: [buildCloseConfirmEmbed(ticket.ticket_code)],
-    components: buildCloseConfirmComponents(ticket.id),
+    embeds: [buildCloseConfirmEmbed(ticket.ticket_code, null, interaction.guildId)],
+    components: buildCloseConfirmComponents(ticket.id, interaction.guildId),
     ephemeral: true,
   });
 }
 
 // Bước 2: Thực sự đóng ticket sau khi confirm
 async function handleTicketClose(interaction, ticketId) {
+  const E = createEmojiResolver(interaction.guildId);
   if (!interaction.inGuild()) {
     await safeReply(interaction, { content: 'Ticket chỉ đóng được trong server.', ephemeral: true });
     return;
@@ -1614,7 +1652,7 @@ async function handleTicketClose(interaction, ticketId) {
 
   const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
   if (!ticket || ticket.status !== 'OPEN') {
-    await safeReply(interaction, { content: '⚠️ Ticket này không còn hợp lệ hoặc đã đóng.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Ticket này không còn hợp lệ hoặc đã đóng.`, ephemeral: true });
     return;
   }
 
@@ -1656,7 +1694,9 @@ async function handleTicketClose(interaction, ticketId) {
         const newName = `closed-${interaction.channel.name}`.slice(0, 95);
         await interaction.channel.setName(newName).catch(() => null);
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('[TICKET_CLOSE] Lỗi đổi tên kênh:', err.message);
+    }
 
     await emitStaffLog(interaction.client, {
       guildId: interaction.guildId, actorId: interaction.user.id, targetId: ticket.customer_id, action: 'TICKET_CLOSE',
@@ -1700,20 +1740,21 @@ async function handleTicketClose(interaction, ticketId) {
 
 
 async function handleDeliveryClaim(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy dữ liệu giao hàng cho đơn này.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy dữ liệu giao hàng cho đơn này.`, ephemeral: true });
     return;
   }
 
   if (order.customer_id !== interaction.user.id) {
-    await safeReply(interaction, { content: '⚠️ Bạn không phải chủ sở hữu của đơn này.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Bạn không phải chủ sở hữu của đơn này.`, ephemeral: true });
     return;
   }
 
   if (!order.credential_email || !order.credential_password) {
     await safeReply(interaction, {
-      content: 'ℹ️ Đơn này không có Gmail để nhận. Hãy liên hệ shop trong ticket nếu cần.',
+      content: `${E('status_info')} Đơn này không có Gmail để nhận. Hãy liên hệ shop trong ticket nếu cần.`,
       ephemeral: true,
     });
     return;
@@ -1731,9 +1772,10 @@ async function handleDeliveryClaim(interaction, orderCode) {
 }
 
 async function handleQueueView(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
@@ -1745,9 +1787,10 @@ async function handleQueueView(interaction, orderCode) {
 }
 
 async function handleOrderCancel(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
@@ -1757,12 +1800,12 @@ async function handleOrderCancel(interaction, orderCode) {
   const isStaff = isStaffMember(member, guildConfig);
 
   if (!isOwner && !isStaff) {
-    await safeReply(interaction, { content: '⚠️ Bạn không có quyền hủy đơn này.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Bạn không có quyền hủy đơn này.`, ephemeral: true });
     return;
   }
 
   if (!['PENDING_PAYMENT', 'PROCESSING'].includes(order.status)) {
-    await safeReply(interaction, { content: '⚠️ Chỉ có thể hủy đơn đang chờ thanh toán hoặc đang xử lý.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ có thể hủy đơn đang chờ thanh toán hoặc đang xử lý.`, ephemeral: true });
     return;
   }
 
@@ -1791,37 +1834,38 @@ async function handleOrderCancel(interaction, orderCode) {
   }
 
   await safeReply(interaction, {
-    content: `❌ Đơn \`${cancelled.order_code}\` đã được hủy.`,
+    content: `${E('status_cross')} Đơn \`${cancelled.order_code}\` đã được hủy.`,
     ephemeral: true,
   });
 }
 
 async function handleFeedbackButton(interaction, orderCode, starsRaw) {
+  const E = createEmojiResolver(interaction.guildId);
   const stars = Number.parseInt(starsRaw, 10);
   const order = getOrderByCode(orderCode);
 
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng để feedback.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng để feedback.`, ephemeral: true });
     return;
   }
 
   if (order.customer_id !== interaction.user.id) {
-    await safeReply(interaction, { content: '⚠️ Bạn không phải chủ đơn hàng này.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Bạn không phải chủ đơn hàng này.`, ephemeral: true });
     return;
   }
 
   if (order.guild_id && order.guild_id !== interaction.guildId) {
-    await safeReply(interaction, { content: '⚠️ Đơn này không thuộc server hiện tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Đơn này không thuộc server hiện tại.`, ephemeral: true });
     return;
   }
 
   if (order.status !== 'COMPLETED') {
-    await safeReply(interaction, { content: '⚠️ Chỉ có thể feedback cho đơn đã hoàn thành.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ có thể feedback cho đơn đã hoàn thành.`, ephemeral: true });
     return;
   }
 
   if (order.feedback_submitted_at) {
-    await safeReply(interaction, { content: 'ℹ️ Đơn này đã feedback rồi.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_info')} Đơn này đã feedback rồi.`, ephemeral: true });
     return;
   }
 
@@ -1831,15 +1875,16 @@ async function handleFeedbackButton(interaction, orderCode, starsRaw) {
 
 // Xử lý khi khách đã chọn sản phẩm từ dropdown bảo hành
 async function handleWarrantyProductSelect(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const orderCode = interaction.values?.[0];
   if (!orderCode) {
-    await safeReply(interaction, { content: '⚠️ Không nhận được lựa chọn. Vui lòng thử lại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không nhận được lựa chọn. Vui lòng thử lại.`, ephemeral: true });
     return;
   }
 
   const order = getOrderByCode(orderCode);
   if (!order || order.customer_id !== interaction.user.id) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng hoặc bạn không phải chủ sở hữu.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng hoặc bạn không phải chủ sở hữu.`, ephemeral: true });
     return;
   }
 
@@ -1862,6 +1907,7 @@ async function handleWarrantyProductSelect(interaction) {
 
 // Xử lý modal lý do bảo hành → tạo ticket
 async function handleWarrantyReasonModalSubmit(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const reason = interaction.fields.getTextInputValue('warranty_reason')?.trim() || null;
 
   const result = await openWarrantyTicket({
@@ -1876,8 +1922,8 @@ async function handleWarrantyReasonModalSubmit(interaction, orderCode) {
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: interaction.user.id, action: 'WARRANTY_OPEN', detail: reason ?? 'Mở bảo hành từ panel', relatedOrderCode: orderCode, relatedTicketCode: result.ticket.ticket_code });
   await interaction.reply({
     content: result.reused
-      ? `ℹ️ Đơn **${orderCode}** đã có ticket bảo hành tại ${result.channel}.`
-      : `✅ Đã mở ticket bảo hành cho đơn **${orderCode}**: ${result.channel}`,
+      ? `${E('status_info')} Đơn **${orderCode}** đã có ticket bảo hành tại ${result.channel}.`
+      : `${E('status_check')} Đã mở ticket bảo hành cho đơn **${orderCode}**: ${result.channel}`,
     ephemeral: true,
   }).catch(() => null);
 }
@@ -1901,8 +1947,9 @@ async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
       const scheduled = scheduleTicketAutoClose(ticket.id, config.autoCloseCompletedTicketMinutes);
       const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
       if (channel?.isTextBased()) {
+        const E_ch = createEmojiResolver(interaction.guildId);
         await channel.send({
-          content: `✅ Đã ghi nhận feedback cho đơn \`${result.order.order_code}\`. Ticket sẽ tự đóng sau **${config.autoCloseCompletedTicketMinutes} phút**. Nếu muốn giữ ticket mở, bấm nút bên dưới.`,
+          content: `${E_ch('status_check')} Đã ghi nhận feedback cho đơn \`${result.order.order_code}\`. Ticket sẽ tự đóng sau **${config.autoCloseCompletedTicketMinutes} phút**. Nếu muốn giữ ticket mở, bấm nút bên dưới.`,
           components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`ticket:keepopen:${scheduled.id}`).setLabel('Giữ ticket mở').setStyle(ButtonStyle.Secondary))],
         }).catch(() => null);
       }
@@ -1915,19 +1962,21 @@ async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
       });
     }
   } catch (error) {
-    await interaction.reply({ content: `⚠️ ${error.message}`, ephemeral: true }).catch(() => null);
+    const E_err = createEmojiResolver(interaction.guildId);
+    await interaction.reply({ content: `${E_err('status_warn')} ${error.message}`, ephemeral: true }).catch(() => null);
   }
 }
 
 async function handleWarrantyButton(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
   if (order.customer_id !== interaction.user.id) {
-    await safeReply(interaction, { content: '⚠️ Chỉ chủ đơn hàng mới có thể mở ticket bảo hành.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ chủ đơn hàng mới có thể mở ticket bảo hành.`, ephemeral: true });
     return;
   }
 
@@ -1943,52 +1992,55 @@ async function handleWarrantyButton(interaction, orderCode) {
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: interaction.user.id, action: 'WARRANTY_OPEN', detail: 'Mở bảo hành từ nút trong ticket', relatedOrderCode: orderCode, relatedTicketCode: result.ticket.ticket_code });
   await safeReply(interaction, {
     content: result.reused
-      ? `ℹ️ Ticket bảo hành đã tồn tại tại ${result.channel}.`
-      : `✅ Đã mở ticket bảo hành tại ${result.channel}.`,
+      ? `${E('status_info')} Ticket bảo hành đã tồn tại tại ${result.channel}.`
+      : `${E('status_check')} Đã mở ticket bảo hành tại ${result.channel}.`,
     ephemeral: true,
   });
 }
 
 
 async function handleOrderClaim(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
   const order = getOrderByCode(orderCode);
   if (!order) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy đơn hàng.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
     return;
   }
 
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!assertStaffCapability(member, guildConfig, 'SUPPORT')) {
-    await safeReply(interaction, { content: '⚠️ Chỉ staff mới được claim đơn.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ staff mới được claim đơn.`, ephemeral: true });
     return;
   }
 
   if (order.claimed_by_id && order.claimed_by_id !== interaction.user.id) {
-    await safeReply(interaction, { content: `⚠️ Đơn này đang được <@${order.claimed_by_id}> claim.`, ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Đơn này đang được <@${order.claimed_by_id}> claim.`, ephemeral: true });
     return;
   }
 
   const updated = order.claimed_by_id === interaction.user.id ? releaseOrderClaim(orderCode) : claimOrder(orderCode, interaction.user.id);
   await emitStaffLog(interaction.client, { guildId: interaction.guildId, actorId: interaction.user.id, targetId: updated.customer_id, action: updated.claimed_by_id ? 'ORDER_CLAIM' : 'ORDER_RELEASE', detail: updated.claimed_by_id ? 'Nhận xử lý đơn' : 'Nhả claim đơn', relatedOrderCode: updated.order_code });
-  await safeReply(interaction, { content: updated.claimed_by_id ? `✅ Bạn đã claim đơn \`${updated.order_code}\`.` : `ℹ️ Bạn đã nhả claim đơn \`${updated.order_code}\`.`, ephemeral: true });
+  await safeReply(interaction, { content: updated.claimed_by_id ? `${E('status_check')} Bạn đã claim đơn \`${updated.order_code}\`.` : `${E('status_info')} Bạn đã nhả claim đơn \`${updated.order_code}\`.`, ephemeral: true });
 }
 
 async function handleKeepOpen(interaction, ticketId) {
+  const E = createEmojiResolver(interaction.guildId);
   const ticket = keepTicketOpen(Number(ticketId));
   if (!ticket) {
-    await safeReply(interaction, { content: '⚠️ Không tìm thấy ticket.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy ticket.`, ephemeral: true });
     return;
   }
-  await safeReply(interaction, { content: '✅ Bot sẽ giữ ticket mở, không tự đóng nữa.', ephemeral: true });
+  await safeReply(interaction, { content: `${E('status_check')} Bot sẽ giữ ticket mở, không tự đóng nữa.`, ephemeral: true });
 }
 
 // ═══════════════════════════════════════════════
 
 async function handleProductEditButton(interaction, productId) {
+  const E = createEmojiResolver(interaction.guildId);
   const product = getProductById(Number(productId));
   if (!product) {
-    await safeReply(interaction, { content: '⚠️ Sản phẩm không tồn tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Sản phẩm không tồn tại.`, ephemeral: true });
     return;
   }
 
@@ -1996,7 +2048,7 @@ async function handleProductEditButton(interaction, productId) {
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!isStaffMember(member, guildConfig)) {
-    await safeReply(interaction, { content: '⛔ Chỉ staff mới có thể chỉnh sửa sản phẩm.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Chỉ staff mới có thể chỉnh sửa sản phẩm.`, ephemeral: true });
     return;
   }
 
@@ -2051,9 +2103,10 @@ async function handleProductEditButton(interaction, productId) {
 }
 
 async function handleProductEditModal(interaction, productId) {
+  const E = createEmojiResolver(interaction.guildId);
   const product = getProductById(Number(productId));
   if (!product) {
-    await safeReply(interaction, { content: '⚠️ Sản phẩm không tồn tại.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Sản phẩm không tồn tại.`, ephemeral: true });
     return;
   }
 
@@ -2065,13 +2118,13 @@ async function handleProductEditModal(interaction, productId) {
 
   const price = parseMoneyInput(rawPrice);
   if (price === null) {
-    await safeReply(interaction, { content: '❌ Giá tiền không hợp lệ.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Giá tiền không hợp lệ.`, ephemeral: true });
     return;
   }
 
   const durationMonths = Number.parseInt(rawDuration, 10);
   if (Number.isNaN(durationMonths) || durationMonths <= 0) {
-    await safeReply(interaction, { content: '❌ Thời hạn không hợp lệ.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Thời hạn không hợp lệ.`, ephemeral: true });
     return;
   }
 
@@ -2092,7 +2145,7 @@ async function handleProductEditModal(interaction, productId) {
   });
 
   await safeReply(interaction, {
-    content: `✅ Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
+    content: `${E('status_check')} Đã cập nhật **${updated.emoji} ${updated.name}** — Giá: **${Number(updated.price).toLocaleString('vi-VN')} VND** / ${updated.duration_months}T`,
     ephemeral: true,
   });
 }
@@ -2100,6 +2153,7 @@ async function handleProductEditModal(interaction, productId) {
 // Duplicate import removed
 
 async function handleProductAddModal(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const name = interaction.fields.getTextInputValue('name');
   const rawPrice = interaction.fields.getTextInputValue('price');
   const rawDuration = interaction.fields.getTextInputValue('duration');
@@ -2108,19 +2162,19 @@ async function handleProductAddModal(interaction) {
 
   const price = parseMoneyInput(rawPrice);
   if (price === null || price <= 0) {
-    await safeReply(interaction, { content: '❌ Giá tiền không hợp lệ.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Giá tiền không hợp lệ.`, ephemeral: true });
     return;
   }
 
   const durationMonths = Number.parseInt(rawDuration, 10);
   if (Number.isNaN(durationMonths) || durationMonths <= 0) {
-    await safeReply(interaction, { content: '❌ Thời hạn không hợp lệ.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_cross')} Thời hạn không hợp lệ.`, ephemeral: true });
     return;
   }
 
   const existing = getProductByName(interaction.guildId, name);
   if (existing) {
-    await safeReply(interaction, { content: `⚠️ Sản phẩm **${name}** đã tồn tại (ID: ${existing.id}).`, ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Sản phẩm **${name}** đã tồn tại (ID: ${existing.id}).`, ephemeral: true });
     return;
   }
 
@@ -2142,7 +2196,7 @@ async function handleProductAddModal(interaction) {
   });
 
   await safeReply(interaction, {
-    content: `✅ Đã thêm sản phẩm **${product.emoji} ${product.name}** (ID: ${product.id}) thành công!`,
+    content: `${E('status_check')} Đã thêm sản phẩm **${product.emoji} ${product.name}** (ID: ${product.id}) thành công!`,
     ephemeral: true,
   });
 }
@@ -2212,9 +2266,10 @@ async function handleProductSaleModal(interaction) {
     successCount++;
   }
 
-  let replyText = `✅ Đã thêm **${successCount}** sản phẩm thành công!`;
+  const E_sale = createEmojiResolver(interaction.guildId);
+  let replyText = `${E_sale('status_check')} Đã thêm **${successCount}** sản phẩm thành công!`;
   if (errors.length) {
-    replyText += `\n\n⚠️ **Có ${errors.length} lỗi:**\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? '\n...với nhiều lỗi khác' : ''}`;
+    replyText += `\n\n${E_sale('status_warn')} **Có ${errors.length} lỗi:**\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? '\n...với nhiều lỗi khác' : ''}`;
   }
 
   if (successCount > 0) {
@@ -2230,6 +2285,7 @@ async function handleProductSaleModal(interaction) {
 }
 
 async function handleSaleRunModal(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const parts = interaction.customId.split(':');
   const percent = Number.parseInt(parts[3], 10) || 0;
   const bulkData = interaction.fields.getTextInputValue('bulk_data');
@@ -2239,15 +2295,15 @@ async function handleSaleRunModal(interaction) {
   try {
     const { runSale } = await import('../services/saleService.js');
     await runSale(interaction.client, interaction.guildId, percent, bulkData);
-    
+
     await safeReply(interaction, {
-      content: `✅ Khởi chạy chương trình Sale **${percent}%** thành công! Bảng giá sale đã được ghim/cập nhật.`,
+      content: `${E('status_check')} Khởi chạy chương trình Sale **${percent}%** thành công! Bảng giá sale đã được ghim/cập nhật.`,
       ephemeral: true
     });
   } catch (error) {
     console.error('[SALE RUN MODAL] Error:', error);
     await safeReply(interaction, {
-      content: `❌ Lỗi khi khởi chạy Sale: ${error.message}`,
+      content: `${E('status_cross')} Lỗi khi khởi chạy Sale: ${error.message}`,
       ephemeral: true
     });
   }
@@ -2256,7 +2312,7 @@ async function handleSaleRunModal(interaction) {
 // ═══════════════ Subscription Handlers ═══════════════
 
 import { addSubscription, getSubscriptionById as getSubById, markCustomerResponse as markSubResponse } from '../services/subscriptionService.js';
-import { buildOwnerCustomerWantsRenewalEmbed, getReminderChannel } from '../services/deepNotificationService.js';
+import { buildOwnerCustomerWantsRenewalV2, getReminderChannel } from '../services/deepNotificationService.js';
 
 function parseDateInput(raw) {
   if (!raw || !raw.trim()) return new Date().toISOString();
@@ -2274,6 +2330,7 @@ function parseDateInput(raw) {
 }
 
 async function handleSubscriptionAddModal(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const type = interaction.customId.split(':')[2]; // nitro, spotify, youtube
   await interaction.deferReply({ ephemeral: true });
 
@@ -2281,7 +2338,7 @@ async function handleSubscriptionAddModal(interaction) {
     const gmail = interaction.fields.getTextInputValue('gmail')?.trim();
     const password = interaction.fields.getTextInputValue('password')?.trim();
     if (!gmail || !password) {
-      return interaction.editReply('❌ Gmail và mật khẩu là bắt buộc.');
+      return interaction.editReply(`${E('status_cross')} Gmail và mật khẩu là bắt buộc.`);
     }
 
     let customerField = null, customerName = null, duration = 2, purchaseDate, renewalMode, renewalCycle = 0;
@@ -2381,7 +2438,7 @@ async function handleSubscriptionAddModal(interaction) {
 
     const EMOJI = { nitro: '🚀', spotify: '🎵', youtube: '📺', netflix: '🎬' };
     const LABEL = { nitro: 'Discord Nitro', spotify: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
-    const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: '✅ Đã trả hết' };
+    const MODE_LABEL = { auto_cycle: '🔄 Định kỳ', one_time: '🔂 Mua lẻ', full_paid: `${E('status_check')} Đã trả hết` };
 
     const embed = new EmbedBuilder()
       .setTitle(`${EMOJI[type]} Đã Thêm ${LABEL[type]}`)
@@ -2403,18 +2460,19 @@ async function handleSubscriptionAddModal(interaction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[SUBSCRIPTION ADD] Error:', error);
-    await interaction.editReply(`❌ Lỗi: ${error.message}`);
+    await interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }
 
 async function handleSubscriptionRenewButton(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
   const parts = interaction.customId.split(':'); // sub:renew:yes/no:ID
   const response = parts[2]; // 'yes' or 'no'
   const subId = Number(parts[3]);
 
   const sub = getSubById(subId);
   if (!sub) {
-    await safeReply(interaction, { content: '⚠️ Subscription không tồn tại hoặc đã hết hạn.', ephemeral: true });
+    await safeReply(interaction, { content: `${E('status_warn')} Subscription không tồn tại hoặc đã hết hạn.`, ephemeral: true });
     return;
   }
 
@@ -2424,16 +2482,16 @@ async function handleSubscriptionRenewButton(interaction) {
     const ch = getReminderChannel(interaction.client, sub.guild_id);
     if (ch) {
       const customerUser = sub.customer_id ? await interaction.client.users.fetch(sub.customer_id).catch(() => null) : null;
-      await ch.send({ embeds: [buildOwnerCustomerWantsRenewalEmbed(sub, customerUser || interaction.user)] });
+      await ch.send(buildOwnerCustomerWantsRenewalV2(sub, customerUser || interaction.user));
     }
     await interaction.update({
-      content: '✅ Cảm ơn bạn! Chủ shop đã nhận được yêu cầu gia hạn và sẽ xử lý sớm nhất.',
+      content: `${E('status_check')} Cảm ơn bạn! Chủ shop đã nhận được yêu cầu gia hạn và sẽ xử lý sớm nhất.`,
       embeds: [], components: [],
     }).catch(() => null);
   } else {
     markSubResponse(subId, 'NO');
     await interaction.update({
-      content: '👋 Cảm ơn bạn đã phản hồi. Nếu thay đổi ý, hãy liên hệ shop nhé!',
+      content: `${E('ticket_user')} Cảm ơn bạn đã phản hồi. Nếu thay đổi ý, hãy liên hệ shop nhé!`,
       embeds: [], components: [],
     }).catch(() => null);
   }
@@ -2449,47 +2507,49 @@ function parsePrefixCommand(content) {
 }
 
 async function handlePrefixQr(message, args) {
+  const E = createEmojiResolver(message.guild?.id);
   const order = getLatestOrderByTicketChannel(message.channel.id);
   if (!order) {
-    await message.reply('⚠️ Ticket này chưa có đơn nào để xác nhận QR.').catch(() => null);
+    await message.reply(`${E('status_warn')} Ticket này chưa có đơn nào để xác nhận QR.`).catch(() => null);
     return;
   }
 
   if (order.payment_status === 'PAID') {
-    await message.reply(`ℹ️ Đơn ${order.order_code} đã thanh toán rồi.`).catch(() => null);
+    await message.reply(`${E('status_info')} Đơn ${order.order_code} đã thanh toán rồi.`).catch(() => null);
     return;
   }
 
   const amount = parseMoneyInput(args.join(' ')) ?? order.total_amount;
   const updated = await confirmOrderPaidManually(message.guild, order.order_code, amount);
-  await message.reply(`✅ Đã xác nhận tay thanh toán cho đơn ${updated.order_code}.`).catch(() => null);
+  await message.reply(`${E('status_check')} Đã xác nhận tay thanh toán cho đơn ${updated.order_code}.`).catch(() => null);
 }
 
 async function handlePrefixDone(message, args) {
+  const E = createEmojiResolver(message.guild?.id);
   const fallbackOrder = getLatestOrderByTicketChannel(message.channel.id);
   const orderCode = args[0]?.trim().toUpperCase() || fallbackOrder?.order_code;
   if (!orderCode) {
-    await message.reply('⚠️ Hãy nhập mã đơn hoặc dùng lệnh trong ticket có đơn hàng.').catch(() => null);
+    await message.reply(`${E('status_warn')} Hãy nhập mã đơn hoặc dùng lệnh trong ticket có đơn hàng.`).catch(() => null);
     return;
   }
 
   try {
     const result = await completeOrderByCode(message.guild, orderCode, message.author.id);
     if (!result) {
-      await message.reply('⚠️ Không tìm thấy mã đơn này.').catch(() => null);
+      await message.reply(`${E('status_warn')} Không tìm thấy mã đơn này.`).catch(() => null);
       return;
     }
 
     if (result.alreadyCompleted) {
-      await message.reply(`ℹ️ Đơn ${result.order.order_code} đã hoàn thành trước đó rồi.`).catch(() => null);
+      await message.reply(`${E('status_info')} Đơn ${result.order.order_code} đã hoàn thành trước đó rồi.`).catch(() => null);
       return;
     }
 
     await message.reply(result.dmResult.dmSent
-      ? `✅ Đã hoàn tất đơn ${result.order.order_code} và gửi DM cho khách.`
-      : `✅ Đã hoàn tất đơn ${result.order.order_code}, nhưng DM chưa gửi được cho khách.`).catch(() => null);
+      ? `${E('status_check')} Đã hoàn tất đơn ${result.order.order_code} và gửi DM cho khách.`
+      : `${E('status_check')} Đã hoàn tất đơn ${result.order.order_code}, nhưng DM chưa gửi được cho khách.`).catch(() => null);
   } catch (error) {
-    await message.reply(`⚠️ ${error.message}`).catch(() => null);
+    await message.reply(`${E('status_warn')} ${error.message}`).catch(() => null);
   }
 }
 
@@ -2691,10 +2751,12 @@ export function registerInteractionHandler(client, commands) {
           } else {
             await sendVietQRPayment({ guild: interaction.guild, orderCode });
           }
-          await interaction.editReply('✅ Đã tạo mã QR thanh toán! Kiểm tra trong ticket nhé.');
+          const E_pm = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_pm('status_check')} Đã tạo mã QR thanh toán! Kiểm tra trong ticket nhé.`);
         } catch (err) {
           console.error('[PAYMENT METHOD]', err);
-          await interaction.editReply(`⚠️ Không tạo được QR: ${err.message}`).catch(() => null);
+          const E_pm = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_pm('status_warn')} Không tạo được QR: ${err.message}`).catch(() => null);
         }
         return;
       }
@@ -2703,8 +2765,9 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isButton() && interaction.customId === 'ticket:panel:edit') {
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
         const guildConfig = getGuildConfig(interaction.guildId);
+        const E_pe = createEmojiResolver(interaction.guildId);
         if (!isManager(member, guildConfig)) {
-          await interaction.reply({ content: '⛔ Chỉ **Manager/Admin** mới được chỉnh sửa Panel.', ephemeral: true });
+          await interaction.reply({ content: `${E_pe('status_cross')} Chỉ **Manager/Admin** mới được chỉnh sửa Panel.`, ephemeral: true });
           return;
         }
         const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
@@ -2794,15 +2857,17 @@ export function registerInteractionHandler(client, commands) {
           console.error('[PANEL EDIT] Lỗi cập nhật panel:', editErr);
         }
 
-        await interaction.editReply('✅ Panel đã được cập nhật thành công!');
+        const E_pu = createEmojiResolver(interaction.guildId);
+        await interaction.editReply(`${E_pu('status_check')} Panel đã được cập nhật thành công!`);
         return;
       }
 
       // ═══════ Shop Panel Edit Button ═══════
       if (interaction.isButton() && interaction.customId === 'shop:panel:edit') {
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const E_sp = createEmojiResolver(interaction.guildId);
         if (!member || !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-          await interaction.reply({ content: '⛔ Chỉ **Admin** mới được chỉnh sửa Panel Shop.', ephemeral: true });
+          await interaction.reply({ content: `${E_sp('status_cross')} Chỉ **Admin** mới được chỉnh sửa Panel Shop.`, ephemeral: true });
           return;
         }
 
@@ -2868,7 +2933,8 @@ export function registerInteractionHandler(client, commands) {
         const category = interaction.fields.getTextInputValue('category')?.trim();
 
         if (!category) {
-          await interaction.editReply('❌ Danh mục không được để trống.');
+          const E_sm = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_sm('status_cross')} Danh mục không được để trống.`);
           return;
         }
 
@@ -2899,10 +2965,12 @@ export function registerInteractionHandler(client, commands) {
             updateShopPanel(panel.id, { title: title || category, imageUrl, features, category });
           }
 
-          await interaction.editReply('✅ Panel Shop đã được cập nhật thành công!');
+          const E_spu = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_spu('status_check')} Panel Shop đã được cập nhật thành công!`);
         } catch (err) {
           console.error('[SHOP PANEL EDIT]', err);
-          await interaction.editReply(`❌ Lỗi cập nhật: ${err.message}`);
+          const E_spe = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_spe('status_cross')} Lỗi cập nhật: ${err.message}`);
         }
         return;
       }
@@ -2918,15 +2986,18 @@ export function registerInteractionHandler(client, commands) {
             const ticket = getTicketByChannelId(interaction.channelId);
             if (ticket && ticket.status !== 'CLOSED') {
               closeTicket(ticket.id, interaction.client.user.id);
-              await interaction.channel.send('❌ Khách hàng đã hủy đơn. Channel sẽ đóng trong giây lát...');
+              const E_cc = createEmojiResolver(interaction.guildId);
+              await interaction.channel.send(`${E_cc('status_cross')} Khách hàng đã hủy đơn. Channel sẽ đóng trong giây lát...`);
               setTimeout(() => {
                 interaction.channel.delete('Customer cancelled order').catch(() => null);
               }, 5000);
             }
           }
-          await interaction.editReply('✅ Đã hủy đơn hàng và đóng ticket.');
+          const E_cc2 = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_cc2('status_check')} Đã hủy đơn hàng và đóng ticket.`);
         } catch (e) {
-          await interaction.editReply(`⚠️ Lỗi: ${e.message}`);
+          const E_cc3 = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_cc3('status_warn')} Lỗi: ${e.message}`);
         }
         return;
       }
@@ -2935,12 +3006,13 @@ export function registerInteractionHandler(client, commands) {
         // Legacy fallback – không nên xảy ra nhưng giữ để tương thích
         const orderCode = interaction.fields.getTextInputValue('warranty_order_code')?.trim().toUpperCase();
         const reason = interaction.fields.getTextInputValue('warranty_reason')?.trim() || null;
-        if (!orderCode) { await interaction.reply({ content: '⚠️ Mã đơn trống.', ephemeral: true }).catch(() => null); return; }
+        const E_wl = createEmojiResolver(interaction.guildId);
+        if (!orderCode) { await interaction.reply({ content: `${E_wl('status_warn')} Mã đơn trống.`, ephemeral: true }).catch(() => null); return; }
         const order = getOrderByCode(orderCode);
-        if (!order || order.customer_id !== interaction.user.id) { await interaction.reply({ content: '⚠️ Không tìm thấy đơn hoặc không phải chủ sở hữu.', ephemeral: true }).catch(() => null); return; }
+        if (!order || order.customer_id !== interaction.user.id) { await interaction.reply({ content: `${E_wl('status_warn')} Không tìm thấy đơn hoặc không phải chủ sở hữu.`, ephemeral: true }).catch(() => null); return; }
         const result = await openWarrantyTicket({ guild: interaction.guild, customerId: interaction.user.id, actorId: interaction.user.id, orderCode, reason: reason ?? 'Bảo hành từ panel.' });
         await updateOrderLogMessage(interaction.guild, result.order);
-        await interaction.reply({ content: result.reused ? `ℹ️ Ticket bảo hành đã tồn tại tại ${result.channel}.` : `✅ Ticket bảo hành đã mở tại ${result.channel}.`, ephemeral: true }).catch(() => null);
+        await interaction.reply({ content: result.reused ? `${E_wl('status_info')} Ticket bảo hành đã tồn tại tại ${result.channel}.` : `${E_wl('status_check')} Ticket bảo hành đã mở tại ${result.channel}.`, ephemeral: true }).catch(() => null);
         return;
       }
 
@@ -2975,30 +3047,30 @@ export function registerInteractionHandler(client, commands) {
           
         const everyoneBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_everyone')
-          .setLabel('⚪ Không Tag @everyone')
+          .setLabel('Không Tag @everyone')
           .setStyle(ButtonStyle.Secondary);
 
         const hereBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_here')
-          .setLabel('⚪ Không Tag @here')
+          .setLabel('Không Tag @here')
           .setStyle(ButtonStyle.Secondary);
-          
+
         const confirmBtn = new ButtonBuilder()
           .setCustomId('announcement:confirm')
-          .setLabel('🚀 Xác nhận gửi')
+          .setLabel('Xác nhận gửi')
           .setStyle(ButtonStyle.Success);
-          
+
         const cancelBtn = new ButtonBuilder()
           .setCustomId('announcement:cancel')
           .setLabel('Hủy')
           .setStyle(ButtonStyle.Danger);
-          
+
         const embed = new EmbedBuilder()
-          .setTitle('📝 Xác nhận thông báo')
+          .setTitle('Xác nhận thông báo')
           .setDescription(`**Nội dung sẽ gửi:**\n\n${content.substring(0, 4000)}`)
           .setColor(0x3498db)
           .setFields([
-            { name: '🏷️ Các Role sẽ tag', value: 'Không có (chỉ gửi tin nhắn thường)', inline: false }
+            { name: 'Các Role sẽ tag', value: 'Không có (chỉ gửi tin nhắn thường)', inline: false }
           ])
           .setFooter({ text: 'Chọn role bên dưới nếu muốn tag, sau đó bấm Xác nhận gửi.' });
           
@@ -3056,22 +3128,22 @@ export function registerInteractionHandler(client, commands) {
 
         const everyoneBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_everyone')
-          .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
+          .setLabel(cacheData.tagEveryone ? 'Dang Tag @everyone' : 'Khong Tag @everyone')
           .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
 
         const hereBtn = new ButtonBuilder()
           .setCustomId('announcement:toggle_here')
-          .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
+          .setLabel(cacheData.tagHere ? 'Dang Tag @here' : 'Khong Tag @here')
           .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
-          
+
         const confirmBtn = new ButtonBuilder()
           .setCustomId('announcement:confirm')
-          .setLabel('🚀 Xác nhận gửi')
+          .setLabel('Xac nhan gui')
           .setStyle(ButtonStyle.Success);
-          
+
         const cancelBtn = new ButtonBuilder()
           .setCustomId('announcement:cancel')
-          .setLabel('Hủy')
+          .setLabel('Huy')
           .setStyle(ButtonStyle.Danger);
 
         await interaction.update({
@@ -3096,7 +3168,7 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId === 'announcement:toggle_everyone' || interaction.customId === 'announcement:toggle_here') {
           const cacheData = announcementCache.get(interaction.message.id);
           if (!cacheData) {
-              await interaction.update({ content: '⚠️ Phiên thao tác đã hết hạn.', embeds: [], components: [] }).catch(()=>null);
+              await interaction.update({ content: 'Phien thao tac da het han.', embeds: [], components: [] }).catch(() => null);
               return;
           }
           const isEveryone = interaction.customId === 'announcement:toggle_everyone';
@@ -3106,14 +3178,14 @@ export function registerInteractionHandler(client, commands) {
           // Cập nhật Embed hiển thị danh sách các role được tag
           const embed = EmbedBuilder.from(interaction.message.embeds[0]);
           const roleMentions = cacheData.roles.map(r => `<@&${r}>`).join(', ') || 'Không có';
-          
+
           const tags = [];
           if (cacheData.tagEveryone) tags.push('@everyone');
           if (cacheData.tagHere) tags.push('@here');
           const tagSuffix = tags.length > 0 ? ` + ${tags.join(', ')}` : '';
 
           embed.setFields([
-            { name: '🏷️ Các Role sẽ tag', value: `${roleMentions}${tagSuffix}`, inline: false }
+            { name: 'Các Role sẽ tag', value: `${roleMentions}${tagSuffix}`, inline: false }
           ]);
 
           const roleSelect = new RoleSelectMenuBuilder()
@@ -3121,24 +3193,24 @@ export function registerInteractionHandler(client, commands) {
             .setPlaceholder('Gõ phím để tìm role (Discord mặc định chỉ hiện 25 Role)...')
             .setMinValues(0)
             .setMaxValues(10);
-          
+
           if (cacheData.roles && cacheData.roles.length > 0) {
             roleSelect.setDefaultRoles(...cacheData.roles);
           }
 
           const everyoneBtn = new ButtonBuilder()
             .setCustomId('announcement:toggle_everyone')
-            .setLabel(cacheData.tagEveryone ? '🟢 Đang Tag @everyone' : '⚪ Không Tag @everyone')
+            .setLabel(cacheData.tagEveryone ? 'Dang Tag @everyone' : 'Khong Tag @everyone')
             .setStyle(cacheData.tagEveryone ? ButtonStyle.Success : ButtonStyle.Secondary);
 
           const hereBtn = new ButtonBuilder()
             .setCustomId('announcement:toggle_here')
-            .setLabel(cacheData.tagHere ? '🟢 Đang Tag @here' : '⚪ Không Tag @here')
+            .setLabel(cacheData.tagHere ? 'Dang Tag @here' : 'Khong Tag @here')
             .setStyle(cacheData.tagHere ? ButtonStyle.Success : ButtonStyle.Secondary);
-            
+
           const confirmBtn = new ButtonBuilder()
             .setCustomId('announcement:confirm')
-            .setLabel('🚀 Xác nhận gửi')
+            .setLabel('Xac nhan gui')
             .setStyle(ButtonStyle.Success);
             
           const cancelBtn = new ButtonBuilder()
@@ -3162,7 +3234,7 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId === 'oauth:verify:button') {
         const host = process.env.PUBLIC_BASE_URL || 'https://api2.cenarstore.xyz';
         const loginUrl = `${host.replace(/\/$/, '')}/oauth/login?guild_id=${interaction.guildId}`;
-        const guildConfig = getGuildConfig(interaction.guildId);
+        const E = createEmojiResolver(interaction.guildId);
 
         // Kiểm tra nếu đã có role verified chưa (tránh verify lại)
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
@@ -3172,48 +3244,55 @@ export function registerInteractionHandler(client, commands) {
         );
 
         if (alreadyVerified) {
-          const alreadyEmbed = new EmbedBuilder()
-            .setColor(0x10B981)
-            .setTitle('✅ Bạn Đã Xác Minh Rồi!')
-            .setDescription([
+          const container = new ContainerBuilder().setAccentColor(0x10B981);
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent([
+              `## ${E('status_check')} Bạn Đã Xác Minh Rồi!`,
               `Tài khoản **${interaction.user.tag}** đã được xác minh và có đầy đủ quyền truy cập.`,
               '',
-              '> 💬 Bạn có thể xem toàn bộ kênh và tạo ticket mua hàng ngay!',
-              '> 🎫 Dùng lệnh `/order` hoặc bấm **Mở Ticket** trong kênh hỗ trợ.'
+              `> ${E('icon_group')} Bạn có thể xem toàn bộ kênh và tạo ticket mua hàng ngay!`,
+              `> ${E('ticket_claim')} Dùng lệnh \`/order\` hoặc bấm **Mở Ticket** trong kênh hỗ trợ.`,
+              '',
+              `-# ${E('icon_heart_purple')} Cenar Store — Cảm ơn bạn đã tin tưởng`,
             ].join('\n'))
-            .setFooter({ text: 'Cenar Store — Cảm ơn bạn đã tin tưởng 💜' });
-          await safeReply(interaction, { embeds: [alreadyEmbed], ephemeral: true });
+          );
+          await safeReply(interaction, {
+            components: [container],
+            flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+          });
           return;
         }
 
-        const verifyEmbed = new EmbedBuilder()
-          .setColor(0x7C3AED)
-          .setTitle('🛡️ Xác Minh Tài Khoản Discord')
-          .setDescription([
+        const avatar = interaction.user.displayAvatarURL({ forceStatic: false, size: 128 });
+        const container = new ContainerBuilder().setAccentColor(0x7C3AED);
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent([
+            `## ${E('icon_lock')} Xác Minh Tài Khoản Discord`,
             `Chào **${interaction.user.username}**! Để mở khóa toàn bộ server bạn cần xác minh tài khoản.`,
             '',
-            '**Tại sao cần xác minh?**',
-            '> 🔒 Bảo vệ server khỏi spam / raid',
-            '> 💾 Bot lưu thông tin — tự động kéo bạn sang server dự phòng nếu bị quét',
-            '> 🔓 Mở khóa: bảng giá, phòng chat, tạo ticket mua hàng',
+            `**Tại sao cần xác minh?**`,
+            `> ${E('icon_lock')} Bảo vệ server khỏi spam / raid`,
+            `> ${E('icon_brain')} Bot lưu thông tin — tự động kéo bạn sang server dự phòng nếu bị quét`,
+            `> ${E('ticket_claim')} Mở khóa: bảng giá, phòng chat, tạo ticket mua hàng`,
             '',
-            '> 👇 **Bấm nút bên dưới để bắt đầu xác minh qua Discord OAuth2:**',
-            '> *(Chỉ mất 5 giây, không lấy mật khẩu của bạn)*'
+            `> ${E('icon_sparkle')} **Bấm nút bên dưới để bắt đầu xác minh qua Discord OAuth2:**`,
+            `> *(Chỉ mất 5 giây, không lấy mật khẩu của bạn)*`,
+            '',
+            `-# ${E('icon_heart_purple')} Cenar Store — Bảo Mật & Uy Tín`,
           ].join('\n'))
-          .setThumbnail(interaction.user.displayAvatarURL({ forceStatic: false }))
-          .setFooter({ text: 'Cenar Store — Bảo Mật & Uy Tín 💜' });
-
-        const verifyLinkRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setLabel('🔗  Xác Minh Ngay Tại Đây')
-            .setStyle(ButtonStyle.Link)
-            .setURL(loginUrl)
         );
 
+        const verifyLinkBtn = new ButtonBuilder()
+          .setLabel('Xac Minh Ngay Tai Day')
+          .setStyle(ButtonStyle.Link)
+          .setURL(loginUrl);
+        const verifyBtnEmoji = E.component('status_check');
+        if (verifyBtnEmoji) verifyLinkBtn.setEmoji(verifyBtnEmoji);
+        const verifyLinkRow = new ActionRowBuilder().addComponents(verifyLinkBtn);
+
         await safeReply(interaction, {
-          embeds: [verifyEmbed],
-          components: [verifyLinkRow],
-          ephemeral: true
+          components: [container, verifyLinkRow],
+          flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
         });
         return;
       }
@@ -3233,8 +3312,9 @@ export function registerInteractionHandler(client, commands) {
         // Thay vì modal, hiện SelectMenu với đơn hàng đã hoàn thành
         const completedOrders = getCompletedOrdersByCustomer(interaction.guildId, interaction.user.id, 25);
         if (!completedOrders.length) {
+          const E_wp = createEmojiResolver(interaction.guildId);
           await safeReply(interaction, {
-            content: '⚠️ Bạn chưa có đơn hàng hoàn thành nào để bảo hành. Liên hệ staff nếu cần hỗ trợ.',
+            content: `${E_wp('status_warn')} Bạn chưa có đơn hàng hoàn thành nào để bảo hành. Liên hệ staff nếu cần hỗ trợ.`,
             ephemeral: true,
           });
           return;
@@ -3242,7 +3322,7 @@ export function registerInteractionHandler(client, commands) {
         {
           const { container, flags } = buildWarrantySelectV2(interaction.guildId);
           await safeReply(interaction, {
-            components: [container, ...buildWarrantyProductSelectComponents(completedOrders)],
+            components: [container, ...buildWarrantyProductSelectComponents(completedOrders, interaction.guildId)],
             flags: flags | MessageFlags.Ephemeral,
           });
         }
@@ -3251,36 +3331,34 @@ export function registerInteractionHandler(client, commands) {
 
       if (interaction.customId === 'announcement:cancel') {
          announcementCache.delete(interaction.message.id);
-         await interaction.update({ content: '❌ Đã hủy đăng thông báo.', embeds: [], components: [] }).catch(() => null);
+         await interaction.update({ content: 'Da huy dang thong bao.', embeds: [], components: [] }).catch(() => null);
          return;
       }
-      
+
       if (interaction.customId === 'announcement:confirm') {
          const cacheData = announcementCache.get(interaction.message.id);
          if (!cacheData) {
-           await interaction.update({ content: '⚠️ Phiên thao tác này đã hết hạn. Vui lòng gõ lại lệnh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
+           await interaction.update({ content: 'Phien thao tac nay da het han. Vui long go lai lenh `/thongbao`.', embeds: [], components: [] }).catch(() => null);
            return;
          }
 
-         // Cập nhật trạng thái gửi ngay lập tức để tránh timeout 3 giây của Discord
-         await interaction.update({ content: '⏳ Đang tiến hành gửi thông báo, vui lòng đợi...', embeds: [], components: [] }).catch(() => null);
-         
+         // ACK ngay để tránh timeout 3 giây Discord
+         await interaction.deferUpdate().catch(() => null);
+
          try {
            let rolePings = cacheData.roles.map(r => `<@&${r}>`).join(' ');
            if (cacheData.tagEveryone) rolePings += ' @everyone';
            if (cacheData.tagHere) rolePings += ' @here';
-           
+
            const prefix = rolePings.trim();
            const fullContent = cacheData.content;
-           
+
            const channel = await interaction.guild.channels.fetch(cacheData.channelId).catch(() => null);
            if (channel) {
-               // Gửi role pings riêng nếu có (để mention đúng cách)
                if (prefix) {
                   await channel.send({ content: prefix }).catch(() => null);
                }
-               
-               // Split nội dung thành chunks <= 2000 ký tự
+
                if (fullContent.length <= 2000) {
                   await channel.send({ content: fullContent });
                } else {
@@ -3291,7 +3369,6 @@ export function registerInteractionHandler(client, commands) {
                       chunks.push(remaining);
                       break;
                     }
-                    // Tìm vị trí xuống dòng gần nhất trước 2000
                     let splitAt = remaining.lastIndexOf('\n', 2000);
                     if (splitAt <= 0) splitAt = remaining.lastIndexOf(' ', 2000);
                     if (splitAt <= 0) splitAt = 2000;
@@ -3302,15 +3379,15 @@ export function registerInteractionHandler(client, commands) {
                     await channel.send({ content: chunk }).catch(() => null);
                   }
                }
-               
+
                announcementCache.delete(interaction.message.id);
-               await interaction.editReply({ content: '✅ Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
+               await interaction.editReply({ content: 'Da dang thong bao thanh cong!', embeds: [], components: [] }).catch(() => null);
            } else {
-               await interaction.editReply({ content: '❌ Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
+               await interaction.editReply({ content: 'Khong tim thay kenh tuong ung de dang.', embeds: [], components: [] }).catch(() => null);
            }
          } catch (err) {
            console.error('[ANNOUNCEMENT_CONFIRM] Lỗi:', err);
-           await interaction.editReply({ content: `❌ Có lỗi xảy ra khi đăng thông báo: ${err.message}`, embeds: [], components: [] }).catch(() => null);
+           await interaction.editReply({ content: `Co loi xay ra khi dang thong bao: ${err.message}`, embeds: [], components: [] }).catch(() => null);
          }
          return;
       }
@@ -3325,7 +3402,8 @@ export function registerInteractionHandler(client, commands) {
         }
         // ticket:close:cancel
         if (parts[2] === 'cancel') {
-          await interaction.update({ content: '❌ Đã hủy đóng ticket.', embeds: [], components: [] }).catch(() => null);
+          const E_tc = createEmojiResolver(interaction.guildId);
+          await interaction.update({ content: `${E_tc('status_cross')} Đã hủy đóng ticket.`, embeds: [], components: [] }).catch(() => null);
           return;
         }
         // ticket:close:${ticketId} → hiện confirmation
@@ -3338,8 +3416,9 @@ export function registerInteractionHandler(client, commands) {
         const [, , customerId] = interaction.customId.split(':');
         const guildConfig = getGuildConfig(interaction.guildId);
         const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const E_tm = createEmojiResolver(interaction.guildId);
         if (!isManager(member, guildConfig)) {
-          await safeReply(interaction, { content: '⛔ Chỉ **Admin / Manager** mới có thể mute user.', ephemeral: true });
+          await safeReply(interaction, { content: `${E_tm('status_cross')} Chỉ **Admin / Manager** mới có thể mute user.`, ephemeral: true });
           return;
         }
         const current = getTicketMuteStatus(interaction.guildId, customerId);
@@ -3349,7 +3428,7 @@ export function registerInteractionHandler(client, commands) {
         if (target) {
           await safeReply(interaction, { embeds: [buildMuteTicketEmbed(target, newMuted, newMuted ? 'Admin mute từ ticket' : null, interaction.user.id)], ephemeral: true });
         } else {
-          await safeReply(interaction, { content: newMuted ? `✅ Đã mute user \`${customerId}\` khỏi ticket.` : `✅ Đã bỏ mute user \`${customerId}\`.`, ephemeral: true });
+          await safeReply(interaction, { content: newMuted ? `${E_tm('status_check')} Đã mute user \`${customerId}\` khỏi ticket.` : `${E_tm('status_check')} Đã bỏ mute user \`${customerId}\`.`, ephemeral: true });
         }
         return;
       }
@@ -3369,6 +3448,22 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId.startsWith('queue:view:')) {
         const [, , orderCode] = interaction.customId.split(':');
         await handleQueueView(interaction, orderCode);
+        return;
+      }
+
+      if (interaction.customId.startsWith('payment:regen:')) {
+        const [, , orderCode] = interaction.customId.split(':');
+        await interaction.deferReply({ flags: 64 });
+        try {
+          const { regeneratePaymentQr } = await import('../services/paymentService.js');
+          await regeneratePaymentQr({ guild: interaction.guild, orderCode });
+          const E_pr = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_pr('status_check')} Đã tạo hoá đơn mới! Quét mã QR mới trong ticket để thanh toán nhé.`);
+        } catch (err) {
+          console.error('[PAYMENT REGEN]', err);
+          const E_pr = createEmojiResolver(interaction.guildId);
+          await interaction.editReply(`${E_pr('status_warn')} Không tạo được hoá đơn mới: ${err.message}`).catch(() => null);
+        }
         return;
       }
 
@@ -3402,7 +3497,8 @@ export function registerInteractionHandler(client, commands) {
       }
     } catch (error) {
       if (error.code === 'RATE_LIMITED') {
-        const payload = { content: `⚠️ ${error.message}`, ephemeral: true };
+        const E_rl = createEmojiResolver(interaction.guildId);
+        const payload = { content: `${E_rl('status_warn')} ${error.message}`, ephemeral: true };
         if (interaction.replied || interaction.deferred) {
           await interaction.followUp(payload).catch(() => null);
         } else {
@@ -3416,8 +3512,9 @@ export function registerInteractionHandler(client, commands) {
         sendErrorLog('Interaction Error', error, interaction);
       }).catch(() => null);
 
+      const E_ge = createEmojiResolver(interaction.guildId);
       const payload = {
-        content: '❌ Có lỗi xảy ra khi xử lý thao tác này. Hãy kiểm tra log console.',
+        content: `${E_ge('status_cross')} Có lỗi xảy ra khi xử lý thao tác này. Hãy kiểm tra log console.`,
         ephemeral: true,
       };
 

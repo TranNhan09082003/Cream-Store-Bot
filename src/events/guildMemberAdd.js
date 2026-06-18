@@ -1,13 +1,40 @@
-import { Events, EmbedBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import {
+  Events, ChannelType,
+  ContainerBuilder, TextDisplayBuilder, SectionBuilder, ThumbnailBuilder,
+  MediaGalleryBuilder, MediaGalleryItemBuilder,
+  SeparatorBuilder, SeparatorSpacingSize,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags,
+} from 'discord.js';
 import { config } from '../config.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 export const name = Events.GuildMemberAdd;
 export const once = false;
 
-// ─── Hằng số server ──────────────────────────────────────────────────
 const SERVER1_ID = '1282637033340403754';
 const SERVER2_ID = '1070676180103086132';
+
+const WELCOME_BANNER = {
+  s1: 'https://i.pinimg.com/originals/f4/8c/17/f48c175f88f9576f0f3ff7b36e9c9e7f.gif',
+  s2: 'https://i.pinimg.com/originals/ab/c7/1e/abc71e5a3a7bce163db86cbfae2a82bf.gif',
+};
+
+// Chống lặp welcome (throttle 60 giây per user)
+const recentWelcomes = new Map();
+const WELCOME_THROTTLE_MS = 60_000;
+
+function shouldThrottle(userId) {
+  const now = Date.now();
+  const last = recentWelcomes.get(userId);
+  if (last && now - last < WELCOME_THROTTLE_MS) return true;
+  recentWelcomes.set(userId, now);
+  if (recentWelcomes.size > 200) {
+    for (const [id, ts] of recentWelcomes) {
+      if (now - ts > WELCOME_THROTTLE_MS) recentWelcomes.delete(id);
+    }
+  }
+  return false;
+}
 
 export async function execute(member) {
   try {
@@ -16,9 +43,15 @@ export async function execute(member) {
     const memberCount = guild.memberCount;
     const isServer1   = guild.id === SERVER1_ID;
     const isServer2   = guild.id === SERVER2_ID;
+    const brandName   = config.storeName || 'Cenar Store';
     const E           = createEmojiResolver(guild.id);
 
-    // ─── 1. Cấp Auto-Role cho Server 2 ─────────────────────────────
+    if (shouldThrottle(user.id)) {
+      console.log(`[WELCOME] Throttled duplicate welcome for ${user.tag} (${user.id})`);
+      return;
+    }
+
+    // 1. Cấp Auto-Role cho Server 2
     if (isServer2) {
       const defaultRole = guild.roles.cache.find(r => r.name === '🍃 ｜ Thành Viên Mới');
       if (defaultRole) {
@@ -28,127 +61,170 @@ export async function execute(member) {
       }
     }
 
-    // ─── 2. Gửi embed Welcome vào kênh #chào-mừng ──────────────────
+    // 2. Welcome Components V2 vào kênh #chào-mừng
     const welcomeChannel = guild.channels.cache.find(
       c => c.type === ChannelType.GuildText && c.name.includes('chào-mừng')
     );
 
     if (welcomeChannel) {
-      const verifyChannel  = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText);
-      const thongBaoChan   = guild.channels.cache.find(c => c.name.includes('thông-báo') && c.type === ChannelType.GuildText);
-      const bangGiaChan    = guild.channels.cache.find(c => c.name.includes('bảng-giá') && c.type === ChannelType.GuildText);
-      const hoTroChan      = guild.channels.cache.find(c => c.name.includes('hỗ-trợ') && c.type === ChannelType.GuildText && !c.name.startsWith('ticket'));
-      const brandName      = config.storeName || 'Cenar Store';
+      const verifyChannel = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText);
+      const thongBaoChan  = guild.channels.cache.find(c => c.name.includes('thông-báo') && c.type === ChannelType.GuildText);
+      const bangGiaChan   = guild.channels.cache.find(c => c.name.includes('bảng-giá') && c.type === ChannelType.GuildText);
+      const hoTroChan     = guild.channels.cache.find(c => c.name.includes('hỗ-trợ') && c.type === ChannelType.GuildText && !c.name.startsWith('ticket'));
+      const thaoluanChan  = guild.channels.cache.find(c => c.name.includes('thảo-luận') && c.type === ChannelType.GuildText);
 
-      // Màu theo server
-      const embedColor = isServer1 ? 0x7C3AED : 0xF472B6; // Purple S1 / Pink S2
-
-      // Số ngày tài khoản tồn tại
       const accountAgeDays = Math.floor((Date.now() - user.createdTimestamp) / 86400000);
       const isNewAccount   = accountAgeDays < 30;
+      const avatar         = user.displayAvatarURL({ forceStatic: false, size: 256 });
 
-      const embed = new EmbedBuilder()
-        .setColor(embedColor)
-        .setAuthor({
-          name: `Thành viên mới gia nhập ${brandName}!`,
-          iconURL: guild.iconURL({ forceStatic: false }) || undefined
-        })
-        .setTitle(`${E('status_info', '👋')} Chào mừng ${user.username}!`)
-        .setDescription([
-          isServer1
-            ? `> Bạn vừa bước vào **Cenar Store** — nơi cung cấp tài khoản bản quyền hàng đầu Việt Nam! ${E('panel_order', '🛍️')}`
-            : `> Bạn vừa bước vào **Cenar Store 2** — chi nhánh chính thức của Cenar Store! ${E('icon_sparkle', '🌸')}`,
-          '',
-          '**📋 Thông tin của bạn:**',
-          `> ${E('ticket_user', '👤')} Tag: \`${user.tag}\``,
-          `> ${E('icon_calendar', '🎂')} Tài khoản tạo: <t:${Math.floor(user.createdTimestamp / 1000)}:R>`,
-          `> ${E('ticket_user', '👥')} Bạn là thành viên thứ **${memberCount.toLocaleString('vi-VN')}**`,
-          isNewAccount ? `> ${E('status_warn', '⚠️')} *Tài khoản mới — cần xác minh để truy cập đầy đủ*` : null,
-          '',
-          '**📌 Để bắt đầu:**',
-          verifyChannel
-            ? `> ${E('ticket_claim', '🛡️')} Vào ${verifyChannel} **xác minh tài khoản** để mở khóa toàn bộ server`
-            : null,
-          thongBaoChan ? `> ${E('status_info', '📢')} ${thongBaoChan} — Xem thông báo & ưu đãi mới nhất` : null,
-          bangGiaChan  ? `> ${E('payment_money', '💰')} ${bangGiaChan} — Xem bảng giá dịch vụ` : null,
-          hoTroChan    ? `> ${E('ticket_open', '🎫')} ${hoTroChan} — Mở ticket để mua hàng / hỗ trợ` : null,
-        ].filter(Boolean).join('\n'))
-        .setThumbnail(user.displayAvatarURL({ forceStatic: false, size: 256 }))
-        .setImage(isServer1
-          ? 'https://i.pinimg.com/originals/f4/8c/17/f48c175f88f9576f0f3ff7b36e9c9e7f.gif'
-          : 'https://i.pinimg.com/originals/ab/c7/1e/abc71e5a3a7bce163db86cbfae2a82bf.gif'
-        )
-        .setFooter({
-          text: `${brandName} — Uy Tín & Chất Lượng 💜`,
-          iconURL: guild.iconURL() || undefined
-        })
-        .setTimestamp();
+      const headLines = [
+        `## ${E('icon_sparkle')} Chào mừng ${user.username} đến với ${brandName}!`,
+        isServer1
+          ? `> ${E('icon_store')} Bạn vừa bước vào **Cenar Store** — nơi cung cấp tài khoản bản quyền & dịch vụ Discord hàng đầu Việt Nam! ${E('panel_order')}`
+          : `> ${E('icon_store')} Bạn vừa bước vào **Cenar Store 2** — chi nhánh chính thức của Cenar Store! ${E('icon_sparkle')}`,
+        '',
+        `> ${E('ticket_user')} **Tag:** \`${user.tag}\``,
+        `> ${E('icon_calendar')} **Tài khoản tạo:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`,
+        `> ${E('icon_group')} **Thành viên thứ:** **#${memberCount.toLocaleString('vi-VN')}**`,
+        isNewAccount ? `> ${E('status_warn')} *Tài khoản mới — cần xác minh để truy cập đầy đủ*` : null,
+      ].filter(Boolean);
 
-      // Nút xác minh (nếu chưa verified)
-      const components = [];
-      if (verifyChannel) {
-        components.push(
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setLabel('Xác Minh Ngay')
-              .setStyle(ButtonStyle.Link)
-              .setEmoji(E('ticket_claim', '🛡️'))
-              .setURL(`https://discord.com/channels/${guild.id}/${verifyChannel.id}`)
-          )
-        );
+      const guideLines = [
+        `### ${E('icon_clipboard')} Để bắt đầu:`,
+        verifyChannel ? `> ${E('ticket_claim')} ${verifyChannel} — **Xác minh tài khoản** để mở khóa toàn bộ server` : null,
+        thongBaoChan  ? `> ${E('icon_announce')} ${thongBaoChan} — Thông báo & ưu đãi mới nhất` : null,
+        bangGiaChan   ? `> ${E('payment_money')} ${bangGiaChan} — Xem bảng giá tất cả dịch vụ` : null,
+        hoTroChan     ? `> ${E('ticket_open')} ${hoTroChan} — Mở ticket để mua hàng / hỗ trợ` : null,
+        thaoluanChan  ? `> ${E('brand_discord')} ${thaoluanChan} — Chat & giao lưu cùng cộng đồng` : null,
+      ].filter(Boolean);
+
+      const serviceLines = [
+        `### ${E('icon_star')} Dịch vụ nổi bật:`,
+        `> ${E('brand_nitro')} **Discord Nitro & Boost** — Nitro giá tốt, Boost Server mọi cấp`,
+        `> ${E('icon_art')} **Decor Discord** — Trang trí profile cực đẹp, giá hạt dẻ`,
+        `> ${E('icon_brain')} **AI Premium** — ChatGPT Plus, Gemini Pro, Claude Pro...`,
+        `> ${E('brand_youtube')} **YouTube Premium** — Xem không quảng cáo, giá siêu rẻ`,
+        `> ${E('brand_discord')} **Setup Discord + Bot Custom** — Combo trọn gói chỉ từ **500k**`,
+        `> ${E('icon_link')} **Website Custom** — Thiết kế web mọi giao diện, giá deal`,
+      ];
+
+      const container = new ContainerBuilder().setAccentColor(isServer1 ? 0x7C3AED : 0xF472B6);
+
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(new TextDisplayBuilder().setContent(headLines.join('\n')))
+          .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar))
+      );
+
+      if (guideLines.length > 1) {
+        container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guideLines.join('\n')));
       }
 
+      container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(serviceLines.join('\n')));
+
+      const banner = isServer1 ? WELCOME_BANNER.s1 : WELCOME_BANNER.s2;
+      container.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner))
+      );
+
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`-# ${E('icon_heart_purple')} ${brandName} — Uy Tín • Chất Lượng • Giá Tốt Nhất`)
+      );
+
+      const extraComponents = [];
+      const btnRow = new ActionRowBuilder();
+
+      if (verifyChannel) {
+        const verifyBtn = new ButtonBuilder()
+          .setLabel('Xac Minh Ngay')
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://discord.com/channels/${guild.id}/${verifyChannel.id}`);
+        const emo = E.component('ticket_claim');
+        if (emo) verifyBtn.setEmoji(emo);
+        btnRow.addComponents(verifyBtn);
+      }
+
+      if (bangGiaChan) {
+        const priceBtn = new ButtonBuilder()
+          .setLabel('Xem Bang Gia')
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://discord.com/channels/${guild.id}/${bangGiaChan.id}`);
+        const emo = E.component('payment_money');
+        if (emo) priceBtn.setEmoji(emo);
+        btnRow.addComponents(priceBtn);
+      }
+
+      if (btnRow.components.length > 0) extraComponents.push(btnRow);
+
       await welcomeChannel.send({
-        content: `👋 Chào mừng ${member} đã ghé thăm **${brandName}**!`,
-        embeds: [embed],
-        components
+        components: [container, ...extraComponents],
+        flags: MessageFlags.IsComponentsV2,
+        allowedMentions: { users: [user.id] },
       }).catch(e => console.error('[WELCOME] Thất bại:', e.message));
     }
 
-    // ─── 3. Thông báo ngắn vào kênh #thảo-luận (chat chung) ────────
+    // 3. Thông báo ngắn vào kênh #thảo-luận
     const chatChannel = guild.channels.cache.find(
       c => c.name.includes('thảo-luận') && c.type === ChannelType.GuildText
     );
 
     if (chatChannel) {
+      const verifyId = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText)?.id;
       const greeting = isServer1
-        ? `${E('icon_sparkle', '✨')} Hân hoan chào đón ${member} gia nhập **Cenar Store**! Ghé kênh <#${guild.channels.cache.find(c=>c.name.includes('xác-minh')&&c.type===ChannelType.GuildText)?.id || ''}> để xác minh và mở khóa server nhé! ${E('ticket_claim', '🛡️')}`
-        : `${E('icon_sparkle', '🌸')} Chào mừng ${member} đã đến with **Cenar Store 2**! Bạn đã được cấp role **Thành Viên Mới** — hãy xem kênh bảng giá và mở ticket nếu cần hỗ trợ! ${E('order_complete', '🎉')}`;
+        ? `${E('icon_sparkle')} Hân hoan chào đón ${member} gia nhập **Cenar Store**!${verifyId ? ` Ghé <#${verifyId}> để xác minh và mở khóa server nhé! ${E('ticket_claim')}` : ''}`
+        : `${E('icon_sparkle')} Chào mừng ${member} đã đến **Cenar Store 2**! Bạn đã được cấp role **Thành Viên Mới** — hãy xem bảng giá và mở ticket nếu cần hỗ trợ! ${E('status_check')}`;
 
-      await chatChannel.send(greeting)
+      await chatChannel.send({ content: greeting, allowedMentions: { users: [user.id] } })
         .catch(e => console.error('[WELCOME CHAT] Thất bại:', e.message));
     }
 
-    // ─── 4. DM chào mừng kèm hướng dẫn verify (Server 1 only) ─────
+    // 4. DM chào mừng kèm hướng dẫn verify (Server 1 only)
     if (isServer1) {
       const verifyChannel = guild.channels.cache.find(
         c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText
       );
 
-      const dmEmbed = new EmbedBuilder()
-        .setColor(0x7C3AED)
-        .setTitle(`${E('status_info', '👋')} Chào mừng đến Cenar Store!`)
-        .setDescription([
-          `Xin chào **${user.username}**! Cảm ơn bạn đã tham gia **Cenar Store** ${E('order_complete', '🎉')}`,
-          '',
-          '**Để truy cập đầy đủ server, bạn cần xác minh tài khoản:**',
-          `> ${E('order_id', '1️⃣')} Vào kênh ${verifyChannel ? `**#${verifyChannel.name}**` : '**#xác-minh**'}`,
-          `> ${E('status_check', '2️⃣')} Bấm nút **${E('status_check', '✅')} Xác Minh Ngay**`,
-          `> ${E('order_id', '3️⃣')} Xác nhận qua Discord OAuth2 (chỉ 5 giây)`,
-          '',
-          '**Sau khi xác minh bạn sẽ thấy:**',
-          `> ${E('payment_money', '💰')} Bảng giá sản phẩm`,
-          `> ${E('brand_discord', '💬')} Phòng chat thành viên`,
-          `> ${E('ticket_open', '🎫')} Hệ thống mua hàng & hỗ trợ`,
-          '',
-          '*Nếu cần hỗ trợ hãy mở ticket trong server.*'
-        ].join('\n'))
-        .setThumbnail(guild.iconURL({ forceStatic: false }) || undefined)
-        .setFooter({ text: 'Cenar Store — Uy Tín & Chất Lượng 💜' })
-        .setTimestamp();
+      const dmLines = [
+        `## ${E('icon_sparkle')} Chào mừng đến ${brandName}!`,
+        `Xin chào **${user.username}**! Cảm ơn bạn đã tham gia **${brandName}** ${E('status_check')}`,
+        '',
+        '**Để truy cập đầy đủ server, bạn cần xác minh tài khoản:**',
+        `> 1. Vào kênh ${verifyChannel ? `**#${verifyChannel.name}**` : '**#xac-minh**'}`,
+        `> 2. Bấm nút **Xac Minh Ngay**`,
+        `> 3. Xác nhận qua Discord OAuth2 (chỉ 5 giây)`,
+        '',
+        '**Sau khi xác minh bạn sẽ thấy:**',
+        `> ${E('payment_money')} Bảng giá sản phẩm & dịch vụ`,
+        `> ${E('brand_discord')} Phòng chat thành viên`,
+        `> ${E('ticket_open')} Hệ thống mua hàng & hỗ trợ tự động`,
+        `> ${E('brand_discord')} Dịch vụ Setup Discord + Bot Custom`,
+        '',
+        `**Dịch vụ nổi bật:**`,
+        `> ${E('brand_nitro')} Nitro Boost từ **50k** — ${E('icon_art')} Decor từ **23k**`,
+        `> ${E('icon_brain')} AI Premium (ChatGPT/Gemini/Claude)`,
+        `> ${E('brand_discord')} Combo Setup Discord + Bot + Boost chỉ **500k**`,
+        '',
+        `-# ${E('icon_heart_purple')} ${brandName} — Uy Tín • Chất Lượng • Giá Tốt Nhất`,
+      ];
 
-      await user.send({ embeds: [dmEmbed] }).catch(() => {
-        // DM bị tắt — bỏ qua, không gây lỗi
+      const dmContainer = new ContainerBuilder().setAccentColor(0x7C3AED);
+      dmContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(dmLines.join('\n')));
+
+      const dmComponents = [dmContainer];
+      if (verifyChannel) {
+        const btn = new ButtonBuilder()
+          .setLabel('Xac Minh Ngay')
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://discord.com/channels/${guild.id}/${verifyChannel.id}`);
+        const emo = E.component('ticket_claim');
+        if (emo) btn.setEmoji(emo);
+        dmComponents.push(new ActionRowBuilder().addComponents(btn));
+      }
+
+      await user.send({ components: dmComponents, flags: MessageFlags.IsComponentsV2 }).catch(() => {
+        // DM bị tắt — bỏ qua
       });
     }
 

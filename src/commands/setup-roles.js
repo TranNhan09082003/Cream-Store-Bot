@@ -34,7 +34,7 @@ export async function execute(interaction) {
 
   await interaction.reply({
     content: [
-      `${E('status_check', '✅')} Đã cập nhật role/channels tự động.`,
+      `${E('status_check')} Đã cập nhật role/channels tự động.`,
       cfg.customer_role_id ? `• Role khách: <@&${cfg.customer_role_id}>` : '• Role khách: chưa cấu hình',
       cfg.loyal_role_id ? `• Role khách quen: <@&${cfg.loyal_role_id}>` : '• Role khách quen: chưa cấu hình',
       cfg.vip_role_id ? `• Role VIP: <@&${cfg.vip_role_id}>` : '• Role VIP: chưa cấu hình',

@@ -71,13 +71,15 @@ export async function applyCustomerRoles(guild, customerId) {
       
       try {
           const { EmbedBuilder } = await import('discord.js');
+          const { createEmojiResolver } = await import('../utils/emojiHelper.js');
+          const E = createEmojiResolver(guild.id);
           const embed = new EmbedBuilder()
-            .setTitle('🎉 Chúc Mừng Thăng Hạng Level Tại Cenar Store!')
-            .setDescription(`Xin chào **${member.user.username}**! Thật tuyệt vời, hệ thống ghi nhận bạn đã nâng hạng và được cấp Role mới: **${highestTier.name}**!\n\nCảm ơn bạn đã đồng hành và luôn tin tưởng sử dụng dịch vụ của Cenar Store 💖`)
+            .setTitle(`${E('icon_sparkle')} Chuc Mung Tang Hang Level Tai ${guild.name}!`.trim())
+            .setDescription(`Xin chao **${member.user.username}**! That tuyet voi, he thong ghi nhan ban da nang hang va duoc cap Role moi: **${highestTier.name}**!\n\nCam on ban da dong hanh va luon tin tuong su dung dich vu cua ${guild.name}!`)
             .setColor('#a855f7')
-            .setFooter({ text: 'Cenar Store Auto-Assign System', iconURL: guild.iconURL() })
+            .setFooter({ text: `${guild.name} Auto-Assign System`, iconURL: guild.iconURL() })
             .setTimestamp();
-          
+
           await member.send({ embeds: [embed] }).catch(() => null);
       } catch (error) {
           console.error("Failed to send VIP role DM:", error);

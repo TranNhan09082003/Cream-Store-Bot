@@ -75,7 +75,12 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   );
 
   const em = getEmojiMap(guildId);
-  const E = (slot, fallback) => em[slot] || fallback;
+  const E = (slot, fallback = '') => em[slot] || fallback;
+  const Ecomp = (slot) => {
+    const raw = em[slot];
+    const m = raw && raw.match(/^<(a?):([a-zA-Z0-9_]+):(\d+)>$/);
+    return m ? { id: m[3], name: m[2], animated: m[1] === 'a' } : null;
+  };
   const displayTitle = title || category;
 
   // ─── Container ───
@@ -114,7 +119,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
 
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `**Systems** 🔧\n${formatted}`
+        `**Systems** ${E('icon_settings')}\n${formatted}`
       )
     );
 
@@ -126,7 +131,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   // Footer
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      subtext(`💜 Chọn gói bên dưới · Cream Store`)
+      subtext(`${E('icon_heart_purple')} Chọn gói bên dưới · Cream Store`)
     )
   );
 
@@ -137,25 +142,25 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${formatCurrency(p.price)} | ${p.duration_months} tháng`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(guildId, p.emoji, '🛒'),
+      emoji: resolveSelectMenuEmoji(guildId, p.emoji, 'order_product'),
     }));
 
     selectRow = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('product:select')
-        .setPlaceholder(`${E('order_product', '🛒')} Chọn gói ( Updated )`)
+        .setPlaceholder('Chọn gói ( Updated )')
         .addOptions(selectOptions)
     );
   }
 
   // ─── Edit button (Admin only) ───
-  const editRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('shop:panel:edit')
-      .setLabel('Sửa Panel')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('✏️')
-  );
+  const editBtn = new ButtonBuilder()
+    .setCustomId('shop:panel:edit')
+    .setLabel('Sửa Panel')
+    .setStyle(ButtonStyle.Secondary);
+  const editEmoji = Ecomp('panel_edit');
+  if (editEmoji) editBtn.setEmoji(editEmoji);
+  const editRow = new ActionRowBuilder().addComponents(editBtn);
 
   const components = [container];
   if (selectRow) components.push(selectRow);

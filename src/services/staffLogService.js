@@ -37,14 +37,14 @@ export async function emitStaffLog(client, payload) {
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setTitle(`🧾 Staff Log: ${payload.action}`)
+    .setTitle(`Staff Log: ${payload.action}`)
     .setTimestamp();
-  
-  if (payload.actorId) embed.addFields({ name: '👨‍💼 Staff', value: `<@${payload.actorId}>`, inline: true });
-  if (payload.targetId) embed.addFields({ name: '👤 Khách Hàng', value: `<@${payload.targetId}>`, inline: true });
-  if (payload.relatedOrderCode) embed.addFields({ name: '📦 Mã Đơn', value: `\`${payload.relatedOrderCode}\``, inline: true });
-  if (payload.relatedTicketCode) embed.addFields({ name: '🎫 Ticket', value: `\`${payload.relatedTicketCode}\``, inline: true });
-  if (payload.detail) embed.addFields({ name: '📝 Chi Tiết', value: payload.detail, inline: false });
+
+  if (payload.actorId) embed.addFields({ name: 'Staff', value: `<@${payload.actorId}>`, inline: true });
+  if (payload.targetId) embed.addFields({ name: 'Khach Hang', value: `<@${payload.targetId}>`, inline: true });
+  if (payload.relatedOrderCode) embed.addFields({ name: 'Ma Don', value: `\`${payload.relatedOrderCode}\``, inline: true });
+  if (payload.relatedTicketCode) embed.addFields({ name: 'Ticket', value: `\`${payload.relatedTicketCode}\``, inline: true });
+  if (payload.detail) embed.addFields({ name: 'Chi Tiet', value: payload.detail, inline: false });
   
   await channel.send({ embeds: [embed] }).catch(() => null);
 }

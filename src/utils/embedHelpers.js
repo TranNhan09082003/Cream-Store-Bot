@@ -121,21 +121,25 @@ export function progressBar(current, total, width = 10) {
 }
 
 /** Status pill ─ trả về string với emoji + text */
-export function statusPill(status, customLabels = {}) {
+export function statusPill(status, customLabels = {}, E = null) {
+    const r = E || (() => '');
     const map = {
-        PENDING_PAYMENT: { emoji: '🟡', text: 'Chờ thanh toán' },
-        PROCESSING:      { emoji: '🟠', text: 'Đang xử lý' },
-        COMPLETED:       { emoji: '🟢', text: 'Hoàn thành' },
-        CANCELLED:       { emoji: '🔴', text: 'Đã hủy' },
-        REFUNDED:        { emoji: '⚪', text: 'Đã hoàn tiền' },
-        OPEN:            { emoji: '🟢', text: 'Đang mở' },
-        CLOSED:          { emoji: '⚫', text: 'Đã đóng' },
-        PAID:            { emoji: '✅', text: 'Đã thanh toán' },
-        FREE:            { emoji: '💜', text: 'Miễn phí' },
+        PENDING_PAYMENT: { emoji: r('order_pending'),    text: 'Cho thanh toan' },
+        PROCESSING:      { emoji: r('order_processing'), text: 'Dang xu ly' },
+        COMPLETED:       { emoji: r('order_complete'),   text: 'Hoan thanh' },
+        CANCELLED:       { emoji: r('order_cancel'),     text: 'Da huy' },
+        REFUNDED:        { emoji: r('order_cancel'),     text: 'Da hoan tien' },
+        OPEN:            { emoji: r('order_processing'), text: 'Dang mo' },
+        CLOSED:          { emoji: r('icon_lock'),        text: 'Da dong' },
+        PAID:            { emoji: r('status_check'),     text: 'Da thanh toan' },
+        FREE:            { emoji: r('icon_sparkle'),     text: 'Mien phi' },
+        WARRANTY_OPEN:   { emoji: r('panel_warranty'),   text: 'Dang bao hanh' },
+        DELIVERED:       { emoji: r('order_product'),    text: 'Da giao hang' },
         ...customLabels,
     };
-    const item = map[status] || { emoji: '⚪', text: status };
-    return `${item.emoji} ${fmt.b(item.text)}`;
+    const item = map[status] || { emoji: '', text: String(status) };
+    const pill = [item.emoji, fmt.b(item.text)].filter(Boolean).join(' ');
+    return pill;
 }
 
 /** Empty line / spacer (1 line trống an toàn) */

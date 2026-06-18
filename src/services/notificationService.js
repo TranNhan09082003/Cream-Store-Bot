@@ -1,5 +1,5 @@
 import { AttachmentBuilder } from 'discord.js';
-import { config, getPublicUrl } from '../config.js';
+import { config, getTranscriptUrl } from '../config.js';
 import { getGuildConfig } from './guildConfigService.js';
 import { applyCustomerRoles } from './roleService.js';
 import {
@@ -31,10 +31,13 @@ export async function sendPaymentConfirmedFlow({ guild, order, amount, transacti
   const ticketChannel = await guild.channels.fetch(order.ticket_channel_id).catch(() => null);
 
   if (ticketChannel?.isTextBased()) {
-    await ticketChannel.send({
-      content: `<@${order.customer_id}>`,
-      embeds: [buildPaymentSuccessEmbed(order, formatCurrency(amount ?? order.amount_paid ?? order.total_amount), transactionContent)],
-    }).catch(() => null);
+    await ticketChannel.send(
+      buildPaymentSuccessEmbed(
+        order,
+        formatCurrency(amount ?? order.amount_paid ?? order.total_amount),
+        transactionContent,
+      )
+    ).catch(() => null);
   }
 
   const customer = await guild.client.users.fetch(order.customer_id).catch(() => null);
@@ -112,24 +115,22 @@ export async function sendCompletedFlow({ guild, order, actorId, supportId }) {
 export async function deliverTranscript({ guild, ticket, transcriptResult, closedById }) {
   const guildConfig = getGuildConfig(guild.id);
 
-  const transcriptUrl = getPublicUrl(`/transcripts/${transcriptResult.htmlFileName}`);
+  const transcriptUrl = getTranscriptUrl(`/transcripts/${transcriptResult.htmlFileName}`);
   const components = buildTranscriptLinkComponents(transcriptUrl);
 
   if (guildConfig?.transcript_channel_id) {
     const transcriptChannel = await guild.channels.fetch(guildConfig.transcript_channel_id).catch(() => null);
     if (transcriptChannel?.isTextBased()) {
+      // Luôn kèm file HTML (đã render đẹp như Discord) — bấm link xem ngay nếu domain
+      // đã trỏ proxy, không thì mở file vẫn xem được. Bản .txt để lưu trữ.
       const payload = {
         embeds: [buildTranscriptSummaryEmbed(ticket, closedById, transcriptResult.messageCount, transcriptUrl)],
         components,
-      };
-      
-      // Chỉ gửi kèm files nếu không có URL web
-      if (!transcriptUrl) {
-        payload.files = [
+        files: [
           new AttachmentBuilder(transcriptResult.htmlBuffer, { name: transcriptResult.htmlFileName }),
           new AttachmentBuilder(transcriptResult.textBuffer, { name: transcriptResult.textFileName }),
-        ];
-      }
+        ],
+      };
       await transcriptChannel.send(payload).catch(() => null);
     }
   }
@@ -142,13 +143,10 @@ export async function deliverTranscript({ guild, ticket, transcriptResult, close
   const customerPayload = {
     embeds: [buildTranscriptCustomerEmbed(ticket, transcriptResult.messageCount, transcriptUrl)],
     components,
+    files: [
+      new AttachmentBuilder(transcriptResult.htmlBuffer, { name: transcriptResult.htmlFileName }),
+    ],
   };
-  
-  if (!transcriptUrl) {
-    customerPayload.files = [
-      new AttachmentBuilder(transcriptResult.htmlBuffer, { name: transcriptResult.htmlFileName })
-    ];
-  }
-  
+
   await customer.send(customerPayload).catch(() => null);
 }

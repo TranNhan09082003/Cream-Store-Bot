@@ -7,6 +7,12 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '300M',
+      restart_delay: 5000,
+      kill_timeout: 8000,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      out_file: './logs/bot1-out.log',
+      error_file: './logs/bot1-error.log',
+      merge_logs: false,
       env: {
         NODE_ENV: 'production',
         ENV_FILE: '.env'
@@ -19,6 +25,12 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '300M',
+      restart_delay: 5000,
+      kill_timeout: 8000,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      out_file: './logs/bot2-out.log',
+      error_file: './logs/bot2-error.log',
+      merge_logs: false,
       env: {
         NODE_ENV: 'production',
         ENV_FILE: '.env.store2'

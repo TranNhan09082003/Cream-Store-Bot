@@ -18,7 +18,7 @@ export async function execute(interaction) {
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!isStaffMember(member, guildConfig)) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Chỉ staff mới được claim đơn hàng.` });
+    await interaction.editReply({ content: `${E('status_warn')} Chỉ staff mới được claim đơn hàng.` });
     return;
   }
 
@@ -26,12 +26,12 @@ export async function execute(interaction) {
   const order = getOrderByCode(orderCode);
 
   if (!order) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Không tìm thấy mã đơn.` });
+    await interaction.editReply({ content: `${E('status_warn')} Không tìm thấy mã đơn.` });
     return;
   }
 
   if (order.claimed_by_id && order.claimed_by_id !== interaction.user.id) {
-    await interaction.editReply({ content: `${E('status_warn', '⚠️')} Đơn này đang do <@${order.claimed_by_id}> xử lý.` });
+    await interaction.editReply({ content: `${E('status_warn')} Đơn này đang do <@${order.claimed_by_id}> xử lý.` });
     return;
   }
 
@@ -45,5 +45,5 @@ export async function execute(interaction) {
     relatedOrderCode: orderCode,
   });
 
-  await interaction.editReply({ content: `${E('status_check', '✅')} Đã claim đơn \`${orderCode}\`.` });
+  await interaction.editReply({ content: `${E('status_check')} Đã claim đơn \`${orderCode}\`.` });
 }

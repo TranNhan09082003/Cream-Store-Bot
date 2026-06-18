@@ -95,7 +95,7 @@ export async function execute(interaction) {
             new TextInputBuilder()
               .setCustomId('emoji')
               .setLabel('Icon / Emoji')
-              .setPlaceholder('VD: 📦 hoặc <:netflix:123456>')
+              .setPlaceholder('VD: brand_netflix hoac <:netflix:123456>')
               .setStyle(TextInputStyle.Short)
               .setRequired(false)
           ),
@@ -118,7 +118,7 @@ export async function execute(interaction) {
       const productId = interaction.options.getInteger('id', true);
       const product = getProductById(productId);
       if (!product || product.guild_id !== interaction.guildId) {
-        return interaction.reply({ content: `${E('status_cross', '❌')} Không tìm thấy sản phẩm với ID này.`, ephemeral: true });
+        return interaction.reply({ content: `${E('status_cross')} Không tìm thấy sản phẩm với ID này.`, ephemeral: true });
       }
 
       import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
@@ -155,7 +155,7 @@ export async function execute(interaction) {
             new TextInputBuilder()
               .setCustomId('emoji')
               .setLabel('Icon / Emoji')
-              .setValue(product.emoji || `${E('order_product', '📦')}`)
+              .setValue(product.emoji || `${E('order_product')}`)
               .setStyle(TextInputStyle.Short)
               .setRequired(false)
           ),
@@ -180,11 +180,11 @@ export async function execute(interaction) {
           .setCustomId('product:sale:modal')
           .setTitle('Thêm Nhiều Sản Phẩm (Chạy Sale)');
 
-        const formatPlaceholder = `Nhập mỗi dòng 1 sản phẩm theo mẫu:
-[Icon] Tên Sản Phẩm | Giá | Tháng | Mô tả
+        const formatPlaceholder = `Nhap moi dong 1 san pham theo mau:
+[Icon] Ten San Pham | Gia | Thang | Mo ta
 
-Ví dụ:
-🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng
+Vi du:
+brand_netflix Netflix Premium | 55000 | 1 | Dung 1 thang
 <:nflx:123> Netflix 3T | 150k | 3
 Spotify Premium | 25k | 1`;
 
@@ -193,7 +193,7 @@ Spotify Premium | 25k | 1`;
             new TextInputBuilder()
               .setCustomId('bulk_data')
               .setLabel('Sản phẩm: Icon Tên | Giá | Tháng | Mô tả')
-              .setPlaceholder('🎬 Netflix Premium | 55000 | 1 | Dùng 1 tháng')
+              .setPlaceholder('brand_netflix Netflix Premium | 55000 | 1 | Dung 1 thang')
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
           )
@@ -209,27 +209,27 @@ Spotify Premium | 25k | 1`;
       const productId = interaction.options.getInteger('id', true);
       const product = getProductById(productId);
       if (!product || product.guild_id !== interaction.guildId) {
-        return interaction.editReply(`${E('status_cross', '❌')} Không tìm thấy sản phẩm với ID này.`);
+        return interaction.editReply(`${E('status_cross')} Không tìm thấy sản phẩm với ID này.`);
       }
       deleteProduct(productId);
-      return interaction.editReply(`🗑️ Đã xóa sản phẩm **${product.name}** (ID: ${product.id}).`);
+      return interaction.editReply(`${E('order_cancel')} Đã xóa sản phẩm **${product.name}** (ID: ${product.id}).`);
     }
 
     if (sub === 'list') {
       const products = getAllProducts(interaction.guildId);
       if (!products.length) {
-        return interaction.editReply(`${E('order_product', '📦')} Chưa có sản phẩm nào. Dùng \`/product add\` để thêm.`);
+        return interaction.editReply(`${E('order_product')} Chưa có sản phẩm nào. Dùng \`/product add\` để thêm.`);
       }
 
       const lines = products.map((p, i) => {
-        const status = p.is_active ? '🟢' : '🔴';
+        const status = p.is_active ? `${E('status_check')}` : `${E('status_cross')}`;
         const priceText = p.price > 0 ? formatCurrency(p.price) : '_Miễn phí_';
         return `${status} **ID ${p.id}** — ${p.emoji} **${p.name}** — ${priceText} / ${p.duration_months}T${p.description ? ` — _${p.description}_` : ''}`;
       });
 
       const embed = new EmbedBuilder()
         .setColor(config.accentColorInfo)
-        .setTitle('📋 Danh Sách Sản Phẩm')
+        .setTitle('Danh Sach San Pham')
         .setDescription(lines.join('\n'))
         .setFooter({ text: `Tổng: ${products.length} sản phẩm | Dùng /product edit <id> để chỉnh sửa` })
         .setTimestamp();
@@ -238,6 +238,6 @@ Spotify Premium | 25k | 1`;
     }
   } catch (error) {
     console.error('[PRODUCT] Error:', error);
-    return interaction.editReply(`${E('status_cross', '❌')} Lỗi: ${error.message}`);
+    return interaction.editReply(`${E('status_cross')} Lỗi: ${error.message}`);
   }
 }

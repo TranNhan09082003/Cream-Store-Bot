@@ -6,8 +6,18 @@ import {
   markRemindSent,
   markCustomerResponse,
 } from './subscriptionService.js';
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} from 'discord.js';
 import { decrypt } from '../utils/crypto.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
 
 // ═══════════════ Helpers ═══════════════
 
@@ -41,90 +51,96 @@ function getReminderChannel(client, guildId) {
 
 // ═══════════════ Subscription Notification Embeds ═══════════════
 
-const SERVICE_EMOJI = { nitro: '🚀', spotify_family: '🎵', youtube: '📺', netflix: '🎬' };
 const SERVICE_LABEL = { nitro: 'Discord Nitro', spotify_family: 'Spotify Family', youtube: 'YouTube Premium', netflix: 'Netflix' };
 const SERVICE_COLOR = { nitro: 0x5865F2, spotify_family: 0x1DB954, youtube: 0xFF0000, netflix: 0xE50914 };
+const SERVICE_SLOT = { nitro: 'brand_nitro', spotify_family: 'brand_spotify', youtube: 'brand_youtube', netflix: 'brand_netflix' };
 
-function buildRenewalEmbed(sub) {
-  const emoji = SERVICE_EMOJI[sub.service_type] || '📦';
+function serviceEmoji(E, type) {
+  return E(SERVICE_SLOT[type]) || E('order_product');
+}
+
+// Trả về { components, flags } để gửi qua channel.send / user.send
+function buildRenewalV2(sub) {
+  const E = createEmojiResolver(sub.guild_id);
   const label = SERVICE_LABEL[sub.service_type] || sub.service_type;
   const color = SERVICE_COLOR[sub.service_type] || 0xFEE75C;
   const totalRenewals = sub.renewal_cycle_months > 0 ? Math.max(0, Math.floor(sub.total_duration_months / sub.renewal_cycle_months) - 1) : 0;
   const renewalTs = Math.floor(new Date(sub.next_renewal_at).getTime() / 1000);
   const customer = sub.customer_id ? `<@${sub.customer_id}>` : (sub.customer_discord_name || '_Chưa gán_');
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${emoji} CẦN GIA HẠN ${label.toUpperCase()}`)
-    .setColor(color)
-    .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    .addFields(
-      { name: '📧 Gmail', value: `\`${sub.gmail_email}\``, inline: true },
-      { name: '🔑 Mật khẩu', value: `\`${decrypt(sub.gmail_password)}\``, inline: true },
-      { name: '👤 Khách hàng', value: customer, inline: true },
-      { name: '⏰ Hạn gia hạn', value: `<t:${renewalTs}:F>\n(<t:${renewalTs}:R>)`, inline: true },
-      { name: '🔢 Lần gia hạn', value: `${sub.times_renewed + 1}/${totalRenewals + 1}`, inline: true },
-    )
-    .setFooter({ text: `ID: ${sub.id} | Dùng /subscription renew ${sub.id} sau khi gia hạn xong` })
-    .setTimestamp();
+  const lines = [
+    `## ${serviceEmoji(E, sub.service_type)} CẦN GIA HẠN ${label.toUpperCase()}`,
+    `> ${E('payment_money')} **Gmail:** \`${sub.gmail_email}\``,
+    `> ${E('icon_key')} **Mật khẩu:** \`${decrypt(sub.gmail_password)}\``,
+    `> ${E('ticket_user')} **Khách hàng:** ${customer}`,
+    `> ${E('icon_clock')} **Hạn gia hạn:** <t:${renewalTs}:F> (<t:${renewalTs}:R>)`,
+    `> ${E('icon_number')} **Lần gia hạn:** ${sub.times_renewed + 1}/${totalRenewals + 1}`,
+  ];
+  if (sub.related_order_code) lines.push(`> ${E('icon_clipboard')} **Đơn gốc:** \`${sub.related_order_code}\``);
+  if (sub.spotify_family_name) lines.push(`> ${E('icon_home')} **Family:** ${sub.spotify_family_name} · ${E('icon_group')} **Slots:** ${sub.spotify_slots_used || 0}/5`);
+  if (sub.note) lines.push(`> ${E('icon_edit')} **Ghi chú:** ${sub.note}`);
+  lines.push('');
+  lines.push(`-# ID: ${sub.id} | Dùng /subscription renew ${sub.id} sau khi gia hạn xong`);
 
-  if (sub.related_order_code) embed.addFields({ name: '📋 Đơn gốc', value: `\`${sub.related_order_code}\``, inline: true });
-  if (sub.spotify_family_name) embed.addFields({ name: '🏠 Family', value: sub.spotify_family_name, inline: true }, { name: '👥 Slots', value: `${sub.spotify_slots_used || 0}/5`, inline: true });
-  if (sub.note) embed.addFields({ name: '📝 Ghi chú', value: sub.note, inline: false });
-
-  return embed;
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
-function buildCustomerRenewalAskEmbed(sub) {
-  const emoji = SERVICE_EMOJI[sub.service_type] || '📦';
+function buildCustomerRenewalAskV2(sub) {
+  const E = createEmojiResolver(sub.guild_id);
   const label = SERVICE_LABEL[sub.service_type] || sub.service_type;
   const expiryTs = Math.floor(new Date(sub.expiry_at).getTime() / 1000);
 
-  return new EmbedBuilder()
-    .setTitle(`${emoji} Gói ${label} sắp hết hạn!`)
-    .setColor(0xFEE75C)
-    .setDescription([
-      sub.related_order_code ? `Mã đơn: \`${sub.related_order_code}\`` : null,
-      `⏰ Hết hạn: <t:${expiryTs}:F> (<t:${expiryTs}:R>)`,
-      '',
-      '**Bạn có muốn gia hạn tiếp không?**',
-      'Nhấn nút bên dưới để trả lời.',
-    ].filter(Boolean).join('\n'))
-    .setTimestamp();
+  const lines = [
+    `## ${serviceEmoji(E, sub.service_type)} Gói ${label} sắp hết hạn!`,
+    sub.related_order_code ? `> ${E('icon_clipboard')} Mã đơn: \`${sub.related_order_code}\`` : null,
+    `> ${E('icon_clock')} Hết hạn: <t:${expiryTs}:F> (<t:${expiryTs}:R>)`,
+    '',
+    '**Bạn có muốn gia hạn tiếp không?**',
+    'Nhấn nút bên dưới để trả lời.',
+  ].filter(Boolean);
+
+  const container = new ContainerBuilder().setAccentColor(0xFEE75C);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  const row = buildCustomerRenewalButtons(sub.id, E);
+  return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
 }
 
-function buildCustomerRenewalButtons(subId) {
+function buildCustomerRenewalButtons(subId, E) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`sub:renew:yes:${subId}`).setLabel('✅ Có, tôi muốn gia hạn').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`sub:renew:no:${subId}`).setLabel('❌ Không, cảm ơn').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`sub:renew:yes:${subId}`).setLabel('Có, tôi muốn gia hạn').setStyle(ButtonStyle.Success).setEmoji(E.component('status_check') ?? undefined),
+    new ButtonBuilder().setCustomId(`sub:renew:no:${subId}`).setLabel('Không, cảm ơn').setStyle(ButtonStyle.Secondary).setEmoji(E.component('status_cross') ?? undefined),
   );
 }
 
-function buildCustomerYoutubeNoticeEmbed(sub) {
+function buildCustomerYoutubeNoticeV2(sub) {
+  const E = createEmojiResolver(sub.guild_id);
   const renewalTs = Math.floor(new Date(sub.next_renewal_at).getTime() / 1000);
-  return new EmbedBuilder()
-    .setTitle('📺 Gói YouTube Premium sắp tới kỳ gia hạn!')
-    .setColor(0xFF0000)
-    .setDescription([
-      `⏰ Hạn: <t:${renewalTs}:F> (<t:${renewalTs}:R>)`,
-      '',
-      'Chủ shop sẽ gia hạn cho bạn. Nếu có vấn đề, hãy mở ticket.',
-    ].join('\n'))
-    .setTimestamp();
+  const lines = [
+    `## ${E('brand_youtube')} Gói YouTube Premium sắp tới kỳ gia hạn!`,
+    `> ${E('icon_clock')} Hạn: <t:${renewalTs}:F> (<t:${renewalTs}:R>)`,
+    '',
+    'Chủ shop sẽ gia hạn cho bạn. Nếu có vấn đề, hãy mở ticket.',
+  ];
+  const container = new ContainerBuilder().setAccentColor(0xFF0000);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
-function buildOwnerCustomerWantsRenewalEmbed(sub, customerUser) {
-  const emoji = SERVICE_EMOJI[sub.service_type] || '📦';
-  return new EmbedBuilder()
-    .setTitle(`${emoji} ✅ KHÁCH MUỐN GIA HẠN`)
-    .setColor(0x57F287)
-    .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    .addFields(
-      { name: '👤 Khách hàng', value: customerUser ? `<@${customerUser.id}> (${customerUser.tag})` : (sub.customer_discord_name || '_Không rõ_'), inline: false },
-      { name: '📧 Gmail', value: `\`${sub.gmail_email}\``, inline: true },
-      { name: '🔑 Mật khẩu', value: `\`${decrypt(sub.gmail_password)}\``, inline: true },
-    )
-    .setFooter({ text: `ID: ${sub.id}` })
-    .setTimestamp();
+function buildOwnerCustomerWantsRenewalV2(sub, customerUser) {
+  const E = createEmojiResolver(sub.guild_id);
+  const lines = [
+    `## ${serviceEmoji(E, sub.service_type)} ${E('status_check')} KHÁCH MUỐN GIA HẠN`,
+    `> ${E('ticket_user')} **Khách hàng:** ${customerUser ? `<@${customerUser.id}> (${customerUser.tag})` : (sub.customer_discord_name || '_Không rõ_')}`,
+    `> ${E('payment_money')} **Gmail:** \`${sub.gmail_email}\``,
+    `> ${E('icon_key')} **Mật khẩu:** \`${decrypt(sub.gmail_password)}\``,
+    '',
+    `-# ID: ${sub.id}`,
+  ];
+  const container = new ContainerBuilder().setAccentColor(0x57F287);
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
 // ═══════════════ Main: Order Expiry Notifications ═══════════════
@@ -137,10 +153,11 @@ export async function runDeepNotifications(client) {
   let sent3d = 0, sent2d = 0, sent1d = 0;
 
   for (const order of notify3d) {
+    const E = createEmojiResolver(order.guild_id);
     const user = await client.users.fetch(order.customer_id).catch(() => null);
     if (!user) continue;
     const ok = await safeSend(user, [
-      '📣 **Gói của bạn sắp hết hạn trong khoảng 3 ngày**',
+      `${E('icon_announce')} **Gói của bạn sắp hết hạn trong khoảng 3 ngày**`,
       `Mã đơn: \`${order.order_code}\``, `Sản phẩm: **${order.product_name}**`,
       `Ngày hết hạn: <t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:F>`,
       'Hãy chuẩn bị gia hạn để quá trình sử dụng không bị ngắt quãng nhé.',
@@ -149,38 +166,40 @@ export async function runDeepNotifications(client) {
       markExpiryNoticeRaw(order.order_code, 'expiry_notice_3d_sent_at'); sent3d++;
       try {
         const ch = getReminderChannel(client, order.guild_id);
-        ch?.send(`📣 Đã nhắc gia hạn **(3 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`);
+        ch?.send(`${E('icon_announce')} Đã nhắc gia hạn **(3 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`);
       } catch {}
     }
   }
 
   for (const order of notify2d) {
+    const E = createEmojiResolver(order.guild_id);
     const user = await client.users.fetch(order.customer_id).catch(() => null);
     if (!user) continue;
     const ok = await safeSend(user, [
-      '📣 **Gói của bạn sắp hết hạn trong khoảng 2 ngày**',
+      `${E('icon_announce')} **Gói của bạn sắp hết hạn trong khoảng 2 ngày**`,
       `Mã đơn: \`${order.order_code}\``, `Sản phẩm: **${order.product_name}**`,
       `Ngày hết hạn: <t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:F>`,
       'Nếu muốn tiếp tục sử dụng, hãy mở ticket hoặc liên hệ shop để gia hạn.',
     ].join('\n'));
     if (ok) {
       markExpiryNoticeRaw(order.order_code, 'expiry_notice_2d_sent_at'); sent2d++;
-      try { const ch = getReminderChannel(client, order.guild_id); ch?.send(`📣 Đã nhắc gia hạn **(2 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`); } catch {}
+      try { const ch = getReminderChannel(client, order.guild_id); ch?.send(`${E('icon_announce')} Đã nhắc gia hạn **(2 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`); } catch {}
     }
   }
 
   for (const order of notify1d) {
+    const E = createEmojiResolver(order.guild_id);
     const user = await client.users.fetch(order.customer_id).catch(() => null);
     if (!user) continue;
     const ok = await safeSend(user, [
-      '⏰ **Gói của bạn sẽ hết hạn trong vòng 1 ngày**',
+      `${E('icon_clock')} **Gói của bạn sẽ hết hạn trong vòng 1 ngày**`,
       `Mã đơn: \`${order.order_code}\``, `Sản phẩm: **${order.product_name}**`,
       `Ngày hết hạn: <t:${Math.floor(new Date(order.expiry_at).getTime() / 1000)}:F>`,
       'Hãy mở ticket gia hạn để tránh gián đoạn sử dụng.',
     ].join('\n'));
     if (ok) {
       markExpiryNoticeRaw(order.order_code, 'expiry_notice_1d_sent_at'); sent1d++;
-      try { const ch = getReminderChannel(client, order.guild_id); ch?.send(`⏰ Đã nhắc gia hạn **(1 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`); } catch {}
+      try { const ch = getReminderChannel(client, order.guild_id); ch?.send(`${E('icon_clock')} Đã nhắc gia hạn **(1 ngày)** cho <@${order.customer_id}> — \`${order.order_code}\` | **${order.product_name}**`); } catch {}
     }
   }
 
@@ -199,7 +218,7 @@ export async function runSubscriptionNotifications(client) {
       const ch = getReminderChannel(client, sub.guild_id);
       if (!ch) continue;
 
-      await ch.send({ embeds: [buildRenewalEmbed(sub)] });
+      await ch.send(buildRenewalV2(sub));
       markRemindSent(sub.id);
       sentOwner++;
 
@@ -207,7 +226,7 @@ export async function runSubscriptionNotifications(client) {
       if (sub.service_type === 'youtube' && sub.customer_id) {
         const user = await client.users.fetch(sub.customer_id).catch(() => null);
         if (user) {
-          await safeSendEmbed(user, { embeds: [buildCustomerYoutubeNoticeEmbed(sub)] });
+          await safeSendEmbed(user, buildCustomerYoutubeNoticeV2(sub));
           sentCustomer++;
         }
       }
@@ -224,7 +243,7 @@ export async function runSubscriptionNotifications(client) {
         // Không có khách → nhắc chủ shop
         const ch = getReminderChannel(client, sub.guild_id);
         if (ch) {
-          await ch.send({ embeds: [buildRenewalEmbed(sub)] });
+          await ch.send(buildRenewalV2(sub));
           markRemindSent(sub.id);
           sentOwner++;
         }
@@ -234,10 +253,7 @@ export async function runSubscriptionNotifications(client) {
       const user = await client.users.fetch(sub.customer_id).catch(() => null);
       if (!user) continue;
 
-      const ok = await safeSendEmbed(user, {
-        embeds: [buildCustomerRenewalAskEmbed(sub)],
-        components: [buildCustomerRenewalButtons(sub.id)],
-      });
+      const ok = await safeSendEmbed(user, buildCustomerRenewalAskV2(sub));
 
       if (ok) {
         markRemindSent(sub.id);
@@ -256,4 +272,4 @@ export async function runSubscriptionNotifications(client) {
 }
 
 // Re-export for use in interactionCreate button handler
-export { buildOwnerCustomerWantsRenewalEmbed, getReminderChannel };
+export { buildOwnerCustomerWantsRenewalV2, getReminderChannel };

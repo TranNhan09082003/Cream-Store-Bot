@@ -14,7 +14,7 @@ export async function execute(interaction) {
   const E = createEmojiResolver(interaction?.guildId);
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!assertStaffCapability(member, guildConfig, 'MANAGE')) { await interaction.reply({ content: `${E('status_warn', '⚠️')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true }); return; }
+  if (!assertStaffCapability(member, guildConfig, 'MANAGE')) { await interaction.reply({ content: `${E('status_warn')} Chỉ manager mới được dùng lệnh này.`, ephemeral: true }); return; }
   await interaction.deferReply({ ephemeral: true });
   const kind = interaction.options.getString('loai', true);
   if (kind === 'db') { const dbPath = getDatabasePath(); const fileName = path.basename(dbPath); await interaction.editReply({ files: [new AttachmentBuilder(dbPath, { name: fileName })] }); return; }
