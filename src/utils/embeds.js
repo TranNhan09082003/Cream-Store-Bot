@@ -378,7 +378,7 @@ export function buildTicketControlComponents(ticketId, customerId = null) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`ticket:close:${ticketId}`)
-      .setLabel('Dong Ticket')
+      .setLabel('Đóng Ticket')
       .setStyle(ButtonStyle.Danger),
   );
   if (customerId) {
@@ -700,11 +700,11 @@ export function buildPaymentPendingComponents(orderCode, checkoutUrl = null) {
   const row = new ActionRowBuilder();
   if (checkoutUrl && /^https?:\/\//i.test(checkoutUrl)) {
     row.addComponents(
-      new ButtonBuilder().setLabel('Thanh Toan Ngay').setStyle(ButtonStyle.Link).setURL(checkoutUrl),
+      new ButtonBuilder().setLabel('Thanh Toán Ngay').setStyle(ButtonStyle.Link).setURL(checkoutUrl),
     );
   }
   row.addComponents(
-    new ButtonBuilder().setCustomId(`queue:view:${orderCode}`).setLabel('Xem Hang Cho').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`queue:view:${orderCode}`).setLabel('Xem Hàng Chờ').setStyle(ButtonStyle.Secondary),
   );
   return row.components.length ? [row] : [];
 }
@@ -725,7 +725,7 @@ export function buildPaymentQrV2({ order, attachmentName = null, checkoutUrl = n
     new TextDisplayBuilder().setContent(joinLines(
       h2(`${E('payment_payos')}  Thanh Toán Đơn Hàng`),
       `> ${fmt.user(order.customer_id)}`,
-      `> ${E('payment_qr')} Quét mã QR ${fmt.b('hoặc')} bấm ${fmt.b('Thanh Toan Ngay')} bên dưới`,
+      `> ${E('payment_qr')} Quét mã QR ${fmt.b('hoặc')} bấm ${fmt.b('Thanh Toán Ngay')} bên dưới`,
       `> ${E('status_check')} Bot ${fmt.b('tự động xác nhận')} sau khi nhận được giao dịch`,
     ))
   );
@@ -765,12 +765,12 @@ export function buildPaymentQrV2({ order, attachmentName = null, checkoutUrl = n
 
   const actionRow = new ActionRowBuilder();
   if (checkoutUrl && /^https?:\/\//i.test(checkoutUrl)) {
-    const payBtn = new ButtonBuilder().setLabel('Thanh Toan Ngay').setStyle(ButtonStyle.Link).setURL(checkoutUrl);
+    const payBtn = new ButtonBuilder().setLabel('Thanh Toán Ngay').setStyle(ButtonStyle.Link).setURL(checkoutUrl);
     const ePay = ec(em, 'payment_payos'); if (ePay) payBtn.setEmoji(ePay);
     actionRow.addComponents(payBtn);
   }
-  const regenBtn = new ButtonBuilder().setCustomId(`payment:regen:${order.order_code}`).setLabel('Tao Hoa Don Moi').setStyle(ButtonStyle.Secondary);
-  const queueBtn = new ButtonBuilder().setCustomId(`queue:view:${order.order_code}`).setLabel('Xem Hang Cho').setStyle(ButtonStyle.Secondary);
+  const regenBtn = new ButtonBuilder().setCustomId(`payment:regen:${order.order_code}`).setLabel('Tạo Hoá Đơn Mới').setStyle(ButtonStyle.Secondary);
+  const queueBtn = new ButtonBuilder().setCustomId(`queue:view:${order.order_code}`).setLabel('Xem Hàng Chờ').setStyle(ButtonStyle.Secondary);
   const eRefresh = ec(em, 'icon_refresh'); if (eRefresh) regenBtn.setEmoji(eRefresh);
   const eQueue = ec(em, 'order_queue'); if (eQueue) queueBtn.setEmoji(eQueue);
   actionRow.addComponents(regenBtn, queueBtn);
