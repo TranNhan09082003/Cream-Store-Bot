@@ -9,7 +9,7 @@ import {
   errorResponse, successResponse, validateRequired,
 } from '../utils/inputValidator.js';
 import { setBlacklistStatus } from './blacklistService.js';
-import { addWalletBalance } from './walletService.js';
+import { addWalletBalance, getWalletBalance } from './walletService.js';
 import { createCoupon, listCoupons, deactivateCoupon } from './couponService.js';
 import * as subService from './subscriptionService.js';
 import { getAiKnowledge, updateAiKnowledge } from './aiKnowledgeService.js';
@@ -239,9 +239,15 @@ export function registerAdminRoutes(app) {
       const { amount, type, reason } = req.body;
       const userId = sanitizeString(req.params.id, 100);
       const actorId = req.header('x-user-id');
-      
-      const changeAmount = type === 'add' ? amount : -amount;
-      addWalletBalance('WEB', userId, changeAmount, 'ADMIN_ADJUST', reason);
+
+      let changeAmount;
+      if (type === 'set') {
+        const current = getWalletBalance('WEB', userId);
+        changeAmount = amount - current;
+      } else {
+        changeAmount = type === 'add' ? amount : -amount;
+      }
+      if (changeAmount !== 0) addWalletBalance('WEB', userId, changeAmount, 'ADMIN_ADJUST', reason);
 
       // Audit log
       try {
@@ -250,6 +256,32 @@ export function registerAdminRoutes(app) {
       } catch { /* ignore audit failures */ }
 
       return successResponse(res, null, 'Cập nhật số dư thành công');
+    } catch (e) {
+      return errorResponse(res, 500, e.message);
+    }
+  });
+
+  // Edit user info (display_name)
+  app.put('/api/bot/admin/users/:id', requireAdminRole, (req, res) => {
+    try {
+      if (req.adminRole !== 'admin') {
+        return errorResponse(res, 403, 'Chỉ Admin mới có quyền chỉnh sửa người dùng.');
+      }
+      const { displayName } = req.body;
+      const userId = sanitizeString(req.params.id, 100);
+      const actorId = req.header('x-user-id');
+      if (userId === actorId) return errorResponse(res, 403, 'Không thể tự chỉnh sửa chính mình.');
+
+      const updates = [];
+      const params = [];
+      if (displayName !== undefined) {
+        updates.push('display_name = ?');
+        params.push(sanitizeString(displayName, 100));
+      }
+      if (updates.length === 0) return errorResponse(res, 400, 'Không có thay đổi nào.');
+      params.push(userId);
+      db.prepare(`UPDATE web_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      return successResponse(res, null, 'Đã cập nhật thông tin người dùng');
     } catch (e) {
       return errorResponse(res, 500, e.message);
     }
