@@ -294,20 +294,20 @@ export async function sendVietQRPayment({ guild, orderCode }) {
   const bankName = (bankInfo.bankName || bankInfo.bankBin || 'BANK').toUpperCase();
   const embed = new EmbedBuilder()
     .setColor(0x00b4d8)
-    .setTitle('Thong Tin Thanh Toan Don Hang')
+    .setTitle('Thông Tin Thanh Toán Đơn Hàng')
     .setDescription(
-      `Bạn có thể quét mã QR hoặc vui lòng chuyển khoản đúng thông tin để hệ thống tự động giải phóng key. Trong trường hợp chuyển sai nội dung vui lòng tạo ticket!`
+      `Quét mã QR hoặc chuyển khoản đúng thông tin bên dưới — hệ thống sẽ tự động xác nhận và xử lý đơn hàng trong vòng 1–2 phút sau khi nhận được tiền.`
     )
     .addFields(
       { name: 'Ngân hàng', value: `\`${bankName}\``, inline: true },
       { name: 'Số tài khoản', value: `\`${bankInfo.accountNo}\``, inline: true },
       { name: 'Chủ tài khoản', value: `\`${(bankInfo.accountName || 'CHỦ TK').toUpperCase()}\``, inline: true },
-      { name: 'Nội dung', value: `\`${transferContent}\``, inline: false },
+      { name: 'Nội dung chuyển khoản', value: `\`${transferContent}\``, inline: false },
       { name: 'Sản phẩm', value: `\`${order.quantity}x ${order.product_name}\``, inline: true },
       { name: 'Số tiền', value: `\`${formatCurrency(order.total_amount)}\``, inline: true },
     )
     .setImage(`attachment://${attachmentName}`)
-    .setFooter({ text: 'Luu y: Giao dich se het han sau 10p neu chua thanh toan. Ban co the tao lai hoa don moi.' });
+    .setFooter({ text: 'Lưu ý: Giao dịch sẽ hết hạn sau 10 phút nếu chưa thanh toán.' });
 
   const sentMessage = await ticketChannel.send({
     content: `<@${order.customer_id}>`,
@@ -315,8 +315,15 @@ export async function sendVietQRPayment({ guild, orderCode }) {
     files: [new AttachmentBuilder(imageBuffer, { name: attachmentName })],
   });
 
-  savePaymentMessage(order.order_code, sentMessage.id);
-  return { order, message: sentMessage, vietqrUrl };
+  // Lưu VietQR URL vào DB để website hiển thị QR code
+  savePaymentLinkData(order.order_code, {
+    paymentLinkId: null,
+    checkoutUrl: null,
+    qrCode: vietqrUrl,
+    qrUrl: vietqrUrl,
+  });
+  const saved = savePaymentMessage(order.order_code, sentMessage.id);
+  return { order: saved, message: sentMessage, vietqrUrl };
 }
 
 export async function sendOrRefreshPaymentQr({ guild, orderCode }) {
