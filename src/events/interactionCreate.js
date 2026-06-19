@@ -1831,7 +1831,10 @@ async function handleOrderCancel(interaction, orderCode) {
 
   const cancelled = cancelOrder(orderCode, `Cancelled by ${interaction.user.tag}`);
   await updateOrderLogMessage(interaction.guild, cancelled);
-  await interaction.message.edit({ components: [] }).catch(() => null);
+  // Chỉ xóa components của tin hiện tại nếu không phải kênh log (tránh làm trắng V2 log embed)
+  if (interaction.channelId !== cancelled.order_log_channel_id) {
+    await interaction.message.edit({ components: [] }).catch(() => null);
+  }
 
   // Nếu staff hủy đơn của khách khác → DM khách
   if (!isOwner && cancelled.customer_id !== interaction.user.id) {
@@ -1839,8 +1842,8 @@ async function handleOrderCancel(interaction, orderCode) {
       const customer = await interaction.client.users.fetch(cancelled.customer_id);
       const wasPaid = cancelled.payment_status === 'PAID';
       const dmMsg = wasPaid
-        ? `🚫 **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy bởi staff. Tiền sẽ được hoàn lại sớm nhất, liên hệ shop nếu chưa nhận được.`
-        : `🚫 **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy. Bạn có thể đặt đơn mới bất kỳ lúc nào.`;
+        ? `${E('icon_block')} **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy bởi staff. Tiền sẽ được hoàn lại sớm nhất, liên hệ shop nếu chưa nhận được.`
+        : `${E('icon_block')} **Cream Store** — Đơn \`${cancelled.order_code}\` đã được hủy. Bạn có thể đặt đơn mới bất kỳ lúc nào.`;
       await customer.send(dmMsg).catch(() => null);
     } catch (e) {}
   }

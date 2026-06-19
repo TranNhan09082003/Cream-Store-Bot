@@ -584,6 +584,62 @@ export function buildOrderCreatedV2(order, orderChannelId) {
   return { container, actionRow, flags: MessageFlags.IsComponentsV2 };
 }
 
+// Cập nhật log embed khi trạng thái đơn thay đổi (hủy / hoàn thành / đang xử lý)
+export function buildOrderLogV2Update(order) {
+  const hasPay = order.total_amount > 0;
+  const em = order.guild_id ? getEmojiMap(order.guild_id) : {};
+  const E = (slot, fallback = '') => em[slot] || fallback;
+
+  const accentMap = {
+    CANCELLED:       0xEF4444,
+    COMPLETED:       0x22C55E,
+    PROCESSING:      0xF59E0B,
+    PENDING_PAYMENT: accentFor('primary'),
+  };
+  const accentColor = accentMap[order.status] ?? accentFor('primary');
+
+  const headerEmojiSlot = {
+    CANCELLED:       'order_cancel',
+    COMPLETED:       'order_complete',
+    PROCESSING:      'payment_success',
+    PENDING_PAYMENT: 'order_created',
+  }[order.status] ?? 'order_created';
+
+  const container = new ContainerBuilder().setAccentColor(accentColor);
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `## ${E(headerEmojiSlot)} Đơn Hàng ${fmt.code(order.order_code)}`,
+      `> ${fmt.user(order.customer_id)} — ${getOrderStatusLabel(order.status, order.guild_id)}`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  const lines = [
+    `${E('order_product')} ${fmt.b('Sản phẩm:')} ${formatOrderProduct(order.quantity, order.product_name)}`,
+    `${E('payment_money')} ${fmt.b('Số tiền:')} ${hasPay ? fmt.b(formatCurrency(order.total_amount)) : fmt.i('Miễn phí')}`,
+    `${E('icon_chart')} ${fmt.b('Trạng thái:')} ${getOrderStatusLabel(order.status, order.guild_id)}`,
+    order.ticket_channel_id
+      ? `${E('icon_clipboard')} ${fmt.b('Ticket:')} ${fmt.channel(order.ticket_channel_id)}`
+      : null,
+    order.status === 'CANCELLED' && order.payment_cancel_reason
+      ? `${E('status_warn')} ${fmt.b('Lý do:')} ${order.payment_cancel_reason}`
+      : null,
+    order.status === 'COMPLETED' && order.completed_at
+      ? `${E('icon_clock')} ${fmt.b('Hoàn thành:')} ${T.rel(order.completed_at)}`
+      : null,
+  ].filter(Boolean);
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(...lines))
+  );
+
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+}
+
 export function buildOrderActionComponents(orderCode) {
   return [
     new ActionRowBuilder().addComponents(

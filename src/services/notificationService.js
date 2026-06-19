@@ -1,4 +1,4 @@
-import { AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder, MessageFlags } from 'discord.js';
 import { config, getTranscriptUrl } from '../config.js';
 import { getGuildConfig } from './guildConfigService.js';
 import { applyCustomerRoles } from './roleService.js';
@@ -15,6 +15,7 @@ import {
   buildWarrantyActionComponents,
   buildPublicOrderLogEmbed,
   buildPublicOrderLogV2,
+  buildOrderLogV2Update,
 } from '../utils/embeds.js';
 import { formatCurrency, buildOrderLogContent } from '../utils/formatters.js';
 
@@ -23,7 +24,11 @@ export async function updateOrderLogMessage(guild, order) {
   if (!orderLogChannel?.isTextBased() || !order.order_log_message_id) return;
 
   const logMessage = await orderLogChannel.messages.fetch(order.order_log_message_id).catch(() => null);
-  if (logMessage) {
+  if (!logMessage) return;
+
+  if (logMessage.flags.has(MessageFlags.IsComponentsV2)) {
+    await logMessage.edit(buildOrderLogV2Update(order)).catch(() => null);
+  } else {
     await logMessage.edit({ content: buildOrderLogContent(order) }).catch(() => null);
   }
 }

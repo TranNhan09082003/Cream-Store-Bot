@@ -166,21 +166,34 @@ export function registerBotApiRoutes(app) {
     });
 
     // ── ORDER DETAIL — 1 đơn cụ thể ───────────────────────────
-    app.get('/api/bot/orders/:code', (req, res) => {
+    app.get('/api/bot/orders/:code', async (req, res) => {
         const code = String(req.params.code || '').toUpperCase();
-        const result = safeQuery(() => {
-            const order = db.prepare(`SELECT * FROM orders WHERE order_code = ?`).get(code);
-            if (!order) return null;
-
-            // Loại bỏ các field nhạy cảm trước khi trả
-            const safe = { ...order };
-            // Giữ credential nếu có (để admin web xem được — vì đã require API key)
-            return safe;
-        });
-        if (result.ok && !result.data) {
-            return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn' });
+        let order;
+        try {
+            order = db.prepare(`SELECT * FROM orders WHERE order_code = ?`).get(code);
+        } catch (e) {
+            return res.json({ ok: false, error: 'Lỗi máy chủ nội bộ.' });
         }
-        res.json(result);
+        if (!order) return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn' });
+
+        const safe = { ...order };
+
+        // Tạo QR on-the-fly cho đơn cũ chưa có payment_qr_code
+        if (!safe.payment_qr_code && safe.status === 'PENDING_PAYMENT' && safe.guild_id) {
+            try {
+                const { getGuildConfig } = await import('./guildConfigService.js');
+                const guildCfg = getGuildConfig(safe.guild_id);
+                if (guildCfg?.bank_bin && guildCfg?.bank_account_no) {
+                    const content = safe.payment_code || safe.order_code;
+                    const qrUrl = `https://img.vietqr.io/image/${guildCfg.bank_bin}-${guildCfg.bank_account_no}-compact2.png?amount=${safe.total_amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(guildCfg.bank_account_name || 'CENAR STORE')}`;
+                    safe.payment_qr_code = qrUrl;
+                    const { savePaymentLinkData } = await import('./orderService.js');
+                    savePaymentLinkData(safe.order_code, { paymentLinkId: null, checkoutUrl: null, qrCode: qrUrl, qrUrl });
+                }
+            } catch (_) {}
+        }
+
+        res.json({ ok: true, data: safe });
     });
 
     // ── CUSTOMER PROFILE — info + spending stats ──────────────
