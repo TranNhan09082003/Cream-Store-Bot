@@ -589,6 +589,21 @@ export function initDatabase() {
       UNIQUE(channel_id)
     );
     CREATE INDEX IF NOT EXISTS idx_ai_conv ON ai_conversations (channel_id);
+
+    CREATE TABLE IF NOT EXISTS oauth_backups (
+      discord_id TEXT NOT NULL,
+      guild_id   TEXT NOT NULL DEFAULT '',
+      username   TEXT,
+      email      TEXT,
+      avatar     TEXT,
+      access_token      TEXT,
+      refresh_token     TEXT,
+      token_expires_at  TEXT,
+      last_refreshed_at TEXT,
+      verified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (discord_id, guild_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_oauth_guild ON oauth_backups (guild_id);
   `);
 }
 

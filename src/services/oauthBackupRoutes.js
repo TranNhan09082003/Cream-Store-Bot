@@ -66,6 +66,8 @@ export function registerOauthRoutes(app) {
       const tokenData = await tokenResponse.json();
       const accessToken = tokenData.access_token;
       const refreshToken = tokenData.refresh_token;
+      const expiresIn = tokenData.expires_in || 604800; // 7 ngày mặc định
+      const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
       // Fetch user profile
       const userResponse = await fetch('https://discord.com/api/users/@me', {
@@ -80,18 +82,22 @@ export function registerOauthRoutes(app) {
       const discordId = userProfile.id;
       const username = `${userProfile.username}${userProfile.discriminator !== '0' ? '#' + userProfile.discriminator : ''}`;
       const email = userProfile.email || null;
+      const avatar = userProfile.avatar || null;
+      const resolvedGuildId = guildId || '';
 
       // Save user to database oauth_backups
       db.prepare(`
-        INSERT INTO oauth_backups (discord_id, access_token, refresh_token, username, email, verified_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(discord_id) DO UPDATE SET
-          access_token = excluded.access_token,
-          refresh_token = excluded.refresh_token,
-          username = excluded.username,
-          email = excluded.email,
-          verified_at = CURRENT_TIMESTAMP
-      `).run(discordId, accessToken, refreshToken, username, email);
+        INSERT INTO oauth_backups (discord_id, guild_id, access_token, refresh_token, token_expires_at, username, email, avatar, verified_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(discord_id, guild_id) DO UPDATE SET
+          access_token     = excluded.access_token,
+          refresh_token    = excluded.refresh_token,
+          token_expires_at = excluded.token_expires_at,
+          username         = excluded.username,
+          email            = excluded.email,
+          avatar           = excluded.avatar,
+          verified_at      = CURRENT_TIMESTAMP
+      `).run(discordId, resolvedGuildId, accessToken, refreshToken, tokenExpiresAt, username, email, avatar);
 
       console.log(`[OAuth Verify] Verified and backed up user: ${username} (${discordId})`);
 
@@ -206,7 +212,7 @@ export function registerOauthRoutes(app) {
   // 3. Check if a Discord user is verified (used by admin API)
   app.get('/oauth/status/:discordId', (req, res) => {
     const { discordId } = req.params;
-    const row = db.prepare('SELECT discord_id, username, verified_at FROM oauth_backups WHERE discord_id = ?').get(discordId);
+    const row = db.prepare('SELECT discord_id, username, verified_at FROM oauth_backups WHERE discord_id = ? LIMIT 1').get(discordId);
     if (row) {
       res.json({ verified: true, username: row.username, verified_at: row.verified_at });
     } else {
@@ -335,13 +341,13 @@ function buildSuccessPage(username, roleGranted, roleName, errorMsg, guildName) 
 </head>
 <body>
   <div class="card">
-    <div class="icon-wrap ${isPartial ? 'icon-partial' : 'icon-success'}">${roleGranted ? '✓' : '⚠'}</div>
+    <div class="icon-wrap ${isPartial ? 'icon-partial' : 'icon-success'}">${roleGranted ? '&#10003;' : '!'}</div>
     <h1>${roleGranted ? 'Xác Minh Thành Công!' : 'Xác Minh Hoàn Tất'}</h1>
     <p class="subtitle">Xin chào <strong>${username}</strong>! ${roleGranted ? 'Tài khoản của bạn đã được xác thực.' : 'Tài khoản được lưu nhưng có lỗi cấp quyền.'}</p>
 
     ${roleGranted
-      ? `<div class="badge badge-success">✅ Đã nhận vai trò: ${roleName || 'Thành Viên'}</div>`
-      : `<div class="badge badge-warning">⚠️ ${errorMsg}</div>`
+      ? `<div class="badge badge-success">Vai trò: ${roleName || 'Thành Viên'}</div>`
+      : `<div class="badge badge-warning">${errorMsg}</div>`
     }
 
     <div class="info-box ${isPartial ? 'warning' : ''}">
@@ -355,22 +361,22 @@ function buildSuccessPage(username, roleGranted, roleName, errorMsg, guildName) 
       </div>
       <div class="info-row">
         <span class="label">Trạng thái</span>
-        <span class="value">${roleGranted ? '✅ Đã xác minh & sao lưu' : '⚠️ Đã lưu, chưa cấp quyền'}</span>
+        <span class="value">${roleGranted ? 'Đã xác minh &amp; sao lưu' : 'Đã lưu, chưa cấp quyền'}</span>
       </div>
     </div>
 
     ${roleGranted ? `
     <div class="steps">
-      <div class="step"><span class="step-icon">💰</span><span class="step-text">Xem bảng giá sản phẩm trong kênh <strong>bảng-giá</strong></span></div>
-      <div class="step"><span class="step-icon">🎫</span><span class="step-text">Mở ticket mua hàng trong kênh <strong>hỗ-trợ</strong></span></div>
-      <div class="step"><span class="step-icon">💬</span><span class="step-text">Tham gia trò chuyện trong kênh <strong>thảo-luận</strong></span></div>
+      <div class="step"><span class="step-icon">&rarr;</span><span class="step-text">Xem bảng giá sản phẩm trong kênh <strong>bảng-giá</strong></span></div>
+      <div class="step"><span class="step-icon">&rarr;</span><span class="step-text">Mở ticket mua hàng trong kênh <strong>hỗ-trợ</strong></span></div>
+      <div class="step"><span class="step-icon">&rarr;</span><span class="step-text">Tham gia trò chuyện trong kênh <strong>thảo-luận</strong></span></div>
     </div>
     ` : ''}
 
     <a href="https://discord.com/app" class="btn">
-      <span>↩</span> Quay lại Discord
+      &larr; Quay lại Discord
     </a>
-    <div class="footer">Cenar Store — Uy Tín & Bảo Mật 💜</div>
+    <div class="footer">Cenar Store — Uy Tín &amp; Bảo Mật</div>
   </div>
 </body>
 </html>`;
@@ -419,11 +425,11 @@ function buildErrorPage(title, message) {
 </head>
 <body>
   <div class="card">
-    <div class="icon">⛔</div>
+    <div class="icon" style="font-size:56px;margin-bottom:24px;">&#10007;</div>
     <h1>${title}</h1>
     <p>${message}</p>
-    <a href="https://discord.com/app" class="btn">↩ Quay lại Discord</a>
-    <div class="footer">Cenar Store — Uy Tín & Bảo Mật 💜</div>
+    <a href="https://discord.com/app" class="btn">&larr; Quay lại Discord</a>
+    <div class="footer">Cenar Store — Uy Tín &amp; Bảo Mật</div>
   </div>
 </body>
 </html>`;
