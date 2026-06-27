@@ -140,6 +140,7 @@ export const config = {
   payosExpireMinutes: Number.parseInt(getEnv('PAYOS_EXPIRE_MINUTES', '60'), 10),
   // VietQR fallback (dùng khi guild chưa setup-bank)
   vietqrBankBin: getEnv('VIETQR_BANK_BIN', '970418'),
+  vietqrAccountNo: getEnv('VIETQR_ACCOUNT_NO', ''),
   vietqrAccountName: getEnv('VIETQR_ACCOUNT_NAME', 'CREAM STORE'),
   customerRoleThreshold: Number.parseInt(getEnv('CUSTOMER_ROLE_THRESHOLD', '1'), 10),
   loyalRoleThreshold: Number.parseInt(getEnv('LOYAL_ROLE_THRESHOLD', '3'), 10),

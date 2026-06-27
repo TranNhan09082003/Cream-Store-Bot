@@ -183,9 +183,19 @@ export function registerBotApiRoutes(app) {
             try {
                 const { getGuildConfig } = await import('./guildConfigService.js');
                 const guildCfg = getGuildConfig(safe.guild_id);
+                let bankBin = config.vietqrBankBin || '970418';
+                let accountNo = config.vietqrAccountNo || '';
+                let accountName = config.vietqrAccountName || 'CREAM STORE';
+                
                 if (guildCfg?.bank_bin && guildCfg?.bank_account_no) {
+                    bankBin = guildCfg.bank_bin;
+                    accountNo = guildCfg.bank_account_no;
+                    accountName = guildCfg.bank_account_name || 'CREAM STORE';
+                }
+                
+                if (accountNo) {
                     const content = safe.payment_code || safe.order_code;
-                    const qrUrl = `https://img.vietqr.io/image/${guildCfg.bank_bin}-${guildCfg.bank_account_no}-compact2.png?amount=${safe.total_amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(guildCfg.bank_account_name || 'CENAR STORE')}`;
+                    const qrUrl = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${safe.total_amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(accountName)}`;
                     safe.payment_qr_code = qrUrl;
                     const { savePaymentLinkData } = await import('./orderService.js');
                     savePaymentLinkData(safe.order_code, { paymentLinkId: null, checkoutUrl: null, qrCode: qrUrl, qrUrl });
@@ -616,9 +626,9 @@ export function registerBotApiRoutes(app) {
                 });
                 finalStatus = 'PROCESSING';
             } else {
-                let bankBin = '970418';
-                let accountNo = '';
-                let accountName = 'CREAM STORE';
+                let bankBin = config.vietqrBankBin || '970418';
+                let accountNo = config.vietqrAccountNo || '';
+                let accountName = config.vietqrAccountName || 'CREAM STORE';
 
                 if (guildConfig && guildConfig.bank_bin && guildConfig.bank_account_no) {
                     bankBin = guildConfig.bank_bin;

@@ -8,6 +8,7 @@ import { deliverTranscript, updateOrderLogMessage } from './notificationService.
 import { emitStaffLog } from './staffLogService.js';
 import { setOrderStatus } from './orderService.js';
 import { runAutoVinhDanh } from './vinhDanhService.js';
+import { processPendingPaymentTickets } from './ticketAutoCloseService.js';
 
 let schedulerHandle = null;
 let backupHandle = null;
@@ -24,6 +25,12 @@ export function startScheduler(client) {
   const intervalMinutes = Number(process.env.DEEP_NOTIFICATION_INTERVAL_MINUTES ?? 5);
 
   const tick = async () => {
+    try {
+      await processPendingPaymentTickets(client);
+    } catch (error) {
+      console.error('[SCHEDULER] Lỗi tự động đóng ticket chưa thanh toán:', error);
+    }
+
     try {
       await runDeepNotifications(client);
     } catch (error) {
