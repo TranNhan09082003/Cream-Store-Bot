@@ -1,0 +1,56 @@
+name: 🚀 Deploy Bot to CloudFly VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Cho phép trigger thủ công từ GitHub UI
+
+concurrency:
+  group: deploy-bot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Sync & Restart Bot (VPS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code (Optional but good for tracking action logs)
+        uses: actions/checkout@v4
+
+      - name: 🚀 SSH to VPS & Pull + Restart Bot
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            cd /opt/cenar-store || exit 1
+            echo "=== Bat dau cap nhat Bot ==="
+            
+            # Fetch va reset cung de dam bao code sach
+            git fetch origin main || exit 1
+            git reset --hard origin/main || exit 1
+            
+            # Cap quyen thuc thi cho cac file shell scripts
+            find scripts/ -name "*.sh" -exec chmod +x {} \;
+            
+            # Cai dat package production
+            npm install --omit=dev || exit 1
+            
+            # Dang ky slash commands voi Discord (Bot 1 + Bot 2)
+            echo "Dang dang ky slash commands cho Store 1..."
+            ENV_FILE=.env node src/deploy-commands.js || true
+            
+            if [ -f ".env.store2" ]; then
+              echo "Dang dang ky slash commands cho Store 2..."
+              ENV_FILE=.env.store2 node src/deploy-commands.js || true
+            fi
+            
+            # Reload cac service tren PM2
+            echo "Dang khoi dong lai cac ung dung PM2..."
+            pm2 startOrReload ecosystem.config.cjs --update-env || exit 1
+            pm2 save || true
+            
+            echo "=== Hoan thanh deploy bot va khoi dong lai PM2! ==="
