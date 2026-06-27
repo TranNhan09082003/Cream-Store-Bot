@@ -5,6 +5,7 @@ import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { emitStaffLog } from './staffLogService.js';
 import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
+import { EmbedBuilder } from 'discord.js';
 
 export async function processPendingPaymentTickets(client) {
   try {
@@ -41,8 +42,21 @@ export async function processPendingPaymentTickets(client) {
       // CASE 1: Chưa gửi nhắc nhở lần 1
       if (!order.payment_reminder_sent_at) {
         if (ageMinutes >= 15) {
+          const embed = new EmbedBuilder()
+            .setColor(0xFEE75C) // Yellow
+            .setTitle(`${E('status_warn')} NHẮC NHỞ THANH TOÁN (LẦN 1)`)
+            .setDescription([
+              `Chào <@${order.customer_id}>, đơn hàng **${order.order_code}** của bạn đã được tạo 15 phút nhưng hệ thống chưa nhận được thanh toán.`,
+              '',
+              `👉 **Yêu cầu:** Vui lòng thanh toán hoặc gửi phản hồi tại đây trong vòng **20 phút** để giữ ticket luôn mở.`,
+              '',
+              `-# *Mẹo: Bạn có thể gõ bất kỳ nội dung nào (ví dụ: 'đợi tí', 'tôi muốn mua') để hệ thống tự động giữ ticket mở.*`
+            ].join('\n'))
+            .setTimestamp();
+
           await channel.send({
-            content: `⚠️ **NHẮC NHỞ THANH TOÁN (LẦN 1)**\n<@${order.customer_id}> ơi, đơn hàng **${order.order_code}** của bạn đã được tạo 15 phút nhưng chưa thanh toán.\n👉 Vui lòng thanh toán hoặc gửi phản hồi tại đây trong vòng **20 phút** để giữ ticket mở.\n*(Bạn có thể gõ bất kỳ phản hồi nào, ví dụ: 'đợi tí' hoặc 'tôi muốn mua' để giữ ticket mở)*`
+            content: `<@${order.customer_id}>`,
+            embeds: [embed]
           }).catch(() => null);
 
           db.prepare(`
@@ -77,8 +91,18 @@ export async function processPendingPaymentTickets(client) {
 
           if (!customerReplied) {
             // Không phản hồi -> Tự động hủy đơn & đóng ticket
+            const embed = new EmbedBuilder()
+              .setColor(0xED4245) // Red
+              .setTitle(`${E('status_cross')} ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG`)
+              .setDescription([
+                `Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **20 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc thứ 1.`,
+                '',
+                `🔒 **Ticket này sẽ tự động đóng và xóa kênh sau 5 giây.**`
+              ].join('\n'))
+              .setTimestamp();
+
             await channel.send({
-              content: `${E('status_cross')} **ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG**\nQuá 20 phút không nhận được phản hồi hoặc thanh toán kể từ lần nhắc thứ 1. Ticket này sẽ được đóng sau 5 giây.`
+              embeds: [embed]
             }).catch(() => null);
 
             cancelOrder(order.order_code, 'Tự động hủy do quá 20 phút không phản hồi/thanh toán lần 1');
@@ -120,8 +144,19 @@ export async function processPendingPaymentTickets(client) {
             const minsSinceReply = (now - latestReplyTimestamp) / (60 * 1000);
             if (minsSinceReply >= 5) {
               // Nhắc nhở lần 2 (Đợi 10 phút)
+              const embed = new EmbedBuilder()
+                .setColor(0xE67E22) // Orange
+                .setTitle(`${E('status_warn')} NHẮC NHỞ THANH TOÁN LẦN CUỐI`)
+                .setDescription([
+                  `Chào <@${order.customer_id}>, cảm ơn bạn đã phản hồi. Tuy nhiên, đơn hàng **${order.order_code}** của bạn vẫn chưa được thanh toán.`,
+                  '',
+                  `👉 **Yêu cầu:** Vui lòng hoàn tất thanh toán hoặc phản hồi tại đây trong vòng **10 phút** tiếp theo, nếu không hệ thống sẽ tự động hủy đơn và đóng ticket.`
+                ].join('\n'))
+                .setTimestamp();
+
               await channel.send({
-                content: `⚠️ **NHẮC NHỞ THANH TOÁN LẦN CUỐI**\n<@${order.customer_id}> ơi, cảm ơn bạn đã phản hồi. Tuy nhiên, đơn hàng vẫn chưa được thanh toán.\n👉 Vui lòng hoàn tất thanh toán hoặc phản hồi tại đây trong vòng **10 phút**, nếu không hệ thống sẽ tự động hủy đơn và đóng ticket.`
+                content: `<@${order.customer_id}>`,
+                embeds: [embed]
               }).catch(() => null);
 
               db.prepare(`
@@ -156,8 +191,18 @@ export async function processPendingPaymentTickets(client) {
 
           if (!customerRepliedAfterSecond) {
             // Không phản hồi lần 2 -> Đóng ticket
+            const embed = new EmbedBuilder()
+              .setColor(0xED4245) // Red
+              .setTitle(`${E('status_cross')} ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG (LẦN 2)`)
+              .setDescription([
+                `Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **10 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc cuối cùng.`,
+                '',
+                `🔒 **Ticket này sẽ tự động đóng và xóa kênh sau 5 giây.**`
+              ].join('\n'))
+              .setTimestamp();
+
             await channel.send({
-              content: `${E('status_cross')} **ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG (LẦN 2)**\nQuá 10 phút không nhận được phản hồi hoặc thanh toán kể từ lần nhắc cuối cùng. Ticket này sẽ đóng sau 5 giây.`
+              embeds: [embed]
             }).catch(() => null);
 
             cancelOrder(order.order_code, 'Tự động hủy do quá 10 phút không phản hồi/thanh toán lần 2');
