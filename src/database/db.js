@@ -477,6 +477,12 @@ export function initDatabase() {
 
   ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
 
+  // Add missing columns to oauth_backups for backward compatibility
+  ensureColumn('oauth_backups', 'guild_id', 'TEXT NOT NULL DEFAULT ""');
+  ensureColumn('oauth_backups', 'avatar', 'TEXT');
+  ensureColumn('oauth_backups', 'token_expires_at', 'TEXT');
+  ensureColumn('oauth_backups', 'last_refreshed_at', 'TEXT');
+
   // Seed product catalog data
   try {
     seedProductCatalog(db);
