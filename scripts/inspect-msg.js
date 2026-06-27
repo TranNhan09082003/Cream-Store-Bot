@@ -9,7 +9,7 @@ const client = new Client({
 });
 
 const channelId = '1282637033814495249';
-const msgId = '1514598369597587546';
+const msgId = '1514606558237069352';
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -19,14 +19,10 @@ client.once('ready', async () => {
       const msg = await ch.messages.fetch(msgId).catch(() => null);
       if (msg) {
         console.log(`Message Found!`);
+        console.log(`  - ID: ${msg.id}`);
         console.log(`  - Content: ${JSON.stringify(msg.content)}`);
-        console.log(`  - Embeds Count: ${msg.embeds.length}`);
-        if (msg.embeds.length > 0) {
-          for (let i = 0; i < msg.embeds.length; i++) {
-            const emb = msg.embeds[i];
-            console.log(`    Embed ${i}: title=${JSON.stringify(emb.title)}, desc=${JSON.stringify(emb.description)}, fields=${JSON.stringify(emb.fields)}`);
-          }
-        }
+        console.log(`  - Author: ${msg.author.tag} (${msg.author.id})`);
+        console.log(`  - Created At: ${msg.createdAt.toISOString()}`);
       } else {
         console.log('Message not found');
       }
