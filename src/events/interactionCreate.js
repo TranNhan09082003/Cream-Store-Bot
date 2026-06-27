@@ -139,26 +139,43 @@ const EMOJI_REGEX = new RegExp(Object.keys(CHAR_TO_SLOT).sort((a, b) => b.length
 function resolvePayloadEmojis(payload, E) {
   if (!payload) return payload;
 
-  if (typeof payload === 'string') {
-    return payload.replace(EMOJI_REGEX, (char) => E(CHAR_TO_SLOT[char], char));
+  function resolveRecursive(val) {
+    if (!val) return val;
+    
+    if (typeof val === 'string') {
+      return val.replace(EMOJI_REGEX, (char) => {
+        const slot = CHAR_TO_SLOT[char];
+        return slot ? E(slot, char) : char;
+      });
+    }
+    
+    if (Array.isArray(val)) {
+      return val.map(resolveRecursive);
+    }
+    
+    if (typeof val === 'object') {
+      // Keep class instances (Buffer, Stream, AttachmentBuilder, ContainerBuilder, etc.) intact
+      const proto = Object.getPrototypeOf(val);
+      if (proto !== Object.prototype && proto !== null) {
+        return val;
+      }
+      
+      const res = {};
+      for (const [key, value] of Object.entries(val)) {
+        if (key === 'files') {
+          res[key] = value;
+        } else {
+          res[key] = resolveRecursive(value);
+        }
+      }
+      return res;
+    }
+    
+    return val;
   }
 
   try {
-    const plainPayload = JSON.parse(JSON.stringify(payload));
-    const jsonStr = JSON.stringify(plainPayload);
-    const resolvedStr = jsonStr.replace(EMOJI_REGEX, (char) => {
-      const slot = CHAR_TO_SLOT[char];
-      return slot ? E(slot, char) : char;
-    });
-    
-    const resolvedPayload = JSON.parse(resolvedStr);
-    
-    for (const key of Object.keys(payload)) {
-      if (!(key in resolvedPayload)) {
-        resolvedPayload[key] = payload[key];
-      }
-    }
-    return resolvedPayload;
+    return resolveRecursive(payload);
   } catch (error) {
     console.error('[EMOJI] Lỗi khi xử lý payload emoji:', error);
     return payload;
