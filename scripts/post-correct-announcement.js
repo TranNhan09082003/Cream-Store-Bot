@@ -9,8 +9,19 @@ const client = new Client({
   ]
 });
 
-const announceChannelId = '1514598369597587546';
-const termsChannelId = '1514597981666672691';
+const isBot1 = process.env.ENV_FILE === '.env';
+
+// Store 1 IDs
+const STORE1_ANNOUNCE_ID = '1282637033814495249';
+const STORE1_TERMS_ID = '1282637033814495248';
+
+// Store 2 IDs
+const STORE2_ANNOUNCE_ID = '1070676180631568411';
+const STORE2_TERMS_ID = '1070676180631568410';
+
+const announceChannelId = isBot1 ? STORE1_ANNOUNCE_ID : STORE2_ANNOUNCE_ID;
+const termsChannelId = isBot1 ? STORE1_TERMS_ID : STORE2_TERMS_ID;
+const storeName = isBot1 ? 'Cenar Store 1' : 'Cenar Store 2';
 
 const announcementText = `@everyone
 <a:tsm_fire:1327553120842158111> **THÔNG BÁO QUAN TRỌNG VỀ CHÍNH SÁCH BẢO HÀNH & NGUỒN CUNG DỊCH VỤ** <a:tsm_fire:1327553120842158111>
@@ -75,7 +86,7 @@ Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các đi
 * **Discord Nitro 12 tháng (Gia hạn):**
   * <a:chamxanh:1481124932447371374> Bảo hành đầy đủ khi Gmail hoạt động tốt.
   * <a:chamxanh:1481124932447371374> Trường hợp mất/khóa Gmail, tùy thuộc vào khả năng cứu hộ Gmail mà thời gian bảo hành có thể bị **khấu trừ 1 - 2 tháng**.
-* **Quy định về việc Gia hạn:**
+* **Quy trình về việc Gia hạn:**
   * <a:chamxanh:1481124932447371374> Gia hạn nên được thực hiện ngay sau khi gói cũ vừa hết hạn (hoàn thành 100% trong 5 - 10 phút).
   * <a:chamxanh:1481124932447371374> Nếu quá hạn trên 1 tháng, tài khoản không thể gia hạn tiếp mà bắt buộc phải chuyển sang gói mua mới.
 
@@ -95,19 +106,19 @@ Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các đi
 -# *Điều khoản có thể được cập nhật theo thời gian để phù hợp với chính sách của các nhà cung cấp gốc. Cảm ơn sự tin tưởng của bạn!*`;
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  console.log(`Logged in as ${client.user.tag} for ${storeName}`);
   
   // 1. Post to announcement channel
   try {
     const announceCh = await client.channels.fetch(announceChannelId).catch(() => null);
     if (announceCh) {
       await announceCh.send({ content: announcementText });
-      console.log(`Successfully sent announcement to channel ${announceChannelId}`);
+      console.log(`Successfully sent announcement to channel ${announceChannelId} in ${storeName}`);
     } else {
-      console.error(`Announce channel ${announceChannelId} not found`);
+      console.error(`Announce channel ${announceChannelId} not found in ${storeName}`);
     }
   } catch (err) {
-    console.error(`Error sending to announce channel:`, err);
+    console.error(`Error sending to announce channel in ${storeName}:`, err);
   }
 
   // 2. Post to terms channel
@@ -115,12 +126,12 @@ client.once('ready', async () => {
     const termsCh = await client.channels.fetch(termsChannelId).catch(() => null);
     if (termsCh) {
       await termsCh.send({ content: termsText });
-      console.log(`Successfully sent terms to channel ${termsChannelId}`);
+      console.log(`Successfully sent terms to channel ${termsChannelId} in ${storeName}`);
     } else {
-      console.error(`Terms channel ${termsChannelId} not found`);
+      console.error(`Terms channel ${termsChannelId} not found in ${storeName}`);
     }
   } catch (err) {
-    console.error(`Error sending to terms channel:`, err);
+    console.error(`Error sending to terms channel in ${storeName}:`, err);
   }
   
   client.destroy();
