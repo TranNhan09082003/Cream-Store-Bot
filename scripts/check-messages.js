@@ -19,14 +19,11 @@ client.once('ready', async () => {
       client.destroy();
       process.exit(1);
     }
-    console.log(`Channel Name: #${channel.name} in Guild: ${channel.guild.name} (${channel.guild.id})`);
-    const messages = await channel.messages.fetch({ limit: 5 }).catch(() => null);
-    if (!messages) {
-      console.log('Failed to fetch messages');
-    } else {
+    const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+    if (messages) {
       console.log(`Fetched ${messages.size} messages:`);
       for (const [id, m] of messages) {
-        console.log(`- [${m.createdAt.toISOString()}] ${m.author.tag}: ${m.content.slice(0, 60)}...`);
+        console.log(`- ID: ${id} | Author: ${m.author.tag} | Created: ${m.createdAt.toISOString()} | Content: ${m.content.slice(0, 50)}...`);
       }
     }
   } catch (err) {
