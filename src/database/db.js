@@ -11,6 +11,7 @@ const resolvedDatabasePath = path.resolve(projectRoot, config.databasePath);
 
 fs.mkdirSync(path.dirname(resolvedDatabasePath), { recursive: true });
 
+console.log('[DB-INIT] Creating Database connection on path:', resolvedDatabasePath);
 export const db = new Database(resolvedDatabasePath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
