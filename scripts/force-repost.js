@@ -8,8 +8,8 @@ const client = new Client({
 });
 
 const isBot1 = process.env.ENV_FILE !== '.env.store2';
-const ANNOUNCE_ID = isBot1 ? '1282637033814495249' : '1070676180631568411';
-const TERMS_ID    = isBot1 ? '1282637033814495248' : '1070676180631568410';
+const ANNOUNCE_ID = isBot1 ? '1514605939765874748' : '1070676180631568411';
+const TERMS_ID    = isBot1 ? '1514605940982218763' : '1070676180631568410';
 const STORE_NAME  = isBot1 ? 'Cenar Store 1' : 'Cenar Store 2';
 
 const announcementText = `@everyone
