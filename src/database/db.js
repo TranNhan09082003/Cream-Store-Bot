@@ -18,7 +18,7 @@ db.close = function(...args) {
   console.log('[DB-CLOSE] db.close was called! Stack trace:', new Error().stack);
   return originalClose.apply(db, args);
 };
-db.pragma('journal_mode = WAL');
+db.pragma('journal_mode = DELETE');
 db.pragma('foreign_keys = ON');
 db.pragma('synchronous = NORMAL');     // Cân bằng tốc độ và an toàn
 db.pragma('cache_size = -8000');       // 8MB cache
