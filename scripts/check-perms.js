@@ -6,7 +6,7 @@ const client = new Client({
 });
 
 const GUILD_ID = '1282637033340403754';
-const ANNOUNCE_ID = '1282637033814495249';
+const ANNOUNCE_ID = '1514605939765874748';
 
 client.once('ready', async () => {
   console.log(`Logged in as: ${client.user.tag}`);
