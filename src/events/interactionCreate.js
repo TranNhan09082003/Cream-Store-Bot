@@ -2721,6 +2721,7 @@ async function handlePrefixDone(message, args) {
 
 export function registerInteractionHandler(client, commands) {
   client.on(Events.InteractionCreate, async (interaction) => {
+    console.log(`[INTERACTION-REC] Type: ${interaction.type} | Command: ${interaction.commandName || 'none'} | CustomID: ${interaction.customId || 'none'} | User: ${interaction.user.tag} (${interaction.user.id})`);
     try {
       if (interaction.guildId) {
         const E = createEmojiResolver(interaction.guildId);
