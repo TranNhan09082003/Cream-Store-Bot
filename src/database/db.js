@@ -13,6 +13,11 @@ fs.mkdirSync(path.dirname(resolvedDatabasePath), { recursive: true });
 
 console.log('[DB-INIT] Creating Database connection on path:', resolvedDatabasePath);
 export const db = new Database(resolvedDatabasePath);
+const originalClose = db.close;
+db.close = function(...args) {
+  console.log('[DB-CLOSE] db.close was called! Stack trace:', new Error().stack);
+  return originalClose.apply(db, args);
+};
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.pragma('synchronous = NORMAL');     // Cân bằng tốc độ và an toàn
