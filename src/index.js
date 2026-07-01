@@ -56,8 +56,60 @@ if (process.env.IS_CHILD_BOT === 'true') {
   });
 
   // Create reverse proxy server for webhooks and dashboard
-  const server = http.createServer((req, res) => {
-    const targetPort = req.url.startsWith('/webhooks/payos-store2') ? 8080 : 2753;
+  const server = http.createServer(async (req, res) => {
+    let targetPort = 2753; // Default to Store 1
+
+    if (req.url.startsWith('/webhooks/payos')) {
+      // PayOS Webhook: Buffer body to inspect payosOrderCode
+      let bodyData = '';
+      req.on('data', chunk => {
+        bodyData += chunk;
+      });
+
+      await new Promise(resolve => req.on('end', resolve));
+
+      try {
+        const payload = JSON.parse(bodyData);
+        const payosOrderCode = payload?.data?.orderCode;
+        if (payosOrderCode) {
+          const Database = (await import('better-sqlite3')).default;
+          const db = new Database(path.join(process.cwd(), 'data', 'shopbot.sqlite'), { readonly: true });
+          const order = db.prepare("SELECT guild_id FROM orders WHERE payos_order_code = ?").get(Number(payosOrderCode));
+          db.close();
+
+          if (order && order.guild_id === '1070676180103086132') { // Store 2 Guild ID
+            targetPort = 8080;
+          }
+        }
+      } catch (err) {
+        console.error('[LAUNCHER] Error parsing/routing PayOS webhook:', err.message);
+      }
+
+      const connector = http.request({
+        hostname: '127.0.0.1',
+        port: targetPort,
+        path: req.url,
+        method: req.method,
+        headers: req.headers
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+
+      connector.on('error', (err) => {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(`Proxy Error: ${err.message}`);
+      });
+
+      connector.write(bodyData);
+      connector.end();
+      return;
+    }
+
+    // Standard routing for other URLs
+    if (req.url.startsWith('/webhooks/payos-store2')) {
+      targetPort = 8080;
+    }
 
     const connector = http.request({
       hostname: '127.0.0.1',
