@@ -90,7 +90,7 @@ export const config = {
   clientId: getEnv('CLIENT_ID'),
   guildId: getEnv('GUILD_ID'),
   databasePath: getEnv('DATABASE_PATH', './data/shopbot.sqlite'),
-  feedbackTimeoutHours: Number.parseInt(getEnv('FEEDBACK_TIMEOUT_HOURS', '24'), 10),
+  feedbackTimeoutHours: Number.parseInt(getEnv('FEEDBACK_TIMEOUT_HOURS', '48'), 10),
   defaultDeliveryNotes: getMultilineEnv(
     'DEFAULT_DELIVERY_NOTES',
     'Vui lòng đổi mật khẩu ngay sau khi đăng nhập. Không chia sẻ tài khoản cho người khác. Nếu có vấn đề, hãy mở ticket ngay.',

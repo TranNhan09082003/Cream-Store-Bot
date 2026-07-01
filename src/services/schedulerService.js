@@ -8,7 +8,7 @@ import { deliverTranscript, updateOrderLogMessage } from './notificationService.
 import { emitStaffLog } from './staffLogService.js';
 import { setOrderStatus } from './orderService.js';
 import { runAutoVinhDanh } from './vinhDanhService.js';
-import { processPendingPaymentTickets } from './ticketAutoCloseService.js';
+import { processPendingPaymentTickets, processCompletedFeedbackTickets } from './ticketAutoCloseService.js';
 
 let schedulerHandle = null;
 let backupHandle = null;
@@ -29,6 +29,12 @@ export function startScheduler(client) {
       await processPendingPaymentTickets(client);
     } catch (error) {
       console.error('[SCHEDULER] Lỗi tự động đóng ticket chưa thanh toán:', error);
+    }
+
+    try {
+      await processCompletedFeedbackTickets(client);
+    } catch (error) {
+      console.error('[SCHEDULER] Lỗi tự động xử lý ticket chưa feedback:', error);
     }
 
     try {

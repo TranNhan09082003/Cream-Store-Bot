@@ -6,6 +6,7 @@ import { emitStaffLog } from './staffLogService.js';
 import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
 import { EmbedBuilder } from 'discord.js';
+import { getGuildConfig } from './guildConfigService.js';
 
 export async function processPendingPaymentTickets(client) {
   try {
@@ -30,10 +31,16 @@ export async function processPendingPaymentTickets(client) {
       }
 
       // Lấy kênh Discord tương ứng
-      const channel = await client.channels.fetch(order.ticket_channel_id).catch(() => null);
-      if (!channel) {
-        // Kênh đã bị xóa thủ công, hủy đơn luôn
-        cancelOrder(order.order_code, 'Kênh ticket đã bị xóa bên ngoài');
+      let channel = null;
+      try {
+        channel = await client.channels.fetch(order.ticket_channel_id);
+      } catch (err) {
+        // Chỉ hủy đơn nếu Discord API trả về mã lỗi 10003 (Unknown Channel) - tức là kênh thực sự đã bị xóa!
+        if (err.code === 10003) {
+          cancelOrder(order.order_code, 'Kênh ticket đã bị xóa bên ngoài');
+        } else {
+          console.error(`[PENDING-PAYMENT-TICKETS] Lỗi tạm thời khi fetch channel ${order.ticket_channel_id} (Đơn ${order.order_code}):`, err.message);
+        }
         continue;
       }
 
@@ -44,13 +51,14 @@ export async function processPendingPaymentTickets(client) {
         if (ageMinutes >= 15) {
           const embed = new EmbedBuilder()
             .setColor(0xFEE75C) // Yellow
-            .setTitle(`${E('status_warn')} NHẮC NHỞ THANH TOÁN (LẦN 1)`)
+            .setTitle(`⏰ NHẮC NHỞ THANH TOÁN (LẦN 1)`)
             .setDescription([
-              `Chào <@${order.customer_id}>, đơn hàng **${order.order_code}** của bạn đã được tạo 15 phút nhưng hệ thống chưa nhận được thanh toán.`,
+              `<a:tsm_fire:1327553120842158111> Chào <@${order.customer_id}>, đơn hàng **${order.order_code}** của bạn đã được tạo 15 phút nhưng hệ thống chưa nhận được thanh toán.`,
+              '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
               '',
               `👉 **Yêu cầu:** Vui lòng thanh toán hoặc gửi phản hồi tại đây trong vòng **20 phút** để giữ ticket luôn mở.`,
               '',
-              `-# *Mẹo: Bạn có thể gõ bất kỳ nội dung nào (ví dụ: 'đợi tí', 'tôi muốn mua') để hệ thống tự động giữ ticket mở.*`
+              `<:muiten:1481124261501337601> *Mẹo: Bạn có thể gõ bất kỳ nội dung nào (ví dụ: 'đợi tí', 'tôi muốn mua') để hệ thống tự động giữ ticket mở.*`
             ].join('\n'))
             .setTimestamp();
 
@@ -93,9 +101,10 @@ export async function processPendingPaymentTickets(client) {
             // Không phản hồi -> Tự động hủy đơn & đóng ticket
             const embed = new EmbedBuilder()
               .setColor(0xED4245) // Red
-              .setTitle(`${E('status_cross')} ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG`)
+              .setTitle(`❌ ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG`)
               .setDescription([
-                `Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **20 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc thứ 1.`,
+                `<a:tick_red51:1384069065626222632> Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **20 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc thứ 1.`,
+                '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
                 '',
                 `🔒 **Ticket này sẽ tự động đóng và xóa kênh sau 5 giây.**`
               ].join('\n'))
@@ -146,11 +155,14 @@ export async function processPendingPaymentTickets(client) {
               // Nhắc nhở lần 2 (Đợi 10 phút)
               const embed = new EmbedBuilder()
                 .setColor(0xE67E22) // Orange
-                .setTitle(`${E('status_warn')} NHẮC NHỞ THANH TOÁN LẦN CUỐI`)
+                .setTitle(`🚨 NHẮC NHỞ THANH TOÁN LẦN CUỐI`)
                 .setDescription([
-                  `Chào <@${order.customer_id}>, cảm ơn bạn đã phản hồi. Tuy nhiên, đơn hàng **${order.order_code}** của bạn vẫn chưa được thanh toán.`,
+                  `<a:tsm_fire:1327553120842158111> Chào <@${order.customer_id}>, cảm ơn bạn đã phản hồi. Tuy nhiên đơn hàng **${order.order_code}** vẫn chưa được hoàn tất thanh toán.`,
+                  '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
                   '',
-                  `👉 **Yêu cầu:** Vui lòng hoàn tất thanh toán hoặc phản hồi tại đây trong vòng **10 phút** tiếp theo, nếu không hệ thống sẽ tự động hủy đơn và đóng ticket.`
+                  `👉 **Yêu cầu:** Vui lòng hoàn tất thanh toán hoặc phản hồi tại đây trong vòng **10 phút** tiếp theo.`,
+                  '',
+                  `<a:tick_red51:1384069065626222632> Quá thời hạn trên, hệ thống sẽ tự động hủy đơn và đóng ticket này.`
                 ].join('\n'))
                 .setTimestamp();
 
@@ -193,9 +205,10 @@ export async function processPendingPaymentTickets(client) {
             // Không phản hồi lần 2 -> Đóng ticket
             const embed = new EmbedBuilder()
               .setColor(0xED4245) // Red
-              .setTitle(`${E('status_cross')} ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG (LẦN 2)`)
+              .setTitle(`❌ ĐƠN HÀNG BỊ HỦY TỰ ĐỘNG (LẦN CUỐI)`)
               .setDescription([
-                `Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **10 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc cuối cùng.`,
+                `<a:tick_red51:1384069065626222632> Đơn hàng **${order.order_code}** đã bị hủy tự động do quá **10 phút** không nhận được phản hồi hoặc thanh toán kể từ lần nhắc cuối cùng.`,
+                '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
                 '',
                 `🔒 **Ticket này sẽ tự động đóng và xóa kênh sau 5 giây.**`
               ].join('\n'))
@@ -251,5 +264,143 @@ export async function processPendingPaymentTickets(client) {
     }
   } catch (error) {
     console.error('[TICKET AUTO CLOSE SERVICE] Lỗi:', error);
+  }
+}
+
+export async function processCompletedFeedbackTickets(client) {
+  try {
+    const orders = db.prepare(`
+      SELECT * FROM orders 
+      WHERE status = 'COMPLETED' 
+        AND feedback_due_at IS NOT NULL 
+        AND feedback_submitted_at IS NULL 
+        AND non_legit_assigned_at IS NULL
+    `).all();
+
+    const now = Date.now();
+
+    for (const order of orders) {
+      const completedTime = new Date(order.completed_at).getTime();
+      const dueTime = new Date(order.feedback_due_at).getTime();
+      
+      const elapsedHours = (now - completedTime) / (1000 * 60 * 60);
+
+      // Lấy kênh Discord tương ứng
+      const channel = await client.channels.fetch(order.ticket_channel_id).catch(() => null);
+
+      // CASE 1: Quá hạn feedback (quá 48 tiếng hoặc qua dueTime) -> Tước bảo hành + Gắn role + Đóng ticket
+      if (now >= dueTime || elapsedHours >= 48) {
+        // Gắn role "Quên feedback"
+        try {
+          const guild = client.guilds.cache.get(order.guild_id) || await client.guilds.fetch(order.guild_id).catch(() => null);
+          if (guild) {
+            const guildConfig = getGuildConfig(order.guild_id);
+            if (guildConfig && guildConfig.non_legit_role_id) {
+              const member = await guild.members.fetch(order.customer_id).catch(() => null);
+              if (member) {
+                await member.roles.add(guildConfig.non_legit_role_id, 'Quá 48h không gửi feedback đơn hàng').catch((e) => {
+                  console.error(`[ROLES] Lỗi gán role non-legit cho ${order.customer_id}:`, e.message);
+                });
+              }
+            }
+          }
+        } catch (roleErr) {
+          console.error('[AUTO_CLOSE_FEEDBACK] Lỗi xử lý gán role:', roleErr.message);
+        }
+
+        // Cập nhật database để đánh dấu đã xử lý tước bảo hành
+        db.prepare(`
+          UPDATE orders 
+          SET non_legit_assigned_at = ?, updated_at = ? 
+          WHERE order_code = ?
+        `).run(nowIso(), nowIso(), order.order_code);
+
+        if (channel) {
+          const E = createEmojiResolver(order.guild_id);
+          const embed = new EmbedBuilder()
+            .setColor(0xED4245) // Red
+            .setTitle(`🔒 TỰ ĐỘNG ĐÓNG TICKET & HỦY BẢO HÀNH`)
+            .setDescription([
+              `<a:tick_red51:1384069065626222632> Đơn hàng **${order.order_code}** đã quá **48 giờ** hoàn thành nhưng bạn vẫn chưa gửi đánh giá (feedback).`,
+              '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
+              '',
+              `🛑 **Hậu quả:**`,
+              `* Tài khoản của bạn đã bị gắn role **Quên Feedback**.`,
+              `* Bạn **bị tước bỏ hoàn toàn quyền lợi bảo hành** cho đơn hàng này.`,
+              `* Kênh ticket này sẽ **tự động đóng và xóa sau 5 giây.**`
+            ].join('\n'))
+            .setTimestamp();
+
+          await channel.send({ embeds: [embed] }).catch(() => null);
+
+          setTimeout(async () => {
+            try {
+              const ticket = db.prepare('SELECT * FROM tickets WHERE channel_id = ?').get(order.ticket_channel_id);
+              if (ticket) {
+                const transcriptResult = await exportTicketTranscript(channel).catch(() => null);
+                closeTicket(ticket.id, client.user.id);
+
+                await emitStaffLog(client, {
+                  guildId: order.guild_id,
+                  actorId: client.user.id,
+                  targetId: order.customer_id,
+                  action: 'TICKET_CLOSE',
+                  detail: `Auto-close do quá 48h không feedback (tước bảo hành)`,
+                  relatedTicketCode: ticket.ticket_code,
+                  relatedOrderCode: order.order_code,
+                });
+
+                if (transcriptResult) {
+                  await deliverTranscript({
+                    guild: channel.guild,
+                    ticket,
+                    transcriptResult,
+                    closedById: client.user.id,
+                  });
+                }
+              }
+              await channel.delete('Quá 48h không feedback').catch(() => null);
+            } catch (err) {
+              console.error('[AUTO_CLOSE_FEEDBACK_ERR]', err);
+            }
+          }, 5000);
+        }
+        continue;
+      }
+
+      // CASE 2: Chưa gửi nhắc nhở và đã quá 24 tiếng kể từ khi hoàn thành -> Gửi nhắc nhở
+      if (!order.feedback_reminder_sent_at && elapsedHours >= 24) {
+        if (channel) {
+          const E = createEmojiResolver(order.guild_id);
+          const embed = new EmbedBuilder()
+            .setColor(0xFEE75C) // Yellow/Orange
+            .setTitle(`⏰ NHẮC NHỞ HOÀN TẤT ĐÁNH GIÁ (FEEDBACK)`)
+            .setDescription([
+              `<a:tsm_fire:1327553120842158111> Chào <@${order.customer_id}>, đơn hàng **${order.order_code}** của bạn đã hoàn thành được **24 giờ**. Tuy nhiên, hệ thống nhận thấy bạn chưa gửi đánh giá (feedback) về cho shop.`,
+              '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
+              '',
+              `👉 **Yêu cầu:** Vui lòng hoàn tất đánh giá trong vòng **24 giờ tới** để **kích hoạt & bảo vệ quyền lợi bảo hành** trọn đời của đơn hàng.`,
+              '',
+              `⚠️ **Lưu ý:** Nếu quá **48 giờ** kể từ lúc giao hàng mà bạn vẫn chưa feedback, hệ thống sẽ **tự động đóng ticket, gắn role Quên Feedback và hủy quyền lợi bảo hành** của đơn hàng này.`,
+              '',
+              `✏️ **Cách gửi:** Gõ lệnh **/feedback** và điền số sao cùng ý kiến của bạn.`
+            ].join('\n'))
+            .setTimestamp();
+
+          await channel.send({
+            content: `<@${order.customer_id}>`,
+            embeds: [embed]
+          }).catch(() => null);
+        }
+
+        db.prepare(`
+          UPDATE orders 
+          SET feedback_reminder_sent_at = ?, updated_at = ? 
+          WHERE order_code = ?
+        `).run(nowIso(), nowIso(), order.order_code);
+      }
+    }
+  } catch (error) {
+    console.error('[TICKET AUTO CLOSE SERVICE - FEEDBACK] Lỗi:', error);
   }
 }

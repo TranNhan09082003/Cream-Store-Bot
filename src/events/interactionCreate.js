@@ -1323,7 +1323,7 @@ async function handlePriceListAdminEditButton(interaction, category) {
       label: `${p.name}`.slice(0, 100),
       description: `Giá: ${Number(p.price).toLocaleString('vi-VN')}đ | Hạn: ${p.duration_months}T | Trạng thái: ${statusText}`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(interaction.guildId, p.emoji, '📦')
+      emoji: resolveSelectMenuEmoji(interaction.guildId, p.emoji, '📦') || undefined
     };
   });
 
@@ -1667,9 +1667,83 @@ async function handleTicketClose(interaction, ticketId) {
     return;
   }
 
-  const ticket = getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId);
-  if (!ticket || ticket.status !== 'OPEN') {
-    await safeReply(interaction, { content: `${E('status_warn')} Ticket này không còn hợp lệ hoặc đã đóng.`, ephemeral: true });
+  const { db, nowIso } = await import('../database/db.js');
+  const ticket = ticketId === 'orphan' ? null : (getTicketById(Number(ticketId)) ?? getTicketByChannelId(interaction.channelId));
+
+  // Xử lý đóng ticket tạo thủ công/không có trong DB
+  if (!ticket) {
+    if (interaction.isButton()) {
+      await interaction.update({ content: `${E('icon_clipboard')} Đang đóng kênh ticket tạo tay...`, embeds: [], components: [] }).catch(() => null);
+    }
+    
+    // Tạo bản ghi đóng trong database để lưu vết và đồng bộ
+    try {
+      const chanName = interaction.channel.name;
+      const ticketCode = `MANUAL_${chanName.replace(/[^0-9]/g, '') || String(Date.now()).slice(-6)}`;
+      
+      let customerId = 'MANUAL';
+      try {
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const supportRoleId = guildConfig?.support_role_id;
+        const managerRoleId = guildConfig?.manager_role_id;
+        const shipperRoleId = guildConfig?.shipper_role_id;
+        
+        const overwrites = interaction.channel.permissionOverwrites.cache;
+        for (const [id, overwrite] of overwrites) {
+          if (overwrite.type === 1) { // member
+            const member = await interaction.guild.members.fetch(id).catch(() => null);
+            if (member && !member.user.bot && !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+              const hasStaffRole = (supportRoleId && member.roles.cache.has(supportRoleId)) ||
+                                   (managerRoleId && member.roles.cache.has(managerRoleId)) ||
+                                   (shipperRoleId && member.roles.cache.has(shipperRoleId));
+              if (!hasStaffRole) {
+                customerId = id;
+                break;
+              }
+            }
+          }
+        }
+      } catch {}
+
+      const type = chanName.startsWith('bao-hanh-') ? 'WARRANTY' : 'ORDER';
+      const now = nowIso();
+      
+      db.prepare(`
+        INSERT INTO tickets (ticket_code, guild_id, channel_id, customer_id, opened_by_id, ticket_type, status, created_at, closed_at, closed_by_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'CLOSED', ?, ?, ?)
+      `).run(ticketCode, interaction.guildId, interaction.channelId, customerId, customerId, type, now, now, interaction.user.id);
+      
+      console.log(`[MANUAL TICKET CLOSE] Saved manual ticket ${ticketCode} to DB.`);
+    } catch (err) {
+      console.error('[MANUAL TICKET CLOSE] Lỗi ghi DB:', err.message);
+    }
+
+    setTimeout(async () => {
+      try {
+        const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
+        if (channel) await channel.delete(`Ticket tạo tay đóng bởi ${interaction.user.tag}`).catch(() => null);
+      } catch {}
+    }, 1000);
+    return;
+  }
+
+  // Nếu ticket đã CLOSED trong DB nhưng kênh Discord vẫn mở (lệch sync)
+  if (ticket.status !== 'OPEN') {
+    try {
+      closeTicket(ticket.id, interaction.user.id);
+    } catch (err) {
+      console.error('[TICKET_CLOSE] Lỗi cập nhật lại DB cho ticket lệch sync:', err.message);
+    }
+    
+    if (interaction.isButton()) {
+      await interaction.update({ content: `${E('icon_clipboard')} Kênh đang đóng và đồng bộ database...`, embeds: [], components: [] }).catch(() => null);
+    }
+    setTimeout(async () => {
+      try {
+        const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
+        if (channel) await channel.delete(`Ép đóng ticket lệch sync ${ticket.ticket_code} bởi ${interaction.user.tag}`).catch(() => null);
+      } catch {}
+    }, 1000);
     return;
   }
 
@@ -1683,13 +1757,7 @@ async function handleTicketClose(interaction, ticketId) {
     // Cập nhật trạng thái database ngay lập tức để tránh race condition khi click nhanh
     closeTicket(ticket.id, interaction.user.id);
 
-    // Ack confirm button
-    if (interaction.isButton()) {
-      await interaction.update({ content: `${E('icon_clipboard')} Đang xuất transcript và đóng ticket...`, embeds: [], components: [] }).catch(() => null);
-    }
-
-    const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
-
+    // 1. KHÓA QUYỀN TRUY CẬP VÀ ĐỔI TÊN KÊNH LẬP TỨC (để ép đóng giao diện đối với user)
     try {
       const everyone = interaction.guild.roles.everyone;
       const guildConfig = getGuildConfig(interaction.guildId);
@@ -1712,8 +1780,16 @@ async function handleTicketClose(interaction, ticketId) {
         await interaction.channel.setName(newName).catch(() => null);
       }
     } catch (err) {
-      console.error('[TICKET_CLOSE] Lỗi đổi tên kênh:', err.message);
+      console.error('[TICKET_CLOSE] Lỗi đổi tên kênh/khóa quyền sớm:', err.message);
     }
+
+    // Ack confirm button
+    if (interaction.isButton()) {
+      await interaction.update({ content: `${E('icon_clipboard')} Đang xuất transcript và đóng ticket...`, embeds: [], components: [] }).catch(() => null);
+    }
+
+    // 2. XUẤT TRANSCRIPT SAU KHI ĐÃ KHÓA KÊNH
+    const transcriptResult = await exportTicketTranscript(interaction.channel).catch(() => null);
 
     await emitStaffLog(interaction.client, {
       guildId: interaction.guildId, actorId: interaction.user.id, targetId: ticket.customer_id, action: 'TICKET_CLOSE',
@@ -1734,7 +1810,7 @@ async function handleTicketClose(interaction, ticketId) {
       new TextDisplayBuilder().setContent([
         `## ${E('icon_lock')} Ticket Đã Đóng`.trim(),
         `> ${E('ticket_user')} **Đóng bởi:** <@${interaction.user.id}>`,
-        `> ${E('icon_clock')} Channel sẽ **tự xóa sau 2 phút**.`,
+        `> ${E('icon_clock')} Channel sẽ **tự xóa sau 1.5 giây**.`,
         transcriptResult
           ? `> ${E('icon_clipboard')} Transcript đã được lưu và gửi cho khách.`
           : `> ${E('status_warn')} Không thể xuất transcript lần này.`,
@@ -1758,7 +1834,7 @@ async function handleTicketClose(interaction, ticketId) {
         const channel = await interaction.guild.channels.fetch(interaction.channelId).catch(() => null);
         if (channel) await channel.delete(`Ticket ${ticket.ticket_code} đóng bởi ${interaction.user.tag}`).catch(() => null);
       } catch {}
-    }, 2 * 60 * 1000);
+    }, 1500);
 
   } catch (error) {
     console.error('[TICKET_CLOSE] Lỗi khi đóng ticket:', error);

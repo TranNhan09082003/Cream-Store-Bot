@@ -92,7 +92,7 @@ export function buildSalePanelComponents(guildId) {
     label: `${p.name}`.slice(0, 100),
     description: `Sale: ${formatCurrency(p.price)} (Gốc: ${formatCurrency(p.original_price)})`.slice(0, 100),
     value: `${p.id}`,
-    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product')),
+    emoji: resolveSelectMenuEmoji(guildId, p.emoji, E('order_product')) || undefined,
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(

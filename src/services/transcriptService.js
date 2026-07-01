@@ -620,12 +620,14 @@ blockquote { margin: 2px 0; padding: 4px 0 4px 12px; border-left: 4px solid #4e5
 export async function exportTicketTranscript(channel) {
   let lastId;
   const allMessages = [];
+  let fetchCount = 0;
 
-  while (true) {
+  while (fetchCount < 15) { // Giới hạn tối đa 15 lần fetch (1500 tin nhắn) để tránh lặp vô hạn/treo bot
     const batch = await channel.messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
     if (!batch.size) break;
     allMessages.push(...batch.values());
     lastId = batch.last().id;
+    fetchCount++;
     if (batch.size < 100) break;
   }
 

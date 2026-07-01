@@ -1,19 +1,26 @@
-import { Events } from 'discord.js';
+import { Events, AttachmentBuilder, EmbedBuilder } from 'discord.js';
 import { getTicketByChannelId, updateTicketAiStatus } from '../services/ticketService.js';
 import { processAiMessage } from '../services/aiService.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { moderateMessage } from '../services/aiModerationService.js';
 import { isMrBeastScam, incrementLinkWarningCount, logAbuseEvent } from '../utils/antiScam.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { db } from '../database/db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 export const name = Events.MessageCreate;
 export const once = false;
 
 // ═══════════════════════════════════════════════
-// Message Processing Queue (tránh race condition)
+// Message Processing Queue & Cache
 // ═══════════════════════════════════════════════
 const processingChannels = new Set();
+const sentGmailGuides = new Set();
 
 async function withChannelLock(channelId, fn) {
   if (processingChannels.has(channelId)) return; // skip nếu đang xử lý
@@ -38,6 +45,87 @@ export async function execute(message) {
   const isStaff = message.member?.roles?.cache?.has(guildConfig.support_role_id) || 
                   message.member?.roles?.cache?.has(guildConfig.manager_role_id) || 
                   message.member?.permissions?.has('ManageGuild');
+  // ═══════════════════════════════════════════════
+  // AUTO SEND GMAIL SAFETY GUIDE FOR NITRO 2M
+  // ═══════════════════════════════════════════════
+  if (ticket && ticket.status === 'OPEN' && !sentGmailGuides.has(ticket.id)) {
+    const contentLower = message.content.toLowerCase();
+    const isNichu2mKeyword = /nichu\s*2\s*m|nitro\s*2\s*m|nichu\s*2\s*tháng|nitro\s*2\s*tháng/i.test(message.content);
+    const hasGmail = /[a-zA-Z0-9._%+-]+@gmail\.com/i.test(message.content);
+    
+    // Logic dự phòng thông minh: Nếu tên channel ticket có chứa nitro/nichu/trial/boost và tin nhắn chứa gmail
+    const isNitroTicketChan = /nitro|nichu|boost|trial/i.test(message.channel.name);
+    
+    let isNitro2mOrder = false;
+    if (ticket.related_order_code) {
+      try {
+        const order = db.prepare('SELECT * FROM orders WHERE order_code = ?').get(ticket.related_order_code);
+        if (order) {
+          const prodNameLower = order.product_name.toLowerCase();
+          if (prodNameLower.includes('nitro') && (prodNameLower.includes('2m') || prodNameLower.includes('2 tháng') || prodNameLower.includes('2 month') || prodNameLower.includes(' 2 '))) {
+            isNitro2mOrder = true;
+          }
+        }
+      } catch (dbErr) {
+        console.error('[Auto-Gmail-Guide] DB check err:', dbErr);
+      }
+    }
+
+    if (hasGmail && (isNitro2mOrder || isNichu2mKeyword || isNitroTicketChan)) {
+      try {
+        sentGmailGuides.add(ticket.id); // Đánh dấu đã gửi để chống spam
+        
+        const imagePath = path.resolve(__dirname, '../assets/gmail_update.png');
+        const attachment = new AttachmentBuilder(imagePath, { name: 'gmail_update.png' });
+        
+        const embedColor = message.guildId === '1282637033340403754' ? 0x7C3AED : 0xF472B6;
+        const brandName = message.guildId === '1282637033340403754' ? 'Cenar Store 1' : 'Cenar Store 2';
+
+        const embed = new EmbedBuilder()
+          .setColor(embedColor)
+          .setTitle(`## <a:tsm_fire:1327553120842158111> HƯỚNG DẪN BẢO MẬT & DUY TRÌ GMAIL NITRO <:verifybadge:1481127479702847646>`)
+          .setDescription([
+            `Chào quý khách! <:20952woodstockjump:1282641293474009089>`,
+            'Dưới đây là các bước **cực kỳ quan trọng** giúp bạn bảo mật tối đa tài khoản Gmail liên kết Nitro, tránh tình trạng bị quét hoặc khóa tài khoản đáng tiếc từ Google:',
+            '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
+            '',
+            '### <a:starxoay:1481141954346483845> 1. DUY TRÌ TRẠNG THÁI ĐĂNG NHẬP',
+            '> * <a:chamxanh:1481124932447371374> Sau khi đăng nhập thành công, bạn vui lòng **LOG OUT - LOG IN** thường xuyên để kiểm tra.',
+            '> * <a:chamxanh:1481124932447371374> *Chú ý:* Gmail bị khóa (die) trên điện thoại và PC nhiều khi không hiển thị thông báo lỗi trực tiếp.',
+            '',
+            '### <a:starxoay:1481141954346483845> 2. CẬP NHẬT THÔNG TIN KHÔI PHỤC (Làm ngay lập tức)',
+            '> *Sau khi login, hãy bổ sung ngay số điện thoại & mail khôi phục để tránh Google quét xác minh:*',
+            '> * <a:69_Arrow:1448888143120957532> **Thêm Số điện thoại khôi phục (Recovery Phone):**',
+            '>   👉 [Bấm vào đây để thiết lập](https://myaccount.google.com/signinoptions/rescuephone)',
+            '> * <a:69_Arrow:1448888143120957532> **Thêm Email khôi phục (Recovery Gmail):**',
+            '>   👉 [Bấm vào đây để thiết lập](https://myaccount.google.com/intro/recovery/email)',
+            '',
+            '### <a:starxoay:1481141954346483845> 3. THAY ĐỔI THÔNG TIN BẢO MẬT (Nên làm sau 7 - 14 ngày)',
+            '> *Đợi mail sống ổn định từ 7-14 ngày trên thiết bị mới rồi mới tiến hành thay đổi các thông tin sau để tránh bị Google khóa tài khoản:*',
+            '> * <a:chamxanh:1481124932447371374> **Thay đổi Số xác minh (Verification Phone):** Cực kỳ quan trọng - **NÊN ĐỔI + XÓA SỐ LẠ**.',
+            '>   👉 [Bấm vào đây để thay đổi](https://myaccount.google.com/phone)',
+            '> * <a:chamxanh:1481124932447371374> **Xác minh khuôn mặt (Video Verification):** Giúp tăng 200% độ bảo mật cho tài khoản.',
+            '>   👉 [Bấm vào đây để xác minh](https://myaccount.google.com/video-verification/signin/precollection)',
+            '',
+            '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
+            '🚨 **🚨 PHÁT HIỆN THIẾT BỊ LẠ ĐĂNG NHẬP ≫ ĐỔI PASSWORD + 2FA NGAY LẬP TỨC! 🚨**',
+            '',
+            `-# *Nếu cần hỗ trợ thêm, bạn hãy nhắn trực tiếp tại ticket này để staff ${brandName} hỗ trợ ngay nhé!* <:purple_heart_glow:1327541911749263360>`
+          ].join('\n'))
+          .setImage('attachment://gmail_update.png')
+          .setFooter({ text: `${brandName} — Phục Vụ Uy Tín & Tận Tâm 💜` })
+          .setTimestamp();
+
+        await message.channel.send({
+          embeds: [embed],
+          files: [attachment]
+        });
+        console.log(`[Auto-Gmail-Guide] Sent safety guide for order in channel ${message.channel.name}`);
+      } catch (err) {
+        console.error('[Auto-Gmail-Guide-Err]', err);
+      }
+    }
+  }
 
   // ═══════════════════════════════════════════════
   // ANTI-SCAM & LINK CHECK (Chỉ áp dụng cho User thường)

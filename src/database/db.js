@@ -33,6 +33,9 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 function ensureColumn(tableName, columnName, definitionSql) {
+  const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(tableName);
+  if (!tableExists) return;
+
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
   const exists = columns.some((column) => column.name === columnName);
   if (!exists) {
@@ -65,6 +68,21 @@ export function initDatabase() {
       bank_bin TEXT,
       bank_account_no TEXT,
       bank_account_name TEXT,
+      support_category_id TEXT,
+      complaint_category_id TEXT,
+      partnership_category_id TEXT,
+      panel_title TEXT,
+      panel_description TEXT,
+      panel_image_url TEXT,
+      public_order_log_channel_id TEXT,
+      price_list_channel_id TEXT,
+      price_list_message_id TEXT,
+      price_list_title TEXT,
+      price_list_description TEXT,
+      price_list_image_url TEXT,
+      price_list_category_configs TEXT,
+      custom_emojis TEXT,
+      warranty_log_channel_id TEXT,
       sale_channel_id TEXT,
       sale_message_id TEXT,
       sale_percent INTEGER DEFAULT 0,
@@ -148,6 +166,7 @@ export function initDatabase() {
       non_legit_assigned_at TEXT,
       payment_reminder_sent_at TEXT,
       processing_reminder_sent_at TEXT,
+      feedback_reminder_sent_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ticket_id) REFERENCES tickets(id)
@@ -435,6 +454,7 @@ export function initDatabase() {
   ensureColumn('orders', 'delivery_login_url', 'TEXT');
   ensureColumn('orders', 'payment_reminder_sent_at', 'TEXT');
   ensureColumn('orders', 'processing_reminder_sent_at', 'TEXT');
+  ensureColumn('orders', 'feedback_reminder_sent_at', 'TEXT');
   ensureColumn('orders', 'status_changed_at', 'TEXT');
   ensureColumn('orders', 'queue_group', 'TEXT');
   ensureColumn('orders', 'priority_rank', 'INTEGER NOT NULL DEFAULT 0');
@@ -480,6 +500,13 @@ export function initDatabase() {
   ensureColumn('guild_settings', 'sale_percent', 'INTEGER DEFAULT 0');
 
   ensureColumn('guild_settings', 'warranty_log_channel_id', 'TEXT');
+  ensureColumn('guild_settings', 'public_order_log_channel_id', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_channel_id', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_message_id', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_title', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_description', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_image_url', 'TEXT');
+  ensureColumn('guild_settings', 'price_list_category_configs', 'TEXT');
 
   ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
 

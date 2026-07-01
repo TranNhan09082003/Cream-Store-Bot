@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { encrypt, decrypt } from '../utils/crypto.js';
 import { applyCors } from '../utils/cors.js';
+import { awardOrderPoints } from './loyaltyService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -345,6 +346,16 @@ export function registerDashboardRoutes(app) {
 
       db.prepare("UPDATE orders SET status = 'COMPLETED', completed_at = COALESCE(completed_at, ?), expiry_at = ?, status_changed_at = ?, history_json = ? WHERE order_code = ?")
         .run(nowTs.toISOString(), newExpiry, nowTs.toISOString(), JSON.stringify(hist), orderId);
+
+      // Tích lũy điểm khi hoàn thành đơn hàng qua Web Dashboard
+      try {
+        const updated = db.prepare('SELECT * FROM orders WHERE order_code = ?').get(orderId);
+        if (updated && updated.guild_id !== 'WEB' && updated.customer_id !== 'WEB') {
+          awardOrderPoints(updated.guild_id, updated.customer_id, updated.order_code, updated.total_amount);
+        }
+      } catch (e) {
+        console.error('[LOYALTY] Lỗi awardOrderPoints trong Dashboard deliver-dm:', e);
+      }
 
       // Staff Log Report
       try {

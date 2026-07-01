@@ -27,14 +27,24 @@ export async function execute(interaction) {
     return;
   }
 
-  const ticket = getTicketByChannelId(interaction.channelId);
-  if (!ticket || ticket.status !== 'OPEN') {
-    await interaction.editReply({ content: `${E('status_warn')} Kênh này không phải ticket đang mở.` });
+  const chanName = interaction.channel.name;
+  const isTicketChan = chanName.startsWith('ticket-') || 
+                       chanName.startsWith('bao-hanh-') || 
+                       chanName.startsWith('closed-') ||
+                       interaction.channel.parentId === guildConfig?.ticket_category_id ||
+                       interaction.channel.parentId === guildConfig?.warranty_category_id;
+
+  if (!isTicketChan) {
+    await interaction.editReply({ content: `${E('status_warn')} Kênh này không phải kênh ticket.` });
     return;
   }
 
+  const ticket = getTicketByChannelId(interaction.channelId);
+  const ticketCode = ticket ? ticket.ticket_code : `MANUAL_${chanName.replace(/[^0-9]/g, '') || 'TICKET'}`;
+  const ticketId = ticket ? ticket.id : 'orphan';
+
   await interaction.editReply({
-    embeds: [buildCloseConfirmEmbed(ticket.ticket_code, null, interaction.guildId)],
-    components: buildCloseConfirmComponents(ticket.id, interaction.guildId),
+    embeds: [buildCloseConfirmEmbed(ticketCode, null, interaction.guildId)],
+    components: buildCloseConfirmComponents(ticketId, interaction.guildId),
   });
 }

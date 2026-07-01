@@ -1,20 +1,14 @@
 import { db, nowIso } from '../database/db.js';
 import {
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-  SeparatorSpacingSize,
-  MediaGalleryBuilder,
-  MediaGalleryItemBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  MessageFlags,
+  EmbedBuilder,
 } from 'discord.js';
 import { getActiveProducts } from './productCatalogService.js';
 import { formatCurrency } from '../utils/formatters.js';
-import { getEmojiMap, resolveSelectMenuEmoji } from './emojiService.js';
+import { getEmojiMap, resolveSelectMenuEmoji, resolveProductEmoji } from './emojiService.js';
 import { fmt, h2, subtext } from '../utils/embedHelpers.js';
 import { config } from '../config.js';
 
@@ -96,9 +90,21 @@ function accentForCategory(category) {
 // ═══════════════════════════════════════════════
 
 export function buildShopPanelV2({ guildId, category, title, imageUrl, features }) {
-  const products = getActiveProducts(guildId).filter(
-    p => p.service_type && p.service_type.toLowerCase() === category.toLowerCase()
-  );
+  let products = [];
+  const activeProducts = getActiveProducts(guildId);
+  const catLower = (category || '').toLowerCase();
+
+  if (catLower === 'nitro') {
+    products = activeProducts.filter(p => p.service_type && ['nitro', 'boost'].includes(p.service_type.toLowerCase()));
+  } else if (catLower === 'decor_acc') {
+    products = activeProducts.filter(p => p.service_type && p.service_type.toLowerCase() === 'decor' && !p.name.toLowerCase().includes('gift'));
+  } else if (catLower === 'decor_gift') {
+    products = activeProducts.filter(p => p.service_type && p.service_type.toLowerCase() === 'decor' && p.name.toLowerCase().includes('gift'));
+  } else if (catLower === 'streaming') {
+    products = activeProducts.filter(p => p.service_type && ['streaming', 'youtube', 'spotify', 'netflix'].includes(p.service_type.toLowerCase()));
+  } else {
+    products = activeProducts.filter(p => p.service_type && p.service_type.toLowerCase() === catLower);
+  }
 
   const em = getEmojiMap(guildId);
   const E = (slot, fallback = '') => em[slot] || fallback;
@@ -116,72 +122,41 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   const brandEmoji = matchedBrandSlot ? E(`brand_${matchedBrandSlot}`) : E('icon_store');
   const accentColor = accentForCategory(category);
 
-  // ─── Container ───
-  const container = new ContainerBuilder().setAccentColor(accentColor);
+  // ─── Build Embed Description ───
+  let desc = `> ${E('icon_sparkle')} **Dịch vụ số chính hãng — bảo hành uy tín tại ${config.storeName || 'Cenar Store'}**\n\n`;
 
-  // Header — trang trí với emoji brand + thương hiệu
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent([
-      `## ${brandEmoji} ${displayTitle}`,
-      `> ${E('icon_sparkle')} Dịch vụ số chính hãng — bảo hành uy tín tại **${config.storeName || 'Cenar Store'}**`,
-    ].join('\n'))
-  );
-
-  // Banner image
-  if (imageUrl) {
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(
-        new MediaGalleryItemBuilder().setURL(imageUrl)
-      )
-    );
-  }
-
-  container.addSeparatorComponents(
-    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-  );
-
-  // Features list — với tiêu đề và bullet có emoji
   if (features) {
     const featureLines = features.split('\n').filter(l => l.trim());
     const formatted = featureLines.map(line => {
       const trimmed = line.trim();
       if (/^[•\-\*]/.test(trimmed)) return trimmed;
       if (/^\p{Emoji}/u.test(trimmed)) return trimmed;
-      return `${E('status_check')} ${trimmed}`;
+      return `${E('status_check') || '✅'} ${trimmed}`;
     }).join('\n');
 
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `### ${E('icon_sparkle')} Quyền Lợi Dịch Vụ\n${formatted}`
-      )
-    );
-
-    container.addSeparatorComponents(
-      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-    );
+    desc += `### ${E('icon_sparkle') || '✨'} Quyền Lợi Dịch Vụ\n${formatted}\n\n`;
   }
 
-  // Thông tin bảng giá inline nếu có sản phẩm
   if (products.length > 0) {
-    const priceLines = products.slice(0, 10).map(p =>
-      `${E('icon_tag')} **${p.name}** — \`${formatCurrency(p.price)}đ\` / ${p.duration_months} tháng`
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `### ${E('icon_price')} Bảng Giá\n${priceLines.join('\n')}`
-      )
-    );
-    container.addSeparatorComponents(
-      new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
-    );
+    const priceLines = products.map(p => {
+      const priceText = Number(p.price).toLocaleString('vi-VN') + 'đ';
+      const pEmoji = resolveProductEmoji(guildId, p.emoji) || E('muiten') || '•';
+      return `${pEmoji} **${p.name}** — \`${priceText}\` / ${p.duration_months} tháng`;
+    });
+    desc += `### ${E('icon_price') || '💳'} Bảng Giá Dịch Vụ\n${priceLines.join('\n')}\n\n`;
   }
 
-  // Footer
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      subtext(`${E('icon_heart_purple')} Chọn gói bên dưới để đặt hàng · ${config.storeName || 'Cenar Store'}`)
-    )
-  );
+  desc += `-# ${E('icon_heart_purple') || '💜'} Chọn gói bên dưới để đặt hàng · ${config.storeName || 'Cenar Store'}`;
+
+  const embed = new EmbedBuilder()
+    .setColor(accentColor || 0x2f3136)
+    .setTitle(`${brandEmoji} ${displayTitle}`)
+    .setDescription(desc)
+    .setTimestamp();
+
+  if (imageUrl) {
+    embed.setImage(imageUrl);
+  }
 
   // ─── Select menu ───
   let selectRow = null;
@@ -190,7 +165,7 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
       label: `${p.name}`.slice(0, 100),
       description: `${formatCurrency(p.price)}đ · ${p.duration_months} tháng`.slice(0, 100),
       value: `${p.id}`,
-      emoji: resolveSelectMenuEmoji(guildId, p.emoji, 'order_product'),
+      emoji: resolveSelectMenuEmoji(guildId, p.emoji, 'order_product') || undefined,
     }));
 
     selectRow = new ActionRowBuilder().addComponents(
@@ -210,11 +185,11 @@ export function buildShopPanelV2({ guildId, category, title, imageUrl, features 
   if (editEmoji) editBtn.setEmoji(editEmoji);
   const editRow = new ActionRowBuilder().addComponents(editBtn);
 
-  const components = [container];
+  const components = [];
   if (selectRow) components.push(selectRow);
   components.push(editRow);
 
-  return { components, flags: MessageFlags.IsComponentsV2 };
+  return { embeds: [embed], components };
 }
 
 // ═══════════════════════════════════════════════
@@ -233,7 +208,7 @@ export async function refreshAllShopPanels(client, guildId) {
       const msg = await channel.messages.fetch(panel.message_id).catch(() => null);
       if (!msg) continue;
 
-      const { components, flags } = buildShopPanelV2({
+      const { embeds, components } = buildShopPanelV2({
         guildId,
         category: panel.category,
         title: panel.title || panel.category,
@@ -241,7 +216,7 @@ export async function refreshAllShopPanels(client, guildId) {
         features: panel.features,
       });
 
-      await msg.edit({ components, flags }).catch(() => null);
+      await msg.edit({ embeds, components }).catch(() => null);
     } catch (e) {
       // Panel bị xóa hoặc lỗi → bỏ qua
     }

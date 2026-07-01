@@ -1,5 +1,17 @@
-import 'dotenv/config';
-import { Client, GatewayIntentBits } from 'discord.js';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '..');
+const envFileName = process.env.ENV_FILE || '.env';
+
+dotenv.config({
+  path: path.resolve(projectRoot, envFileName),
+  override: true
+});
 
 const client = new Client({
   intents: [
@@ -9,111 +21,86 @@ const client = new Client({
   ]
 });
 
-const isBot1 = process.env.ENV_FILE === '.env';
+const isBot1 = !process.env.ENV_FILE || process.env.ENV_FILE === '.env';
 
 // Store 1 IDs
-const STORE1_ANNOUNCE_ID = '1282637033814495249';
-const STORE1_TERMS_ID = '1282637033814495248';
+const STORE1_ANNOUNCE_ID = '1514598369597587546';
+const STORE1_TERMS_ID = '1514597981666672691';
 
 // Store 2 IDs
-const STORE2_ANNOUNCE_ID = '1070676180631568411';
-const STORE2_TERMS_ID = '1070676180631568410';
+const STORE2_ANNOUNCE_ID = '1514594182717640735';
+const STORE2_TERMS_ID = '1514594186828189858';
 
 const announceChannelId = isBot1 ? STORE1_ANNOUNCE_ID : STORE2_ANNOUNCE_ID;
 const termsChannelId = isBot1 ? STORE1_TERMS_ID : STORE2_TERMS_ID;
 const storeName = isBot1 ? 'Cenar Store 1' : 'Cenar Store 2';
 
-const announcementText = `@everyone
-<a:tsm_fire:1327553120842158111> **THÔNG BÁO QUAN TRỌNG VỀ CHÍNH SÁCH BẢO HÀNH & NGUỒN CUNG DỊCH VỤ** <a:tsm_fire:1327553120842158111>
+const announcementText = `## <a:tsm_fire:1327553120842158111> THÔNG BÁO QUY ĐỊNH DỊCH VỤ & CHÍNH SÁCH BẢO HÀNH <a:tsm_fire:1327553120842158111>
 <a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
 
-Chào các bạn thành viên của **Cenar Store**, dưới đây là cập nhật mới nhất về quy định bảo hành, quy trình gia hạn dịch vụ Nitro, YouTube Premium cùng một số lưu ý quan trọng. Vui lòng đọc kỹ để đảm bảo quyền lợi tốt nhất khi mua sắm tại cửa hàng.
+Quý khách vui lòng đọc kỹ các quy định dưới đây để đảm bảo quyền lợi tốt nhất khi giao dịch tại **Cenar Store**:
 
----
+### <:verifybadge:1481127479702847646> 1. DỊCH VỤ DISCORD NITRO
+* **Nitro 2 tháng (Mua mới):**
+  * <a:chamxanh:1481124932447371374> Shop chỉ nhận bảo hành khi Gmail liên kết **còn hoạt động bình thường**.
+  * <a:chamxanh:1481124932447371374> Nếu bạn để Gmail bị khóa/chết, shop xin phép **miễn trừ trách nhiệm**.
+  * <a:chamxanh:1481124932447371374> *Lưu ý:* Do thị trường Gmail khan hiếm, đơn mua mới có thể bị trả đơn chậm nhẹ.
+* **Nitro 12 tháng (Gia hạn):**
+  * <a:chamxanh:1481124932447371374> Bảo hành đầy đủ khi Gmail hoạt động tốt. Trường hợp Gmail bị mất/khóa, thời gian bảo hành sẽ bị khấu trừ **1 - 2 tháng** tùy mức độ khôi phục tài khoản.
+* **Quy trình gia hạn:**
+  * <a:chamxanh:1481124932447371374> Cần thực hiện gia hạn ngay sau khi gói cũ vừa hết hạn. Quá hạn trên 1 tháng sẽ không thể gia hạn tiếp mà phải mua gói mới.
 
-### <:verifybadge:1481127479702847646> 1. QUY ĐỊNH BẢO HÀNH & GIA HẠN DISCORD NITRO
-* **Discord Nitro 2 tháng (Mua mới):**
-  * <a:chamxanh:1481124932447371374> Shop chỉ chấp nhận bảo hành nếu Gmail của bạn **còn hoạt động bình thường**.
-  * <a:chamxanh:1481124932447371374> Trường hợp bạn để Gmail bị khóa/chết, shop xin phép **miễn trừ trách nhiệm** (vì shop đã có hướng dẫn chi tiết cách bảo quản Gmail).
-* **Discord Nitro 12 tháng (Gia hạn):**
-  * <a:chamxanh:1481124932447371374> Bảo hành đầy đủ nếu tài khoản Gmail của bạn còn sống.
-  * <a:chamxanh:1481124932447371374> Nếu Gmail bị mất/khóa, tùy vào mức độ cứu hộ Gmail mà thời gian bảo hành có thể bị khấu trừ từ **1 - 2 tháng**.
-* **Quy trình Gia hạn Nitro:**
-  * <a:chamxanh:1481124932447371374> **Gia hạn ngay lập tức:** Khách hàng thực hiện gia hạn ngay sau khi gói cũ vừa hết hạn. Tỷ lệ hoàn thành **100% chỉ trong 5 - 10 phút**.
-  * <a:chamxanh:1481124932447371374> **Quá hạn trên 1 tháng:** Nếu gói Nitro đã hết hạn quá 1 tháng, Gmail cũ sẽ không thể gia hạn tiếp. Bạn buộc phải chuyển sang **mua mới**.
-* **Tình trạng Nitro 2 tháng mua mới:**
-  * <a:chamxanh:1481124932447371374> Hiện tại nguồn cung Gmail trên thị trường đang cực kỳ khan hiếm. Vì vậy, đơn hàng Nitro 2 tháng mua mới sẽ cần **đợi một khoảng thời gian đến khi có Gmail**. Mong các bạn thông cảm và lưu ý trước khi lên đơn.
+### <:youtube:1373734824342327297> 2. DỊCH VỤ YOUTUBE PREMIUM
+* **Mua mới:** Quý khách chỉ cần gửi địa chỉ Gmail, kiểm tra thư mời và bấm đồng ý tham gia Family.
+* **Bảo hành:** Cung cấp đầy đủ **Gmail chủ Family** và **Gmail cá nhân của bạn** để xử lý nhanh nhất.
+* **Bảo mật:** Nhóm gia đình đảm bảo **riêng tư 100%**, tuyệt đối không chia sẻ thông tin cá nhân.
 
----
-
-### <:verifybadge:1481127479702847646> 2. QUY ĐỊNH DỊCH VỤ YOUTUBE PREMIUM
-* **YouTube Premium (Mua mới):**
-  * <a:chamxanh:1481124932447371374> Bạn chỉ cần gửi địa chỉ Gmail của mình cho shop, sau đó kiểm tra hòm thư và bấm đồng ý tham gia Family. Cam kết gia đình **riêng tư 100%**, không chia sẻ bất kỳ dữ liệu cá nhân nào của bạn.
-* **YouTube Premium (Bảo hành):**
-  * <a:chamxanh:1481124932447371374> Để được hỗ trợ nhanh nhất khi cần bảo hành, vui lòng cung cấp đầy đủ: **Tên Gmail chủ Family đang tham gia** và **Địa chỉ Gmail của bạn**.
-
----
-
-### <:verifybadge:1481127479702847646> 3. CHÍNH SÁCH BẢO HÀNH CHUNG & CAM KẾT CỦA CỬA HÀNG
-* **Điều kiện bắt buộc nhận bảo hành:**
-  * <a:chamxanh:1481124932447371374> **Không out Server:** Khách hàng rời khỏi Server của chúng tôi sau khi mua hàng sẽ bị **từ chối bảo hành hoàn toàn**.
-  * <a:chamxanh:1481124932447371374> **Yêu cầu phản hồi (Feedback):** Khách hàng mua hàng bắt buộc phải gửi feedback đánh giá. Những trường hợp không feedback (hoặc chỉ feedback khi cần bảo hành) sẽ **bị từ chối hỗ trợ bảo hành**.
-* **Về tiến độ trả đơn hàng:**
-  * <a:chamxanh:1481124932447371374> Cenar Store cam kết **không bao giờ giữ (hold) đơn hàng của khách**. Mọi sự chậm trễ hoàn toàn do tình trạng khan hiếm nguyên liệu chung của thị trường.
-  * <a:chamxanh:1481124932447371374> Hiện tại ngoài dòng Nitro 2 tháng đang biến động, các dịch vụ khác như **Spotify, YouTube, Netflix** đang chạy rất mượt mà và trả đơn cực nhanh. Các bạn có thể yên tâm lên đơn nhé!
+### <:Partner:1367138825129955379> 3. CHÍNH SÁCH BẢO HÀNH CHUNG
+* **Duy trì thành viên:** Rời (out) khỏi Server Discord của shop sẽ bị **từ chối hỗ trợ bảo hành** cho mọi đơn hàng trước đó.
+* **Yêu cầu Feedback:** Bắt buộc gửi feedback đánh giá sau khi hoàn thành đơn để kích hoạt bảo hành. Shop xin phép không hỗ trợ bảo hành nếu thiếu feedback.
+* **Thời gian giao hàng:** Shop cam kết không giữ (hold) đơn hàng. Các gói Spotify, YouTube, Netflix... luôn được xử lý rất nhanh.
 
 <a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
-<a:starxoay:1481141954346483845> **Chúc các bạn mua sắm vui vẻ cùng Cenar Store!** <a:starxoay:1481141954346483845>`;
+<a:starxoay:1481141954346483845> **Chúc quý khách mua sắm vui vẻ cùng Cenar Store!** <:purple_heart_glow:1327541911749263360>`;
 
-const termsText = `<a:emoji:1327552040355762187> **ĐIỀU KHOẢN DỊCH VỤ & CHÍNH SÁCH BẢO HÀNH — CENAR STORE** <a:emoji:1327552040355762187>
+const termsText = `## <a:emoji:1327552040355762187> ĐIỀU KHOẢN DỊCH VỤ & CHÍNH SÁCH BẢO HÀNH <a:emoji:1327552040355762187>
 <a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
 
-Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các điều khoản sử dụng và chính sách bảo hành chính thức. Khi thực hiện giao dịch mua hàng, bạn mặc định đồng ý với các quy định sau:
+Khi thực hiện giao dịch tại **Cenar Store**, quý khách mặc định đồng ý tuân thủ các quy định dưới đây:
 
----
+### <:cr_baohanh:1348625535512870965> 1. CHÍNH SÁCH BẢO HÀNH CHUNG
+* <:muiten:1481124261501337601> **Duy trì thành viên:** Không out khỏi Server Discord của shop. Out Server đồng nghĩa với việc tự nguyện **từ bỏ quyền bảo hành** đối với toàn bộ dịch vụ đã mua.
+* <:muiten:1481124261501337601> **Gửi đánh giá (Feedback):** Bắt buộc phải gửi feedback đánh giá sau khi nhận hàng để kích hoạt thời gian bảo hành.
+* <:muiten:1481124261501337601> **Ticket hỗ trợ:** Khi có sự cố, vui lòng mở ticket đúng loại và cung cấp đầy đủ thông tin để staff hỗ trợ nhanh nhất.
 
-### 🛡️ 1. CHÍNH SÁCH BẢO HÀNH CHUNG
-* **Không out Server:** Khách hàng tự ý out (rời) khỏi Server Discord của shop sau khi mua hàng sẽ bị **từ chối hỗ trợ bảo hành** cho mọi đơn hàng trước đó.
-* **Feedback đánh giá:** Việc gửi feedback sau khi hoàn tất đơn hàng là bắt buộc để kích hoạt quyền lợi bảo hành. Khách hàng không feedback (hoặc chỉ gửi feedback khi cần bảo hành) sẽ **bị từ chối bảo hành**.
-* **Bảo hành YouTube Premium:** Khi cần hỗ trợ bảo hành, vui lòng cung cấp đầy đủ: **Tên Gmail chủ Family** và **Gmail cá nhân của bạn** để shop xử lý nhanh nhất.
+### <:cr_cardd:1348624271437463552> 2. ĐIỀU KHOẢN DISCORD NITRO
+* <:muiten:1481124261501337601> **Nitro 2 tháng:** Chỉ hỗ trợ bảo hành khi Gmail liên kết sống. Gmail bị khóa/vô hiệu hóa sẽ không thuộc diện hỗ trợ.
+* <:muiten:1481124261501337601> **Nitro 12 tháng:** Hỗ trợ bảo hành khi Gmail sống. Trường hợp mất/khóa Gmail, shop khấu trừ **1 - 2 tháng** thời hạn bảo hành.
+* <:muiten:1481124261501337601> **Hạn gia hạn:** Thực hiện gia hạn ngay khi gói cũ hết hạn. Quá hạn trên 1 tháng buộc phải chuyển sang gói mua mới.
 
----
-
-### 💎 2. CHÍNH SÁCH ĐỐI VỚI DISCORD NITRO
-* **Discord Nitro 2 tháng (Mua mới):**
-  * <a:chamxanh:1481124932447371374> Chỉ bảo hành khi tài khoản Gmail liên kết còn hoạt động bình thường.
-  * <a:chamxanh:1481124932447371374> Nếu bạn để Gmail bị khóa/chết, shop xin phép **miễn trừ trách nhiệm bảo hành**.
-* **Discord Nitro 12 tháng (Gia hạn):**
-  * <a:chamxanh:1481124932447371374> Bảo hành đầy đủ khi Gmail hoạt động tốt.
-  * <a:chamxanh:1481124932447371374> Trường hợp mất/khóa Gmail, tùy thuộc vào khả năng cứu hộ Gmail mà thời gian bảo hành có thể bị **khấu trừ 1 - 2 tháng**.
-* **Quy trình về việc Gia hạn:**
-  * <a:chamxanh:1481124932447371374> Gia hạn nên được thực hiện ngay sau khi gói cũ vừa hết hạn (hoàn thành 100% trong 5 - 10 phút).
-  * <a:chamxanh:1481124932447371374> Nếu quá hạn trên 1 tháng, tài khoản không thể gia hạn tiếp mà bắt buộc phải chuyển sang gói mua mới.
-
----
-
-### 📺 3. CHÍNH SÁCH YOUTUBE PREMIUM
-* **YouTube Premium mua mới:** Bạn chỉ cần cung cấp địa chỉ Gmail cá nhân, sau đó check hòm thư để đồng ý gia nhập Family.
-* **Bảo mật thông tin:** Cam kết nhóm gia đình **riêng tư 100%**, tuyệt đối không chia sẻ bất kỳ dữ liệu cá nhân nào giữa các thành viên.
-
----
-
-### ⚙️ 4. CAM KẾT TRẢ ĐƠN & TIẾN ĐỘ
-* <a:chamxanh:1481124932447371374> Cenar Store cam kết **không bao giờ hold (giữ) đơn hàng** của khách.
-* <a:chamxanh:1481124932447371374> Mọi sự chậm trễ giao hàng (đặc biệt đối với gói Nitro 2 tháng) hoàn toàn do tình trạng khan hiếm nguyên liệu chung của thị trường. Các gói dịch vụ khác như Spotify, YouTube, Netflix... trả đơn cực kỳ nhanh chóng.
+### <:cr_shop:1392749981332541501> 3. ĐIỀU KHOẢN DỊCH VỤ KHÁC
+* <:muiten:1481124261501337601> **YouTube Premium:** Tham gia Family qua lời mời email. Đảm bảo nhóm gia đình bảo mật và riêng tư 100%.
+* <:muiten:1481124261501337601> **Giao nhận:** Các đơn hàng Spotify, YouTube, Netflix... được giao tự động và nhanh chóng.
 
 <a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
--# *Điều khoản có thể được cập nhật theo thời gian để phù hợp với chính sách của các nhà cung cấp gốc. Cảm ơn sự tin tưởng của bạn!*`;
+-# *Điều khoản có thể được cập nhật theo thời gian để phù hợp với chính sách của các nhà cung cấp gốc (Discord, Google, Netflix...).*`;
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag} for ${storeName}`);
   
+  const embedColor = isBot1 ? 0x7C3AED : 0xF472B6;
+
   // 1. Post to announcement channel
   try {
     const announceCh = await client.channels.fetch(announceChannelId).catch(() => null);
     if (announceCh) {
-      await announceCh.send({ content: announcementText });
-      console.log(`Successfully sent announcement to channel ${announceChannelId} in ${storeName}`);
+      const cleanAnnounceText = announcementText.replace('@everyone', '').trim();
+      const embed = new EmbedBuilder()
+        .setColor(embedColor)
+        .setDescription(cleanAnnounceText)
+        .setTimestamp();
+      await announceCh.send({ embeds: [embed] });
+      console.log(`Successfully sent announcement embed to channel ${announceChannelId} in ${storeName}`);
     } else {
       console.error(`Announce channel ${announceChannelId} not found in ${storeName}`);
     }
@@ -125,8 +112,12 @@ client.once('ready', async () => {
   try {
     const termsCh = await client.channels.fetch(termsChannelId).catch(() => null);
     if (termsCh) {
-      await termsCh.send({ content: termsText });
-      console.log(`Successfully sent terms to channel ${termsChannelId} in ${storeName}`);
+      const embed = new EmbedBuilder()
+        .setColor(embedColor)
+        .setDescription(termsText)
+        .setTimestamp();
+      await termsCh.send({ embeds: [embed] });
+      console.log(`Successfully sent terms embed to channel ${termsChannelId} in ${storeName}`);
     } else {
       console.error(`Terms channel ${termsChannelId} not found in ${storeName}`);
     }

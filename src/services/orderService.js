@@ -6,6 +6,7 @@ import { syncCustomerStats, getCustomerProfile } from './customerService.js';
 import { normalizeQueueGroup } from '../utils/formatters.js';
 import { broadcastDashboardEvent } from './dashboardMiniServer.js';
 import { encrypt } from '../utils/crypto.js';
+import { awardOrderPoints } from './loyaltyService.js';
 
 function createOrderStmt() {
   return db.prepare(`
@@ -121,6 +122,16 @@ export function markOrderCompleted(orderCode, completedById, timeoutHours = conf
   clearClaimStmt().run(completedAt, orderCode);
   ensureOrderExpiry(orderCode, new Date(completedAt));
   const updated = getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id);
+
+  // Tích lũy điểm khi đơn hàng hoàn thành
+  if (updated && updated.guild_id !== 'WEB' && updated.customer_id !== 'WEB') {
+    try {
+      awardOrderPoints(updated.guild_id, updated.customer_id, updated.order_code, updated.total_amount);
+    } catch (e) {
+      console.error('[LOYALTY] Lỗi awardOrderPoints trong markOrderCompleted:', e);
+    }
+  }
+
   broadcastDashboardEvent('order_update');
   return updated;
 }
@@ -169,7 +180,24 @@ export function markOrderPaid(orderCode,{amountPaid,transactionId,transactionCon
   broadcastDashboardEvent('order_update');
   return updated;
 }
-export function setOrderStatus(orderCode,status){const order=getOrderByCode(orderCode); if(!order) return null; setOrderStatusStmt().run(status, nowIso(), nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); broadcastDashboardEvent('order_update'); return updated;}
+export function setOrderStatus(orderCode,status){
+  const order=getOrderByCode(orderCode); if(!order) return null; 
+  setOrderStatusStmt().run(status, nowIso(), nowIso(), orderCode); 
+  const updated=getOrderByCode(orderCode); 
+  syncCustomerStats(updated.guild_id, updated.customer_id); 
+  
+  // Tích luỹ điểm thưởng khi đơn hàng chuyển sang trạng thái COMPLETED
+  if (status === 'COMPLETED' && updated && updated.guild_id !== 'WEB' && updated.customer_id !== 'WEB') {
+    try {
+      awardOrderPoints(updated.guild_id, updated.customer_id, updated.order_code, updated.total_amount);
+    } catch (e) {
+      console.error('[LOYALTY] Lỗi awardOrderPoints trong setOrderStatus:', e);
+    }
+  }
+
+  broadcastDashboardEvent('order_update'); 
+  return updated;
+}
 export function updateOrderEditableFields(orderCode,{productName,quantity,totalAmount,priorityRank}){const order=getOrderByCode(orderCode); if(!order) return null; const nextName=productName ?? order.product_name; const nextQty=quantity ?? order.quantity; const nextAmount=totalAmount === undefined ? order.total_amount : ensureAmountValue(totalAmount); const nextPriority=priorityRank === undefined ? Number(order.priority_rank ?? 0) : Number(priorityRank); updateOrderFieldsStmt().run(nextName, nextQty, nextAmount, normalizeQueueGroup(nextName) || 'mac-dinh', nextPriority, nowIso(), orderCode); return getOrderByCode(orderCode);}
 
 export const getOutstandingOrders = (guildId, customerId=null, limit=20, offset=0) => getOutstandingOrdersStmt().all(guildId, customerId, customerId, limit, offset);

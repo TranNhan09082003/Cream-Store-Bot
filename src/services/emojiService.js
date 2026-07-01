@@ -298,8 +298,8 @@ export function autoSyncGuildEmojis(guild) {
 
     if (result.changes === 0) {
       db.prepare(`
-        INSERT INTO guild_settings (guild_id, custom_emojis, updated_at, ticket_category_id)
-        VALUES (@guild_id, @custom_emojis, @now, '')
+        INSERT INTO guild_settings (guild_id, custom_emojis, updated_at, ticket_category_id, order_log_channel_id, feedback_channel_id)
+        VALUES (@guild_id, @custom_emojis, @now, '', '', '')
       `).run({ guild_id: guild.id, custom_emojis: JSON.stringify(current), now });
     }
 
