@@ -57,9 +57,25 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
   // Create reverse proxy server for webhooks and dashboard
   const server = http.createServer(async (req, res) => {
-    let targetPort = 2753; // Default to Store 1
+    // 1. Redirect /store2/dashboard to /store2/dashboard/ (to load relative assets correctly)
+    if (req.url === '/store2/dashboard') {
+      res.writeHead(301, { 'Location': '/store2/dashboard/' });
+      res.end();
+      return;
+    }
 
-    if (req.url.startsWith('/webhooks/payos')) {
+    let targetPort = 2753; // Default to Store 1
+    let targetUrl = req.url;
+
+    // 2. Strip /store2 prefix for Store 2 routing
+    if (req.url.startsWith('/store2/')) {
+      targetPort = 8080;
+      targetUrl = req.url.slice(7); // Remove '/store2'
+    } else if (req.url.startsWith('/webhooks/payos-store2')) {
+      targetPort = 8080;
+    }
+
+    if (targetUrl.startsWith('/webhooks/payos')) {
       // PayOS Webhook: Buffer body to inspect payosOrderCode
       let bodyData = '';
       req.on('data', chunk => {
@@ -88,7 +104,7 @@ if (process.env.IS_CHILD_BOT === 'true') {
       const connector = http.request({
         hostname: '127.0.0.1',
         port: targetPort,
-        path: req.url,
+        path: targetUrl,
         method: req.method,
         headers: req.headers
       }, (proxyRes) => {
@@ -107,14 +123,10 @@ if (process.env.IS_CHILD_BOT === 'true') {
     }
 
     // Standard routing for other URLs
-    if (req.url.startsWith('/webhooks/payos-store2')) {
-      targetPort = 8080;
-    }
-
     const connector = http.request({
       hostname: '127.0.0.1',
       port: targetPort,
-      path: req.url,
+      path: targetUrl,
       method: req.method,
       headers: req.headers
     }, (proxyRes) => {
@@ -134,12 +146,22 @@ if (process.env.IS_CHILD_BOT === 'true') {
   server.on('upgrade', (req, socket, head) => {
     const parsedUrl = new URL(req.url, 'http://localhost');
     const pathname = parsedUrl.pathname;
-    const targetPort = pathname.startsWith('/ws/dashboard-store2') || pathname.includes('store2') ? 8080 : 2753;
+    
+    // Check path or Referer header to identify Store 2 dashboard WebSockets
+    const referer = req.headers.referer || '';
+    const isStore2 = pathname.startsWith('/ws/dashboard-store2') || 
+                      pathname.startsWith('/store2/ws/dashboard') || 
+                      pathname.includes('store2') || 
+                      referer.includes('/store2/');
+
+    const targetPort = isStore2 ? 8080 : 2753;
+    const targetUrl = req.url.replace('/ws/dashboard-store2', '/ws/dashboard')
+                             .replace('/store2/ws/dashboard', '/ws/dashboard');
 
     const connector = http.request({
       hostname: '127.0.0.1',
       port: targetPort,
-      path: req.url,
+      path: targetUrl,
       method: 'GET',
       headers: {
         ...req.headers,
