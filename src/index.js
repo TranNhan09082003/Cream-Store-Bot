@@ -31,14 +31,14 @@ if (process.env.IS_CHILD_BOT === 'true') {
 } else {
   // --- PARENT LAUNCHER / PROXY MODE ---
   const PORT = Number(process.env.SERVER_PORT || process.env.PORT || 2753);
-  console.log(`[LAUNCHER] Starting Store 1 (ENV_FILE=.env) on local port 3001...`);
+  console.log(`[LAUNCHER] Starting Store 1 (ENV_FILE=.env) on local port 2753...`);
   const child1 = fork(__filename, [], {
-    env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env', HTTP_PORT: '3001' }
+    env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env', HTTP_PORT: '2753' }
   });
 
-  console.log(`[LAUNCHER] Starting Store 2 (ENV_FILE=.env.store2) on local port 3002...`);
+  console.log(`[LAUNCHER] Starting Store 2 (ENV_FILE=.env.store2) on local port 8080...`);
   const child2 = fork(__filename, [], {
-    env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env.store2', HTTP_PORT: '3002' }
+    env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env.store2', HTTP_PORT: '8080' }
   });
 
   // Handle process shutdown
@@ -57,7 +57,7 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
   // Create reverse proxy server for webhooks and dashboard
   const server = http.createServer((req, res) => {
-    const targetPort = req.url.startsWith('/webhooks/payos-store2') ? 3002 : 3001;
+    const targetPort = req.url.startsWith('/webhooks/payos-store2') ? 8080 : 2753;
 
     const connector = http.request({
       hostname: '127.0.0.1',
@@ -82,7 +82,7 @@ if (process.env.IS_CHILD_BOT === 'true') {
   server.on('upgrade', (req, socket, head) => {
     const parsedUrl = new URL(req.url, 'http://localhost');
     const pathname = parsedUrl.pathname;
-    const targetPort = pathname.startsWith('/ws/dashboard-store2') ? 3002 : 3001;
+    const targetPort = pathname.startsWith('/ws/dashboard-store2') || pathname.includes('store2') ? 8080 : 2753;
 
     const connector = http.request({
       hostname: '127.0.0.1',
