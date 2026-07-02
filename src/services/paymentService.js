@@ -105,14 +105,20 @@ function buildPayOSRequestPayload(order) {
     throw new Error('Thiếu PUBLIC_BASE_URL hoặc PAYOS_RETURN_PATH / PAYOS_CANCEL_PATH trong .env.');
   }
 
-  const description = truncateText(order.payment_code ?? order.order_code, 25);
-  const amount = Number(order.total_amount);
+  const order_code = order.orderCode ?? order.order_code;
+  const payos_order_code = order.payosOrderCode ?? order.payos_order_code;
+  const total_amount = order.totalAmount ?? order.total_amount;
+  const payment_code = order.paymentCode ?? order.payment_code;
+  const product_name = order.productName ?? order.product_name;
+
+  const description = truncateText(payment_code ?? order_code, 25);
+  const amount = Number(total_amount);
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error(`Đơn ${order.order_code} có số tiền không hợp lệ (${order.total_amount}). Không thể tạo QR PayOS.`);
+    throw new Error(`Đơn ${order_code} có số tiền không hợp lệ (${total_amount}). Không thể tạo QR PayOS.`);
   }
-  const orderCode = Number(order.payos_order_code ?? String(order.order_code ?? '').replace(/^[A-Z]+_/, ''));
+  const orderCode = Number(payos_order_code ?? String(order_code ?? '').replace(/^[A-Z]+_/, ''));
   if (!Number.isFinite(orderCode) || orderCode <= 0) {
-    throw new Error(`Đơn ${order.order_code} chưa có payos_order_code hợp lệ để tạo checkout PayOS.`);
+    throw new Error(`Đơn ${order_code} chưa có payos_order_code hợp lệ để tạo checkout PayOS.`);
   }
   const expiredAt = Math.floor(Date.now() / 1000) + (Math.max(1, config.payosExpireMinutes) * 60);
 
@@ -122,7 +128,7 @@ function buildPayOSRequestPayload(order) {
     description,
     items: [
       {
-        name: truncateText(order.product_name, 25) || 'Don hang Cenar Store',
+        name: truncateText(product_name, 25) || 'Don hang Cenar Store',
         quantity: 1,
         price: amount,
       },
@@ -175,7 +181,14 @@ async function renderPaymentQrImage(order) {
 export async function createOrLoadPayOSLink(order) {
   assertPaymentConfig();
 
-  if (order.payment_link_id && order.payment_checkout_url) {
+  const payment_link_id = order.paymentLinkId ?? order.payment_link_id;
+  const payment_checkout_url = order.paymentCheckoutUrl ?? order.payment_checkout_url;
+  const order_code = order.orderCode ?? order.order_code;
+  const payos_order_code = order.payosOrderCode ?? order.payos_order_code;
+  const payment_qr_code = order.paymentQrCode ?? order.payment_qr_code;
+  const payment_qr_text = order.paymentQrText ?? order.payment_qr_text;
+
+  if (payment_link_id && payment_checkout_url) {
     return order;
   }
 
@@ -183,7 +196,7 @@ export async function createOrLoadPayOSLink(order) {
 
   try {
     const created = await callPayOSApi('POST', '/v2/payment-requests', payload);
-    return savePaymentLinkData(order.order_code, {
+    return savePaymentLinkData(order_code, {
       paymentLinkId: created.paymentLinkId ?? created.id ?? null,
       checkoutUrl: created.checkoutUrl ?? buildCheckoutUrlFromLinkId(created.paymentLinkId ?? created.id),
       qrCode: created.qrCode ?? null,
@@ -195,13 +208,13 @@ export async function createOrLoadPayOSLink(order) {
     const knownDuplicate = /đơn thanh toán đã tồn tại|already exists/i.test(error.message);
     if (!knownDuplicate) throw error;
 
-    const info = await getPayOSPaymentInfo(order.payos_order_code);
-    return savePaymentLinkData(order.order_code, {
-      paymentLinkId: info.id ?? order.payment_link_id ?? null,
-      checkoutUrl: order.payment_checkout_url ?? buildCheckoutUrlFromLinkId(info.id),
-      qrCode: order.payment_qr_code ?? null,
-      qrUrl: order.payment_checkout_url ?? buildCheckoutUrlFromLinkId(info.id),
-      qrText: order.payment_qr_text ?? null,
+    const info = await getPayOSPaymentInfo(payos_order_code);
+    return savePaymentLinkData(order_code, {
+      paymentLinkId: info.id ?? payment_link_id ?? null,
+      checkoutUrl: payment_checkout_url ?? buildCheckoutUrlFromLinkId(info.id),
+      qrCode: payment_qr_code ?? null,
+      qrUrl: payment_checkout_url ?? buildCheckoutUrlFromLinkId(info.id),
+      qrText: payment_qr_text ?? null,
       expiredAt: info.expiredAt ? new Date(Number(info.expiredAt) * 1000).toISOString() : null,
     });
   }
