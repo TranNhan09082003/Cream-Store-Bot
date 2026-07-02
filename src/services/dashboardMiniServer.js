@@ -271,23 +271,13 @@ export function registerDashboardRoutes(app) {
     }
   });
 
-  // Serve static storefront files at root '/'
-  const possibleShopPaths = [
-    path.join(process.cwd(), 'shop-web'),
-    path.join(__dirname, 'shop-web'),
-    path.join(process.cwd(), 'src', 'shop-web')
-  ];
-  let shopPath = possibleShopPaths[0];
-  for (const p of possibleShopPaths) {
-    if (fs.existsSync(p)) {
-      shopPath = p; break;
-    }
-  }
-
-  app.use('/', express.static(shopPath));
+  // Redirect root '/' and '/payment' to the official website 'https://cenarstore.xyz'
+  app.get('/', (req, res) => {
+    res.redirect('https://cenarstore.xyz');
+  });
 
   app.get('/payment', (req, res) => {
-    res.sendFile(path.join(shopPath, 'index.html'));
+    res.redirect('https://cenarstore.xyz');
   });
 
   const enabled = String(process.env.DASHBOARD_ENABLED ?? 'false').toLowerCase() === 'true';
