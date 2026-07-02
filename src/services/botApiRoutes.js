@@ -616,6 +616,8 @@ export function registerBotApiRoutes(app) {
             let payment_qr_code = null;
             let finalStatus = order.status;
 
+             let payment_checkout_url = null;
+
              if (paymentProvider === 'WALLET') {
                 // Đánh dấu đã thanh toán
                 const { markOrderPaid } = await import('./orderService.js');
@@ -626,27 +628,43 @@ export function registerBotApiRoutes(app) {
                 });
                 finalStatus = 'PROCESSING';
             } else {
-                let bankBin = config.vietqrBankBin || '970418';
-                let accountNo = config.vietqrAccountNo || '';
-                let accountName = config.vietqrAccountName || 'CREAM STORE';
-
-                if (guildConfig && guildConfig.bank_bin && guildConfig.bank_account_no) {
-                    bankBin = guildConfig.bank_bin;
-                    accountNo = guildConfig.bank_account_no;
-                    accountName = guildConfig.bank_account_name || 'CREAM STORE';
+                // Nếu cấu hình chính là PAYOS
+                if (config.paymentProvider === 'PAYOS') {
+                    try {
+                        const { createOrLoadPayOSLink } = await import('./paymentService.js');
+                        // Lấy đầy đủ bản ghi order vừa tạo
+                        const payosOrder = await createOrLoadPayOSLink(order);
+                        payment_checkout_url = payosOrder.payment_checkout_url || payosOrder.payment_qr_url;
+                        payment_qr_code = payosOrder.payment_qr_code;
+                    } catch (err) {
+                        console.error('[WEB ORDER] Lỗi tạo cổng thanh toán PayOS:', err);
+                        // Fallback sang VietQR thường bên dưới
+                    }
                 }
+                
+                // Fallback hoặc dùng VietQR thường nếu PayOS lỗi/không bật
+                if (!payment_checkout_url) {
+                    let bankBin = config.vietqrBankBin || '970418';
+                    let accountNo = config.vietqrAccountNo || '';
+                    let accountName = config.vietqrAccountName || 'CREAM STORE';
 
-                if (accountNo) {
-                    const encodedContent = encodeURIComponent(orderCode);
-                    const encodedName = encodeURIComponent(accountName);
-                    payment_qr_code = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${totalAmount}&addInfo=${encodedContent}&accountName=${encodedName}`;
-                    
-                    // Lưu mã QR vào DB để trang chi tiết đơn hàng tra cứu được
-                    const { savePaymentLinkData } = await import('./orderService.js');
-                    savePaymentLinkData(orderCode, {
-                        qrCode: payment_qr_code,
-                        qrUrl: payment_qr_code
-                    });
+                    if (guildConfig && guildConfig.bank_bin && guildConfig.bank_account_no) {
+                        bankBin = guildConfig.bank_bin;
+                        accountNo = guildConfig.bank_account_no;
+                        accountName = guildConfig.bank_account_name || 'CREAM STORE';
+                    }
+
+                    if (accountNo) {
+                        const encodedContent = encodeURIComponent(orderCode);
+                        const encodedName = encodeURIComponent(accountName);
+                        payment_qr_code = `https://img.vietqr.io/image/${bankBin}-${accountNo}-compact2.png?amount=${totalAmount}&addInfo=${encodedContent}&accountName=${encodedName}`;
+                        
+                        const { savePaymentLinkData } = await import('./orderService.js');
+                        savePaymentLinkData(orderCode, {
+                            qrCode: payment_qr_code,
+                            qrUrl: payment_qr_code
+                        });
+                    }
                 }
             }
             
@@ -655,7 +673,7 @@ export function registerBotApiRoutes(app) {
                 ok: true,
                 data: {
                     order_code: orderCode,
-                    payment_checkout_url: null, // Sẽ dùng QR trực tiếp
+                    payment_checkout_url: payment_checkout_url,
                     payment_qr_code: payment_qr_code,
                     total_amount: totalAmount,
                     status: finalStatus
