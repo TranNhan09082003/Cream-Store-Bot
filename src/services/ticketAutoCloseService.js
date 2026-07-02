@@ -7,14 +7,16 @@ import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
 import { EmbedBuilder } from 'discord.js';
 import { getGuildConfig } from './guildConfigService.js';
+import { config } from '../config.js';
 
 export async function processPendingPaymentTickets(client) {
   try {
     const pendingOrders = db.prepare(`
       SELECT * FROM orders 
-      WHERE status = 'PENDING_PAYMENT' 
+      WHERE guild_id = ?
+        AND status = 'PENDING_PAYMENT' 
         AND payment_status = 'UNPAID'
-    `).all();
+    `).all(config.guildId);
 
     const now = Date.now();
 
@@ -271,11 +273,12 @@ export async function processCompletedFeedbackTickets(client) {
   try {
     const orders = db.prepare(`
       SELECT * FROM orders 
-      WHERE status = 'COMPLETED' 
+      WHERE guild_id = ?
+        AND status = 'COMPLETED' 
         AND feedback_due_at IS NOT NULL 
         AND feedback_submitted_at IS NULL 
         AND non_legit_assigned_at IS NULL
-    `).all();
+    `).all(config.guildId);
 
     const now = Date.now();
 

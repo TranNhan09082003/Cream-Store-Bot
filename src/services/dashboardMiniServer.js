@@ -99,6 +99,166 @@ function isDashboardAuthorized(req) {
 }
 
 export function registerDashboardRoutes(app) {
+  // --- Helper safeCount ---
+  function safeCount(sql, ...params) {
+    try {
+      const row = db.prepare(sql).get(...params);
+      return row ? (row.count || row.total || 0) : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // --- Public APIs for Storefront ---
+  app.get('/api/public/products', (req, res) => {
+    try {
+      const rows = db.prepare(`
+        SELECT id, guild_id, name, description, price, original_price, duration_months, service_type, emoji, is_active, sort_order
+        FROM product_catalog
+        WHERE is_active = 1
+        ORDER BY sort_order ASC
+      `).all();
+      res.json({ ok: true, data: rows });
+    } catch (e) {
+      console.error('[PUBLIC API] Error listing products:', e);
+      res.status(500).json({ ok: false, error: 'Lỗi tải danh sách sản phẩm.' });
+    }
+  });
+
+  app.get('/api/public/stats', (req, res) => {
+    try {
+      const totalOrders = safeCount('SELECT COUNT(*) AS total FROM orders');
+      const completedOrders = safeCount("SELECT COUNT(*) AS total FROM orders WHERE status = 'COMPLETED'");
+      const totalCustomers = safeCount('SELECT COUNT(DISTINCT customer_id) AS total FROM orders');
+      const ratingRow = db.prepare("SELECT AVG(stars) as avg_rating FROM feedbacks").get();
+      const avgRating = Number(ratingRow?.avg_rating || 4.9);
+      
+      res.json({
+        ok: true,
+        data: {
+          total_orders: totalOrders,
+          completed_orders: completedOrders,
+          total_customers: totalCustomers,
+          avg_rating: avgRating
+        }
+      });
+    } catch (e) {
+      console.error('[PUBLIC API] Error getting stats:', e);
+      res.status(500).json({ ok: false, error: 'Lỗi tải thống kê.' });
+    }
+  });
+
+  app.get('/api/public/feedbacks', (req, res) => {
+    try {
+      const rows = db.prepare(`
+        SELECT f.*, o.customer_id
+        FROM feedbacks f
+        LEFT JOIN orders o ON f.order_code = o.order_code
+        WHERE f.stars >= 4
+        ORDER BY f.id DESC
+        LIMIT 10
+      `).all();
+      
+      const mapped = rows.map(r => {
+        let username = "Khách hàng Discord";
+        try {
+          const cl = req.app.locals.discordClient;
+          if (cl && r.customer_id) {
+            const dUser = cl.users.cache.get(r.customer_id);
+            if (dUser) username = dUser.username;
+          }
+        } catch (e) {}
+        return {
+          id: r.id,
+          order_code: r.order_code,
+          stars: r.stars,
+          content: r.content,
+          username: username
+        };
+      });
+      
+      res.json({ ok: true, data: mapped });
+    } catch (e) {
+      console.error('[PUBLIC API] Error listing feedbacks:', e);
+      res.status(500).json({ ok: false, error: 'Lỗi tải đánh giá.' });
+    }
+  });
+
+  app.get('/api/public/orders/:code', (req, res) => {
+    try {
+      const row = db.prepare("SELECT order_code, status FROM orders WHERE order_code = ?").get(req.params.code);
+      if (!row) return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng.' });
+      res.json({ ok: true, data: row });
+    } catch (e) {
+      console.error('[PUBLIC API] Error getting order:', e);
+      res.status(500).json({ ok: false, error: 'Lỗi truy vấn đơn hàng.' });
+    }
+  });
+
+  app.post('/api/public/orders', async (req, res) => {
+    try {
+      const { productId, discord_id, contact, note } = req.body || {};
+      if (!productId) return res.status(400).json({ ok: false, error: 'Thiếu thông tin sản phẩm.' });
+      if (!contact) return res.status(400).json({ ok: false, error: 'Thiếu thông tin email liên hệ.' });
+
+      const product = db.prepare("SELECT * FROM product_catalog WHERE id = ?").get(productId);
+      if (!product || !product.is_active) {
+        return res.status(404).json({ ok: false, error: 'Sản phẩm không tồn tại hoặc đã ngừng bán.' });
+      }
+
+      // Forward request to internal botApiRoutes web-orders endpoint
+      const botResponse = await fetch(`http://127.0.0.1:${process.env.HTTP_PORT || 2753}/api/bot/web-orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Bot-Api-Key': process.env.BOT_API_KEY
+        },
+        body: JSON.stringify({
+          items: [{
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            duration_months: product.duration_months,
+            product_name: product.name
+          }],
+          contact: contact,
+          note: note || '',
+          discord_id: discord_id || null,
+          source: 'web'
+        })
+      });
+
+      const botData = await botResponse.json();
+      if (!botResponse.ok) {
+        return res.status(botResponse.status || 400).json({ ok: false, error: botData.error || 'Lỗi từ Bot API.' });
+      }
+
+      return res.json(botData);
+    } catch (e) {
+      console.error('[PUBLIC API] Error creating order:', e);
+      res.status(500).json({ ok: false, error: 'Lỗi máy chủ khi tạo đơn hàng.' });
+    }
+  });
+
+  // Serve static storefront files at root '/'
+  const possibleShopPaths = [
+    path.join(process.cwd(), 'shop-web'),
+    path.join(__dirname, 'shop-web'),
+    path.join(process.cwd(), 'src', 'shop-web')
+  ];
+  let shopPath = possibleShopPaths[0];
+  for (const p of possibleShopPaths) {
+    if (fs.existsSync(p)) {
+      shopPath = p; break;
+    }
+  }
+
+  app.use('/', express.static(shopPath));
+
+  app.get('/payment', (req, res) => {
+    res.sendFile(path.join(shopPath, 'index.html'));
+  });
+
   const enabled = String(process.env.DASHBOARD_ENABLED ?? 'false').toLowerCase() === 'true';
   if (!enabled) return;
 

@@ -10,11 +10,8 @@ import { setOrderStatus } from '../services/orderService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
 import { getTicketByChannelId, reopenTicket } from '../services/ticketService.js';
 
-function isTicketChannel(channel) {
-  if (!channel || channel.type !== ChannelType.GuildText) return false;
-  const name = channel.name?.toLowerCase?.() ?? '';
-  return name.startsWith('ticket-') || name.startsWith('bao-hanh-') || name.startsWith('closed-');
-}
+import { getGuildConfig } from '../services/guildConfigService.js';
+import { isTicketChannel } from '../services/ticketService.js';
 
 export const data = new SlashCommandBuilder()
   .setName('reopen')
@@ -25,8 +22,9 @@ export async function execute(interaction) {
   const E = createEmojiResolver(interaction?.guildId);
   await interaction.deferReply({ flags: 64 });
 
+  const guildConfig = getGuildConfig(interaction.guildId);
   const channel = interaction.channel;
-  if (!isTicketChannel(channel)) {
+  if (!isTicketChannel(channel, guildConfig)) {
     await interaction.editReply(`${E('status_warn')} Lệnh này chỉ dùng trong ticket.`);
     return;
   }

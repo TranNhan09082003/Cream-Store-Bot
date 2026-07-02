@@ -1,5 +1,5 @@
 import { Events, AttachmentBuilder, EmbedBuilder } from 'discord.js';
-import { getTicketByChannelId, updateTicketAiStatus } from '../services/ticketService.js';
+import { getTicketByChannelId, updateTicketAiStatus, isTicketChannel } from '../services/ticketService.js';
 import { processAiMessage } from '../services/aiService.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { moderateMessage } from '../services/aiModerationService.js';
@@ -148,7 +148,7 @@ export async function execute(message) {
     }
 
     // 2. Kiểm tra chặn Link (Trừ kênh ticket)
-    const isTicketChan = message.channel.name.startsWith('ticket-') || message.channel.name.startsWith('bao-hanh-') || !!ticket;
+    const isTicketChan = isTicketChannel(message.channel, guildConfig);
     const linkRegex = /(https?:\/\/[^\s]+|discord\.gg\/[^\s]+)/gi;
     const hasLink = linkRegex.test(message.content);
 

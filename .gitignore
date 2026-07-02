@@ -47,3 +47,7 @@ scripts/*
 !scripts/send-service-panel.js
 
 
+
+.github/workflows/deploy-cpanel.yml
+
+.github/workflows/deploy-cpanel.yml

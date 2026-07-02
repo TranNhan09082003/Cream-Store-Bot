@@ -2,7 +2,7 @@ import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
 import { buildCloseConfirmComponents, buildCloseConfirmEmbed } from '../utils/embeds.js';
-import { getTicketByChannelId } from '../services/ticketService.js';
+import { getTicketByChannelId, isTicketChannel } from '../services/ticketService.js';
 import { isManager } from '../utils/permissions.js';
 
 export const data = new SlashCommandBuilder()
@@ -27,20 +27,13 @@ export async function execute(interaction) {
     return;
   }
 
-  const chanName = interaction.channel.name;
-  const isTicketChan = chanName.startsWith('ticket-') || 
-                       chanName.startsWith('bao-hanh-') || 
-                       chanName.startsWith('closed-') ||
-                       interaction.channel.parentId === guildConfig?.ticket_category_id ||
-                       interaction.channel.parentId === guildConfig?.warranty_category_id;
-
-  if (!isTicketChan) {
+  if (!isTicketChannel(interaction.channel, guildConfig)) {
     await interaction.editReply({ content: `${E('status_warn')} Kênh này không phải kênh ticket.` });
     return;
   }
 
   const ticket = getTicketByChannelId(interaction.channelId);
-  const ticketCode = ticket ? ticket.ticket_code : `MANUAL_${chanName.replace(/[^0-9]/g, '') || 'TICKET'}`;
+  const ticketCode = ticket ? ticket.ticket_code : `MANUAL_${interaction.channel.name.replace(/[^0-9]/g, '') || 'TICKET'}`;
   const ticketId = ticket ? ticket.id : 'orphan';
 
   await interaction.editReply({

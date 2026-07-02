@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cenar Store - Hệ thống cung cấp tài khoản premium, dịch vụ số uy tín hàng đầu Việt Nam. Hỗ trợ tự động, bảo hành 24/7.">
+    <title>Cenar Store | Premium Digital Services</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- GLOBAL LOADER -->
+    <div id="global-loader" class="global-loader">
+        <div class="g-spinner"></div>
+        <div class="g-text">Đang tải dữ liệu cửa hàng...</div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <div class="shop-wrapper">
+        
+        <!-- HEADER NAVIGATION (Max height: 72px) -->
+        <header class="shop-header">
+            <div class="header-container">
+                <a href="/" class="brand-logo">
+                    <div class="logo-mark"><i class="ph-bold ph-lightning"></i></div>
+                    <span class="logo-text">Cenar Store</span>
+                </a>
+                
+                <nav class="desktop-nav">
+                    <a href="#products-section" class="nav-link">Sản phẩm</a>
+                    <a href="#stats-section" class="nav-link">Uy tín</a>
+                    <a href="#feedbacks-section" class="nav-link">Đánh giá</a>
+                    <a href="#faq-section" class="nav-link">Hỗ trợ</a>
+                </nav>
+
+                <div class="header-actions">
+                    <a href="https://discord.gg/cenar" target="_blank" class="btn btn-discord">
+                        <i class="ph ph-discord-logo"></i>
+                        <span>Cộng đồng</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- HERO SECTION (Split screen 50/50, min-h-[100dvh]) -->
+        <section class="hero-section">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <i class="ph-fill ph-seal-check"></i>
+                        <span>Hệ thống tự động 24/7</span>
+                    </div>
+                    <h1 class="hero-title">Trải nghiệm Dịch vụ số <span class="highlight">Đặc quyền</span></h1>
+                    <p class="hero-desc">Cung cấp tài khoản Premium bản quyền giá cực tốt. Nhận hàng lập tức, bảo hành trọn vẹn suốt thời gian sử dụng.</p>
+                    <div class="hero-ctas">
+                        <a href="#products-section" class="btn btn-primary">
+                            <span>Mua ngay</span>
+                            <i class="ph ph-arrow-right"></i>
+                        </a>
+                        <a href="https://discord.gg/cenar" target="_blank" class="btn btn-secondary">
+                            <span>Mở Ticket hỗ trợ</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="visual-wrapper">
+                        <img src="assets/hero_premium.png" alt="Premium membership illustration" class="hero-img">
+                        <div class="glow-effect"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATS SECTION (Social Proof) -->
+        <section id="stats-section" class="stats-section">
+            <div class="stats-container">
+                <div class="stat-item">
+                    <div class="stat-num" id="stat-orders">1,200+</div>
+                    <div class="stat-label">Đơn hàng hoàn thành</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <div class="stat-num" id="stat-customers">800+</div>
+                    <div class="stat-label">Khách hàng tin tưởng</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <div class="stat-num" id="stat-rating">4.9/5 ⭐</div>
+                    <div class="stat-label">Đánh giá sao trung bình</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BRAND TRUST LOGOS (Simple Icons CDN, Logo Only) -->
+        <section class="logos-section">
+            <div class="logos-container">
+                <div class="logo-wall">
+                    <img src="https://cdn.simpleicons.org/netflix/a1a1aa" alt="Netflix">
+                    <img src="https://cdn.simpleicons.org/spotify/a1a1aa" alt="Spotify">
+                    <img src="https://cdn.simpleicons.org/youtube/a1a1aa" alt="YouTube">
+                    <img src="https://cdn.simpleicons.org/discord/a1a1aa" alt="Discord">
+                    <img src="https://cdn.simpleicons.org/openai/a1a1aa" alt="OpenAI">
+                    <img src="https://cdn.simpleicons.org/canva/a1a1aa" alt="Canva">
+                </div>
+            </div>
+        </section>
+
+        <!-- PRODUCTS SECTION (Dynamic Card/Grid Layout) -->
+        <section id="products-section" class="products-section">
+            <div class="section-header">
+                <h2 class="section-title">Bảng giá dịch vụ Premium</h2>
+                <p class="section-subtitle">Chọn sản phẩm bạn muốn đăng ký. Tất cả giao dịch đều được mã hóa tự động.</p>
+            </div>
+            
+            <div class="products-grid" id="products-grid">
+                <!-- Dynamically populated products from API -->
+                <div class="product-skeleton-card"></div>
+                <div class="product-skeleton-card"></div>
+                <div class="product-skeleton-card"></div>
+            </div>
+        </section>
+
+        <!-- FEEDBACKS SECTION (Dynamic Quote Layout) -->
+        <section id="feedbacks-section" class="feedbacks-section">
+            <div class="section-header">
+                <h2 class="section-title">Khách hàng nói gì về chúng tôi</h2>
+                <p class="section-subtitle">Những đánh giá sao thực tế từ người dùng mua sắm trực tiếp qua Discord & Web.</p>
+            </div>
+            
+            <div class="feedbacks-grid" id="feedbacks-grid">
+                <!-- Dynamically populated feedbacks -->
+                <div class="feedback-skeleton-card"></div>
+                <div class="feedback-skeleton-card"></div>
+            </div>
+        </section>
+
+        <!-- FAQ SECTION -->
+        <section id="faq-section" class="faq-section">
+            <div class="section-header">
+                <h2 class="section-title">Câu hỏi thường gặp</h2>
+                <p class="section-subtitle">Giải đáp nhanh các thắc mắc về quá trình mua hàng và chính sách bảo hành.</p>
+            </div>
+            
+            <div class="faq-accordion">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>Sau khi thanh toán xong tôi sẽ nhận hàng ở đâu?</span>
+                        <i class="ph ph-caret-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Hệ thống tự động tạo cho bạn một ticket mua hàng riêng tư trên Discord. Nếu bạn đã nhập Discord ID, thông tin đăng nhập và hướng dẫn sử dụng chi tiết sẽ được gửi trực tiếp qua DM (Tin nhắn riêng) của bạn và kênh ticket đó.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>Chính sách bảo hành tại Cenar Store hoạt động như thế nào?</span>
+                        <i class="ph ph-caret-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Chúng tôi cam kết bảo hành 1 đổi 1 hoặc hoàn tiền tương ứng trọn gói suốt thời gian sử dụng dịch vụ. Nếu gặp lỗi, bạn chỉ cần gõ lệnh <code>/baohanh</code> hoặc bấm nút bảo hành trong ticket để được xử lý tự động ngay lập tức.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>Làm sao để nạp tiền vào ví tài khoản của tôi?</span>
+                        <i class="ph ph-caret-down"></i>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Bạn có thể mở ticket trên Discord, chọn tính năng nạp tiền ví, hệ thống sẽ cấp mã QR nạp tiền tự động. Số dư ví sẽ được cộng tức thì sau khi hệ thống nhận được chuyển khoản.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="shop-footer">
+            <div class="footer-container">
+                <div class="footer-brand">
+                    <a href="/" class="brand-logo">
+                        <div class="logo-mark"><i class="ph-bold ph-lightning"></i></div>
+                        <span class="logo-text">Cenar Store</span>
+                    </a>
+                    <p class="footer-desc">Premium Digital Hub. Chuyên cung cấp giải pháp tài khoản giải trí, công việc cao cấp chính hãng.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="links-col">
+                        <h4>Liên kết</h4>
+                        <a href="#products-section">Sản phẩm</a>
+                        <a href="#stats-section">Thống kê</a>
+                        <a href="https://discord.gg/cenar" target="_blank">Discord Server</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Cenar Store. All rights reserved. Designed with Cold Luxury aesthetics.</p>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- CHECKOUT MODAL (Tactile feedback, explicit states) -->
+    <div id="checkout-modal" class="modal-backdrop">
+        <div class="modal-container">
+            <button class="modal-close" onclick="closeCheckoutModal()"><i class="ph ph-x"></i></button>
+            
+            <div class="modal-header">
+                <h3 id="checkout-title">Đơn hàng mới</h3>
+                <p id="checkout-subtitle">Điền thông tin để tiếp tục thanh toán</p>
+            </div>
+            
+            <div class="modal-body" id="modal-form-view">
+                <!-- FORM STATE -->
+                <div class="form-group">
+                    <label for="input-discord">Discord User ID (Không bắt buộc)</label>
+                    <div class="input-with-icon">
+                        <i class="ph ph-discord-logo"></i>
+                        <input type="text" id="input-discord" placeholder="VD: 607920769535836172">
+                    </div>
+                    <span class="input-helper">Để bot gửi tin nhắn thông báo & tạo ticket bàn giao riêng trên server của bạn.</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="input-email">Email nhận thông tin (Bắt buộc)</label>
+                    <div class="input-with-icon">
+                        <i class="ph ph-envelope"></i>
+                        <input type="email" id="input-email" required placeholder="VD: customer@gmail.com">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="input-note">Ghi chú đơn hàng (Không bắt buộc)</label>
+                    <textarea id="input-note" placeholder="Nhập ghi chú của bạn nếu có..."></textarea>
+                </div>
+
+                <div class="order-summary-card">
+                    <div class="summary-row">
+                        <span>Sản phẩm:</span>
+                        <strong id="summary-product-name">-</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Thời hạn:</span>
+                        <span id="summary-duration">-</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span>Tổng tiền:</span>
+                        <strong id="summary-total-amount">0đ</strong>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block btn-large" onclick="submitOrder()">
+                    <span>Thanh toán ngay</span>
+                    <i class="ph ph-credit-card"></i>
+                </button>
+            </div>
+
+            <!-- PAYMENT WAITING STATE -->
+            <div class="modal-body" id="modal-payment-view" style="display:none;">
+                <div class="payment-instructions">
+                    <div class="qr-container">
+                        <img id="payment-qr" src="" alt="VietQR Payment Code">
+                        <div class="qr-spinner-overlay" id="qr-loading-spinner">
+                            <div class="g-spinner"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-details">
+                        <h4>Mã đơn hàng: <span id="payment-order-code">...</span></h4>
+                        <p class="amount-alert">Vui lòng chuyển khoản chính xác: <strong id="payment-amount">0đ</strong></p>
+                        
+                        <div class="detail-box">
+                            <div class="detail-item">
+                                <span>Nội dung chuyển khoản (Bắt buộc):</span>
+                                <div class="copy-row">
+                                    <strong id="payment-ref">...</strong>
+                                    <button class="btn-copy" onclick="copyText('payment-ref')"><i class="ph ph-copy"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="waiting-alert">
+                            <span class="pulse-dot"></span>
+                            <span>Đang chờ bạn quét mã chuyển khoản để hoàn thành...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUCCESS STATE -->
+            <div class="modal-body" id="modal-success-view" style="display:none;">
+                <div class="success-screen">
+                    <div class="success-icon"><i class="ph-fill ph-check-circle"></i></div>
+                    <h3>Thanh toán thành công!</h3>
+                    <p>Đơn hàng <strong id="success-order-code">...</strong> đã được hệ thống ghi nhận thanh toán hoàn tất.</p>
+                    <div class="success-actions">
+                        <a href="https://discord.gg/cenar" target="_blank" class="btn btn-primary">
+                            <i class="ph ph-discord-logo"></i>
+                            <span>Truy cập Discord Ticket</span>
+                        </a>
+                        <button class="btn btn-secondary" onclick="closeCheckoutModal()">Đóng cửa sổ</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERROR STATE -->
+            <div class="modal-body" id="modal-error-view" style="display:none;">
+                <div class="error-screen">
+                    <div class="error-icon"><i class="ph-fill ph-warning-circle"></i></div>
+                    <h3>Không thể tạo đơn hàng!</h3>
+                    <p id="error-message">Đã có lỗi xảy ra trong quá trình kết nối với bot.</p>
+                    <button class="btn btn-secondary" onclick="resetModalView()">Thử lại</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

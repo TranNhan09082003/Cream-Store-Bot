@@ -12,7 +12,7 @@ function reopenTicketStmt(){return db.prepare(`UPDATE tickets SET status='OPEN',
 function getTicketByIdStmt(){return db.prepare('SELECT * FROM tickets WHERE id=?');}
 function scheduleAutoCloseStmt(){return db.prepare(`UPDATE tickets SET auto_close_at=?, keep_open_requested=0 WHERE id=?`);}
 function clearAutoCloseStmt(){return db.prepare(`UPDATE tickets SET auto_close_at=NULL, keep_open_requested=1 WHERE id=?`);}
-function dueAutoCloseTicketsStmt(){return db.prepare(`SELECT * FROM tickets WHERE status='OPEN' AND auto_close_at IS NOT NULL AND keep_open_requested=0 AND datetime(auto_close_at) <= datetime(?) ORDER BY auto_close_at ASC LIMIT ?`);}
+function dueAutoCloseTicketsStmt(){return db.prepare(`SELECT * FROM tickets WHERE guild_id=? AND status='OPEN' AND auto_close_at IS NOT NULL AND keep_open_requested=0 AND datetime(auto_close_at) <= datetime(?) ORDER BY auto_close_at ASC LIMIT ?`);}
 function updateTicketAiStatusStmt(){return db.prepare(`UPDATE tickets SET ai_status=? WHERE id=?`);}
 
 
@@ -31,6 +31,34 @@ export function reopenTicket(ticketId){reopenTicketStmt().run(ticketId); return 
 export const getTicketById = (ticketId) => getTicketByIdStmt().get(ticketId) ?? null;
 export function scheduleTicketAutoClose(ticketId, minutes=5){const at=addMinutes(new Date(), minutes).toISOString(); scheduleAutoCloseStmt().run(at, ticketId); return getTicketById(ticketId);}
 export function keepTicketOpen(ticketId){clearAutoCloseStmt().run(ticketId); return getTicketById(ticketId);}
-export const getDueAutoCloseTickets = (limit=20) => dueAutoCloseTicketsStmt().all(nowIso(), limit);
+export const getDueAutoCloseTickets = (guildId, limit=20) => dueAutoCloseTicketsStmt().all(guildId, nowIso(), limit);
 export function updateTicketAiStatus(ticketId, status){updateTicketAiStatusStmt().run(status, ticketId); return getTicketById(ticketId);}
+
+export function isTicketChannel(channel, guildConfig) {
+  if (!channel) return false;
+  const name = channel.name || '';
+  
+  // 1. Check if registered in database
+  const ticket = getTicketByChannelId(channel.id);
+  if (ticket) return true;
+
+  // 2. Check if inside ticket categories
+  const parentId = channel.parentId;
+  if (parentId && guildConfig) {
+    const ticketCategories = [
+      guildConfig.ticket_category_id,
+      guildConfig.support_category_id,
+      guildConfig.complaint_category_id,
+      guildConfig.partnership_category_id,
+      guildConfig.warranty_category_id
+    ].filter(Boolean);
+    if (ticketCategories.includes(parentId)) return true;
+  }
+
+  // 3. Fallback check for common prefixes
+  const prefixes = ['ticket-', 'bao-hanh-', 'closed-', 'nitro-', 'netflix-', 'spotify-', 'ai-', 'game-', 'gearup-', 'capcut-', 'adobe-', 'office-', 'gemini-', 'gpt-'];
+  if (prefixes.some(prefix => name.startsWith(prefix))) return true;
+
+  return false;
+}
 

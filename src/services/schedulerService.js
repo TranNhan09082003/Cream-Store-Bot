@@ -3,6 +3,7 @@ import path from 'node:path';
 import { runDeepNotifications, runSubscriptionNotifications } from './deepNotificationService.js';
 import { backupDatabase } from './backupService.js';
 import { getDueAutoCloseTickets, closeTicket } from './ticketService.js';
+import { config } from '../config.js';
 import { exportTicketTranscript } from './transcriptService.js';
 import { deliverTranscript, updateOrderLogMessage } from './notificationService.js';
 import { emitStaffLog } from './staffLogService.js';
@@ -61,7 +62,7 @@ export function startScheduler(client) {
     }
 
     try {
-      const dueTickets = getDueAutoCloseTickets(20);
+      const dueTickets = getDueAutoCloseTickets(config.guildId, 20);
       for (const ticket of dueTickets) {
         try {
           const channel = await client.channels.fetch(ticket.channel_id).catch(() => null);
