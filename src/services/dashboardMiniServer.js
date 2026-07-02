@@ -240,6 +240,37 @@ export function registerDashboardRoutes(app) {
     }
   });
 
+  // --- Secure Webhook Deploy API for CI/CD ---
+  app.post('/api/public/deploy', async (req, res) => {
+    try {
+      const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
+      const expectedKey = process.env.BOT_API_KEY;
+      if (!providedKey || providedKey !== expectedKey) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized' });
+      }
+
+      console.log('[BOT API] Received deployment trigger from GitHub Actions. Updating code...');
+      
+      // Send response immediately
+      res.json({ ok: true, message: 'Deployment triggered successfully. Updating and restarting bot...' });
+
+      // Run code update & restart bot process asynchronously
+      const { exec } = await import('child_process');
+      exec('git fetch origin main && git reset --hard origin/main && npm install --omit=dev', (err, stdout, stderr) => {
+        if (err) {
+          console.error('[DEPLOY ERROR]', err);
+        } else {
+          console.log('[DEPLOY SUCCESS]', stdout);
+        }
+        // Exit process, PM2 will automatically restart
+        process.exit(0);
+      });
+    } catch (e) {
+      console.error('[DEPLOY API ERROR]', e);
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
   // Serve static storefront files at root '/'
   const possibleShopPaths = [
     path.join(process.cwd(), 'shop-web'),
