@@ -455,10 +455,38 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
 async function handleProductSelect(interaction) {
   const E = createEmojiResolver(interaction.guildId);
   const productId = interaction.values[0];
-  const product = getProductById(Number(productId));
+  let product = getProductById(Number(productId));
+
+  // Fallback: nếu không tìm được theo ID (bảng-giá cũ, DB đã cập nhật)
+  // thử tìm theo tên sản phẩm từ label của option đã chọn
   if (!product) {
-    await safeReply(interaction, { content: `${E('status_cross')} Sản phẩm không còn tồn tại.`, ephemeral: true });
-    return;
+    // Attempt: get the label (product name) from the selected option component
+    const selectedLabel = interaction.component?.options?.find(
+      o => o.value === productId
+    )?.label;
+
+    if (selectedLabel) {
+      // Try to find by name across guild products
+      const { getActiveProducts } = await import('../services/productCatalogService.js');
+      const allProducts = getActiveProducts(interaction.guildId);
+      product = allProducts.find(p =>
+        p.name.toLowerCase() === selectedLabel.toLowerCase()
+      ) || null;
+    }
+
+    if (!product) {
+      // Auto-refresh panels so next interaction will work
+      try {
+        const { refreshAllShopPanels } = await import('../services/shopPanelService.js');
+        await refreshAllShopPanels(interaction.client, interaction.guildId);
+      } catch (_) { /* silent */ }
+
+      await safeReply(interaction, {
+        content: `${E('status_warn')} Danh sách sản phẩm đã được cập nhật. Vui lòng chọn lại sản phẩm từ menu bên dưới.`,
+        ephemeral: true
+      });
+      return;
+    }
   }
 
   const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
