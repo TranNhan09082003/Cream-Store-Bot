@@ -240,6 +240,22 @@ export function registerDashboardRoutes(app) {
     }
   });
 
+  // --- Debug API to check SQLite products ---
+  app.get('/api/public/list-db', async (req, res) => {
+    try {
+      const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
+      const expectedKey = process.env.BOT_API_KEY;
+      if (providedKey !== expectedKey) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized' });
+      }
+      const { db } = await import('../database/db.js');
+      const rows = db.prepare('SELECT id, name, price, service_type FROM product_catalog').all();
+      res.json({ ok: true, products: rows });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
   // --- Secure Webhook Deploy API for CI/CD ---
   app.post('/api/public/deploy', async (req, res) => {
     try {
