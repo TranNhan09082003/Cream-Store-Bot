@@ -468,11 +468,19 @@ async function handleProductSelect(interaction) {
     console.log('[DEBUG SELECT] Selected label from component options:', selectedLabel);
 
     if (selectedLabel) {
-      const allProducts = getActiveProducts(interaction.guildId);
-      console.log('[DEBUG SELECT] All active products names:', allProducts.map(p => p.name));
-      product = allProducts.find(p =>
-        p.name.toLowerCase() === selectedLabel.toLowerCase()
-      ) || null;
+      product = getProductByName(interaction.guildId, selectedLabel);
+      
+      if (!product) {
+        // Fuzzy matching fallback: match up to the first parenthesis (e.g., "YouTube Premium 3 Tháng")
+        const labelPrefix = selectedLabel.split('(')[0].trim().toLowerCase();
+        const allProducts = db.prepare('SELECT * FROM product_catalog WHERE is_active = 1').all();
+        
+        product = allProducts.find(p => {
+          const dbPrefix = p.name.split('(')[0].trim().toLowerCase();
+          return dbPrefix === labelPrefix;
+        }) ?? null;
+      }
+      
       console.log('[DEBUG SELECT] Found product by name fallback:', product ? product.name : 'null');
     }
 
