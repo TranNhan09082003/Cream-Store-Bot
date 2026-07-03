@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Cho phép trigger thủ công từ GitHub UI
+  workflow_dispatch: # Cho phép click deploy thủ công từ giao diện Actions
 
 concurrency:
   group: deploy-bot-${{ github.ref }}
