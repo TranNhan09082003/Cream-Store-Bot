@@ -243,27 +243,48 @@ export function registerDashboardRoutes(app) {
   // --- Secure Webhook Deploy API for CI/CD ---
   app.post('/api/public/deploy', async (req, res) => {
     try {
-      const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
+      const providedKey = req.headers['x-bot-api-key'] || req.headers['x-github-deploy-secret'] || req.query.api_key;
       const expectedKey = process.env.BOT_API_KEY;
       if (!providedKey || providedKey !== expectedKey) {
         return res.status(401).json({ ok: false, error: 'Unauthorized' });
       }
 
-      console.log('[BOT API] Received deployment trigger from GitHub Actions. Updating code...');
-      
-      // Send response immediately
+      console.log('[DEPLOY] Received deployment trigger. Updating code...');
       res.json({ ok: true, message: 'Deployment triggered successfully. Updating and restarting bot...' });
 
-      // Run code update & restart bot process asynchronously
       const { exec } = await import('child_process');
-      exec('git fetch origin main && git reset --hard origin/main && npm install --omit=dev', (err, stdout, stderr) => {
+      const { existsSync } = await import('fs');
+      const { join } = await import('path');
+
+      const cwd = process.cwd();
+      const gitDir = join(cwd, '.git');
+      const REPO_URL = process.env.GITHUB_REPO_URL || 'https://github.com/TranNhan09082003/Cream-Store-Bot.git';
+
+      let cmd;
+      if (!existsSync(gitDir)) {
+        // Lần đầu: clone repo vào thư mục tạm rồi di chuyển .git về
+        console.log('[DEPLOY] No .git found - initializing git repo from GitHub...');
+        cmd = [
+          `git init`,
+          `git remote add origin ${REPO_URL}`,
+          `git fetch origin main`,
+          `git reset --hard origin/main`,
+          `npm install --omit=dev --prefer-offline`
+        ].join(' && ');
+      } else {
+        // Các lần sau: pull bình thường
+        cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline`;
+      }
+
+      exec(cmd, { cwd }, (err, stdout, stderr) => {
         if (err) {
-          console.error('[DEPLOY ERROR]', err);
+          console.error('[DEPLOY ERROR]', err.message);
+          console.error('[DEPLOY STDERR]', stderr);
         } else {
-          console.log('[DEPLOY SUCCESS]', stdout);
+          console.log('[DEPLOY SUCCESS]', stdout.slice(-500));
         }
-        // Exit process, PM2 will automatically restart
-        process.exit(0);
+        // Restart — VibeHost launcher sẽ tự khởi động lại process
+        setTimeout(() => process.exit(0), 500);
       });
     } catch (e) {
       console.error('[DEPLOY API ERROR]', e);
