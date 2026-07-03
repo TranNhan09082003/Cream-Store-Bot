@@ -32,6 +32,15 @@ export async function processPendingPaymentTickets(client) {
         continue;
       }
 
+      // Bỏ qua các đơn WEB - ticket_channel_id không phải Discord snowflake
+      // Ví dụ: 'web-cn-854625' là ID đơn web, không thể fetch từ Discord API
+      if (
+        typeof order.ticket_channel_id === 'string' &&
+        (order.ticket_channel_id.startsWith('web-') || !/^\d+$/.test(order.ticket_channel_id))
+      ) {
+        continue; // Đơn web không có Discord channel, bỏ qua silently
+      }
+
       // Lấy kênh Discord tương ứng
       let channel = null;
       try {

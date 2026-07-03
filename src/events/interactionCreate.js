@@ -71,6 +71,7 @@ import { keepTicketOpen, scheduleTicketAutoClose } from '../services/ticketServi
 import { getActiveProducts, getProductById, updateProduct, addProduct, getAllProducts, getProductByName } from '../services/productCatalogService.js';
 import { getCenarHub } from '../services/cenarHub.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
+import { refreshAllShopPanels } from '../services/shopPanelService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -460,14 +461,11 @@ async function handleProductSelect(interaction) {
   // Fallback: nếu không tìm được theo ID (bảng-giá cũ, DB đã cập nhật)
   // thử tìm theo tên sản phẩm từ label của option đã chọn
   if (!product) {
-    // Attempt: get the label (product name) from the selected option component
     const selectedLabel = interaction.component?.options?.find(
       o => o.value === productId
     )?.label;
 
     if (selectedLabel) {
-      // Try to find by name across guild products
-      const { getActiveProducts } = await import('../services/productCatalogService.js');
       const allProducts = getActiveProducts(interaction.guildId);
       product = allProducts.find(p =>
         p.name.toLowerCase() === selectedLabel.toLowerCase()
@@ -475,9 +473,8 @@ async function handleProductSelect(interaction) {
     }
 
     if (!product) {
-      // Auto-refresh panels so next interaction will work
+      // Auto-refresh panels so next interaction will work with fresh IDs
       try {
-        const { refreshAllShopPanels } = await import('../services/shopPanelService.js');
         await refreshAllShopPanels(interaction.client, interaction.guildId);
       } catch (_) { /* silent */ }
 
