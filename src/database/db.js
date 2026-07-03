@@ -18,7 +18,8 @@ db.close = function(...args) {
   console.log('[DB-CLOSE] db.close was called! Stack trace:', new Error().stack);
   return originalClose.apply(db, args);
 };
-db.pragma('journal_mode = DELETE');
+db.pragma('journal_mode = WAL');       // WAL: cho phép concurrent reads + 1 writer, tránh "database is locked"
+db.pragma('busy_timeout = 5000');      // Chờ tối đa 5 giây nếu DB đang bị lock trước khi báo lỗi
 db.pragma('foreign_keys = ON');
 db.pragma('synchronous = NORMAL');     // Cân bằng tốc độ và an toàn
 db.pragma('cache_size = -8000');       // 8MB cache
