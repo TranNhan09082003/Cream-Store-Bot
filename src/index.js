@@ -134,8 +134,23 @@ if (process.env.IS_CHILD_BOT === 'true') {
             console.error('[DEPLOY-LAUNCHER] Git pull/install failed:', err.message);
             console.error(stderr);
           } else {
-            console.log('[DEPLOY-LAUNCHER] Git pull and npm install succeeded. Exiting launcher to trigger container restart...');
-            process.exit(0); // Exit process, Pterodactyl container will restart it automatically
+            console.log('[DEPLOY-LAUNCHER] Git pull and npm install succeeded. Triggering cPanel process optimization...');
+            
+            const apiKey = process.env.BOT_API_KEY || '';
+            const websiteUrl = `https://cenarstore.xyz/optimize.php?token=${encodeURIComponent(apiKey)}`;
+            
+            import('https').then(https => {
+              https.get(websiteUrl, (cleanRes) => {
+                console.log(`[DEPLOY-LAUNCHER] cPanel process optimization returned HTTP ${cleanRes.statusCode}`);
+                process.exit(0);
+              }).on('error', (cleanErr) => {
+                console.error('[DEPLOY-LAUNCHER] cPanel process optimization fetch failed:', cleanErr.message);
+                process.exit(0);
+              });
+            }).catch(e => {
+              console.error('[DEPLOY-LAUNCHER] Failed to load https module:', e.message);
+              process.exit(0);
+            });
           }
         });
       } catch (err) {
