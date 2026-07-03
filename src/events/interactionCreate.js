@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config } from '../config.js';
+import { db } from '../database/db.js';
 import { getGuildConfig, upsertGuildConfig } from '../services/guildConfigService.js';
 import { getCustomerFlag, getTicketMuteStatus, setTicketMuteStatus } from '../services/blacklistService.js';
 import { emitStaffLog } from '../services/staffLogService.js';
