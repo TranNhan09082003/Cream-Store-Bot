@@ -461,26 +461,28 @@ async function handleProductSelect(interaction) {
   // Fallback: nếu không tìm được theo ID (bảng-giá cũ, DB đã cập nhật)
   // thử tìm theo tên sản phẩm từ label của option đã chọn
   if (!product) {
+    console.log('[DEBUG SELECT] Product not found by ID:', productId);
     const selectedLabel = interaction.component?.options?.find(
       o => o.value === productId
     )?.label;
+    console.log('[DEBUG SELECT] Selected label from component options:', selectedLabel);
 
     if (selectedLabel) {
       const allProducts = getActiveProducts(interaction.guildId);
+      console.log('[DEBUG SELECT] All active products names:', allProducts.map(p => p.name));
       product = allProducts.find(p =>
         p.name.toLowerCase() === selectedLabel.toLowerCase()
       ) || null;
+      console.log('[DEBUG SELECT] Found product by name fallback:', product ? product.name : 'null');
     }
 
     if (!product) {
-      // Auto-refresh panels so next interaction will work with fresh IDs
-      try {
-        await refreshAllShopPanels(interaction.client, interaction.guildId);
-      } catch (_) { /* silent */ }
+      // Auto-refresh panels in the background so next interaction will work with fresh IDs
+      refreshAllShopPanels(interaction.client, interaction.guildId).catch(console.error);
 
       await safeReply(interaction, {
         content: `${E('status_warn')} Danh sách sản phẩm đã được cập nhật. Vui lòng chọn lại sản phẩm từ menu bên dưới.`,
-        ephemeral: true
+        flags: 64 // Use flags instead of ephemeral: true to fix the deprecation warning
       });
       return;
     }
