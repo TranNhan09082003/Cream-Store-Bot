@@ -35,10 +35,22 @@ if (process.env.IS_CHILD_BOT === 'true') {
   const child1 = fork(__filename, [], {
     env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env', HTTP_PORT: '2753' }
   });
+  child1.on('error', (err) => {
+    console.error('[LAUNCHER] Store 1 fork error:', err);
+  });
+  child1.on('exit', (code, signal) => {
+    console.log(`[LAUNCHER] Store 1 exited with code ${code} and signal ${signal}`);
+  });
 
   console.log(`[LAUNCHER] Starting Store 2 (ENV_FILE=.env.store2) on local port 8080...`);
   const child2 = fork(__filename, [], {
     env: { ...process.env, IS_CHILD_BOT: 'true', ENV_FILE: '.env.store2', HTTP_PORT: '8080' }
+  });
+  child2.on('error', (err) => {
+    console.error('[LAUNCHER] Store 2 fork error:', err);
+  });
+  child2.on('exit', (code, signal) => {
+    console.log(`[LAUNCHER] Store 2 exited with code ${code} and signal ${signal}`);
   });
 
   // Handle process shutdown
@@ -57,6 +69,59 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
   // Create reverse proxy server for webhooks and dashboard
   const server = http.createServer(async (req, res) => {
+    // Intercept deployment endpoint directly in the launcher to allow deploying even when child bot processes are crashed
+    if (req.url.startsWith('/api/public/deploy')) {
+      try {
+        const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+        const providedKey = req.headers['x-bot-api-key'] || req.headers['x-github-deploy-secret'] || urlParams.get('api_key');
+        const expectedKey = process.env.BOT_API_KEY;
+        if (!providedKey || providedKey !== expectedKey) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+          return;
+        }
+
+        console.log('[DEPLOY-LAUNCHER] Intercepted deployment trigger. Updating code...');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, message: 'Deployment triggered successfully on launcher. Updating and restarting bot...' }));
+
+        const { exec } = await import('child_process');
+        const { existsSync } = await import('fs');
+        const { join } = await import('path');
+
+        const cwd = process.cwd();
+        const gitDir = join(cwd, '.git');
+        const REPO_URL = process.env.GITHUB_REPO_URL || 'https://github.com/TranNhan09082003/Cream-Store-Bot.git';
+
+        let cmd;
+        if (!existsSync(gitDir)) {
+          cmd = [
+            `git init`,
+            `git remote add origin ${REPO_URL}`,
+            `git fetch origin main`,
+            `git reset --hard origin/main`,
+            `npm install --omit=dev --prefer-offline`
+          ].join(' && ');
+        } else {
+          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline`;
+        }
+
+        exec(cmd, { cwd }, (err, stdout, stderr) => {
+          if (err) {
+            console.error('[DEPLOY-LAUNCHER] Git pull/install failed:', err.message);
+            console.error(stderr);
+          } else {
+            console.log('[DEPLOY-LAUNCHER] Git pull and npm install succeeded. Exiting launcher to trigger container restart...');
+            process.exit(0); // Exit process, Pterodactyl container will restart it automatically
+          }
+        });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Deploy Error: ${err.message}`);
+      }
+      return;
+    }
+
     // 1. Redirect /store2/dashboard to /store2/dashboard/ (to load relative assets correctly)
     if (req.url === '/store2/dashboard') {
       res.writeHead(301, { 'Location': '/store2/dashboard/' });
