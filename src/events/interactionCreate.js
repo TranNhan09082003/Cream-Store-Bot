@@ -497,32 +497,30 @@ async function handleProductSelect(interaction) {
     return;
   }
 
-  import('discord.js').then(({ ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle }) => {
-    const modal = new ModalBuilder()
-      .setCustomId(`product:purchase:modal:${product.id}`)
-      .setTitle(`Mua: ${product.name}`.slice(0, 45));
+  const modal = new ModalBuilder()
+    .setCustomId(`product:purchase:modal:${product.id}`)
+    .setTitle(`Mua: ${product.name}`.slice(0, 45));
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('quantity')
-          .setLabel('Số lượng')
-          .setValue('1')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('discount_code')
-          .setLabel('Mã giảm giá (nếu có)')
-          .setPlaceholder('VD: SALE10')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-      )
-    );
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('quantity')
+        .setLabel('Số lượng')
+        .setValue('1')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('discount_code')
+        .setLabel('Mã giảm giá (nếu có)')
+        .setPlaceholder('VD: SALE10')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    )
+  );
 
-    interaction.showModal(modal).catch(console.error);
-  });
+  await interaction.showModal(modal).catch(console.error);
 }
 
 // Helper to parse price input (e.g. 180k -> 180000, 180000 -> 180000)
