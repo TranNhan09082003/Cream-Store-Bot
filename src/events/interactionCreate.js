@@ -3619,6 +3619,9 @@ export function registerInteractionHandler(client, commands) {
            return;
          }
 
+         // Xóa ngay khỏi cache để chống spam/double click/retry
+         announcementCache.delete(interaction.message.id);
+
          // ACK ngay để tránh timeout 3 giây Discord
          await interaction.deferUpdate().catch(() => null);
 
@@ -3657,7 +3660,6 @@ export function registerInteractionHandler(client, commands) {
                   }
                }
 
-               announcementCache.delete(interaction.message.id);
                await interaction.editReply({ content: 'Đã đăng thông báo thành công!', embeds: [], components: [] }).catch(() => null);
            } else {
                await interaction.editReply({ content: 'Không tìm thấy kênh tương ứng để đăng.', embeds: [], components: [] }).catch(() => null);
