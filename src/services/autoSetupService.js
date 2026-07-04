@@ -85,22 +85,21 @@ export async function autoSetupPartnerAndCtv(client) {
 
       // 5. Cập nhật cấu hình vào Database (partner_settings & ctv_settings)
       db.prepare(`
-        INSERT INTO partner_settings (guild_id, recruit_channel_id, review_channel_id, directory_channel_id, partner_role_id, minimum_members)
-        VALUES (?, ?, ?, ?, ?, 500)
+        INSERT INTO partner_settings (guild_id, recruit_channel_id, approve_channel_id, directory_channel_id, partner_role_id)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(guild_id) DO UPDATE SET
           recruit_channel_id=excluded.recruit_channel_id,
-          review_channel_id=excluded.review_channel_id,
+          approve_channel_id=excluded.approve_channel_id,
           directory_channel_id=excluded.directory_channel_id,
-          partner_role_id=excluded.partner_role_id,
-          minimum_members=excluded.minimum_members
+          partner_role_id=excluded.partner_role_id
       `).run(guild.id, partnerRecruitChan.id, reviewChan.id, partnerDirChan.id, partnerRole.id);
 
       db.prepare(`
-        INSERT INTO ctv_settings (guild_id, recruit_channel_id, review_channel_id, ctv_role_id)
+        INSERT INTO ctv_settings (guild_id, recruit_channel_id, approve_channel_id, ctv_role_id)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(guild_id) DO UPDATE SET
           recruit_channel_id=excluded.recruit_channel_id,
-          review_channel_id=excluded.review_channel_id,
+          approve_channel_id=excluded.approve_channel_id,
           ctv_role_id=excluded.ctv_role_id
       `).run(guild.id, ctvRecruitChan.id, reviewChan.id, ctvRole.id);
 
