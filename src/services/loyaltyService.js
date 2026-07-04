@@ -84,11 +84,52 @@ export function deductPoints(guildId, customerId, points, description, relatedCo
  * Award points for a completed order
  */
 export function awardOrderPoints(guildId, customerId, orderCode, amount) {
+  // Check if points were already awarded for this order
+  const existing = db.prepare('SELECT id FROM loyalty_transactions WHERE guild_id = ? AND customer_id = ? AND type = ? AND related_code = ?').get(guildId, customerId, 'ORDER_COMPLETE', orderCode);
+  if (existing) {
+    console.log(`[LOYALTY] Points already awarded for order ${orderCode}. Skipping.`);
+    return null;
+  }
+
   const points = calculatePoints(amount);
   if (points <= 0) return null;
   
   return addPoints(guildId, customerId, points, 'ORDER_COMPLETE', 
     `Tích điểm đơn hàng ${orderCode} (${amount.toLocaleString('vi-VN')}đ)`, orderCode);
+}
+
+/**
+ * Refund/deduct points for a cancelled order
+ */
+export function refundOrderPoints(guildId, customerId, orderCode) {
+  // Check if points were awarded
+  const earnedTx = db.prepare('SELECT points FROM loyalty_transactions WHERE guild_id = ? AND customer_id = ? AND type = ? AND related_code = ?').get(guildId, customerId, 'ORDER_COMPLETE', orderCode);
+  if (!earnedTx) return null; // No points were awarded
+
+  // Check if already refunded
+  const refunded = db.prepare('SELECT id FROM loyalty_transactions WHERE guild_id = ? AND customer_id = ? AND type = ? AND related_code = ?').get(guildId, customerId, 'ORDER_CANCEL', orderCode);
+  if (refunded) return null; // Already refunded
+
+  const pointsToDeduct = earnedTx.points;
+  if (pointsToDeduct <= 0) return null;
+
+  const current = getPoints(guildId, customerId);
+  const actualDeduct = Math.min(current.points, pointsToDeduct);
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE loyalty_points 
+      SET points = points - ?, lifetime_points = MAX(0, lifetime_points - ?), updated_at = CURRENT_TIMESTAMP
+      WHERE guild_id = ? AND customer_id = ?
+    `).run(actualDeduct, pointsToDeduct, guildId, customerId);
+
+    db.prepare(
+      'INSERT INTO loyalty_transactions (guild_id, customer_id, points, type, description, related_code) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(guildId, customerId, -actualDeduct, 'ORDER_CANCEL', `Hoàn/trừ điểm đơn hàng bị hủy ${orderCode}`, orderCode);
+  });
+
+  tx();
+  return getPoints(guildId, customerId);
 }
 
 /**

@@ -1542,15 +1542,36 @@ export function buildCustomerProfileEmbed(user, profile, orders) {
 }
 
 // ═══ Customer Profile V2 (Components V2) ═══
-export function buildCustomerProfileV2(user, profile, orders, guildId = null) {
+export function buildCustomerProfileV2(user, profile, orders, points, guildId = null) {
   const em = guildId ? getEmojiMap(guildId) : {};
   const E = (slot, fallback = '') => em[slot] || fallback;
 
   const container = new ContainerBuilder().setAccentColor(accentFor('info'));
 
+  // Calculate Rank based on lifetime points
+  const lp = points?.lifetime_points ?? 0;
+  let rankName = 'Thành Viên Mới';
+  let rankEmoji = E('icon_sparkle', '✨');
+  if (lp >= 1000) {
+    rankName = 'Thành Viên Kim Cương';
+    rankEmoji = E('icon_gem', '💎');
+  } else if (lp >= 500) {
+    rankName = 'Thành Viên Bạch Kim';
+    rankEmoji = E('icon_crown', '👑');
+  } else if (lp >= 200) {
+    rankName = 'Thành Viên Vàng';
+    rankEmoji = E('icon_gold', '🥇');
+  } else if (lp >= 50) {
+    rankName = 'Thành Viên Bạc';
+    rankEmoji = E('icon_silver', '🥈');
+  } else if (lp >= 10) {
+    rankName = 'Thành Viên Đồng';
+    rankEmoji = E('icon_bronze', '🥉');
+  }
+
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(joinLines(
-      h2(`${E('ticket_user')}  Hồ Sơ Khách Hàng`),
+      h2(`${E('ticket_user', '👤')} HỒ SƠ KHÁCH HÀNG ${E('icon_sparkle', '✨')}`),
       `> ${fmt.user(user.id)}`,
     ))
   );
@@ -1561,12 +1582,24 @@ export function buildCustomerProfileV2(user, profile, orders, guildId = null) {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(joinLines(
-      `${E('icon_calendar')} ${fmt.b('Mua Từ:')} ${profile?.first_seen_at ? T.rel(profile.first_seen_at) : fmt.i('Chưa có')}`,
-      `${E('order_product')} ${fmt.b('Tổng Đơn:')} ${profile?.total_orders ?? 0}`,
-      `${E('order_complete')} ${fmt.b('Hoàn Thành:')} ${profile?.total_completed_orders ?? 0}`,
-      `${E('order_pending')} ${fmt.b('Đang Nợ:')} ${profile?.total_open_orders ?? 0}`,
-      `${E('payment_money')} ${fmt.b('Tổng Chi:')} ${fmt.b(formatCurrency(profile?.total_spent ?? 0))}`,
-      `${E('payment_success')} ${fmt.b('Đã Thanh Toán:')} ${formatCurrency(profile?.total_paid_amount ?? 0)}`,
+      `### ${E('icon_clipboard', '📋')} Thông Tin Mua Hàng`,
+      `* ${E('icon_calendar', '📅')} ${fmt.b('Thành viên từ:')} ${profile?.first_seen_at ? T.rel(profile.first_seen_at) : fmt.i('Chưa rõ')}`,
+      `* ${E('order_product', '📦')} ${fmt.b('Tổng số đơn:')} ${profile?.total_orders ?? 0} (Đã hoàn thành: **${profile?.total_completed_orders ?? 0}** | Đang xử lý: **${profile?.total_open_orders ?? 0}** )`,
+      `* ${E('payment_money', '💵')} ${fmt.b('Tổng chi tiêu:')} ${fmt.b(formatCurrency(profile?.total_spent ?? 0))}`,
+      `* ${E('payment_success', '💳')} ${fmt.b('Thực nhận:')} ${formatCurrency(profile?.total_paid_amount ?? 0)}`,
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `### ${E('icon_trophy', '🏆')} Tích Lũy Điểm Thưởng`,
+      `* ${rankEmoji} ${fmt.b('Hạng thành viên:')} ${fmt.b(rankName)}`,
+      `* ${E('icon_star', '⭐')} ${fmt.b('Điểm hiện tại:')} **${points?.points ?? 0}** LP`,
+      `* ${E('icon_trophy', '🏆')} ${fmt.b('Điểm tích lũy trọn đời:')} **${lp}** LP`,
     ))
   );
 
@@ -1576,9 +1609,9 @@ export function buildCustomerProfileV2(user, profile, orders, guildId = null) {
     );
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(joinLines(
-        `${E('icon_history')} ${fmt.b('5 Đơn Gần Nhất')}`,
+        `### ${E('icon_history', '📜')} Lịch Sử Đơn Hàng`,
         ...orders.map(o =>
-          `> ${fmt.code(o.order_code)} — ${formatOrderProduct(o.quantity, o.product_name)} — ${fmt.b(getOrderStatusLabel(o.status))}`,
+          `> \`${o.order_code}\` — ${formatOrderProduct(o.quantity, o.product_name)} — ${fmt.b(getOrderStatusLabel(o.status))}`,
         ),
       ))
     );
@@ -1588,7 +1621,7 @@ export function buildCustomerProfileV2(user, profile, orders, guildId = null) {
     new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
   );
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(subtext(`${E('icon_heart_purple')} ${config.storeFooter || brandName('store')}`))
+    new TextDisplayBuilder().setContent(subtext(`${E('icon_heart_purple', '💜')} ${config.storeFooter || brandName('store')}`))
   );
 
   return { container, flags: MessageFlags.IsComponentsV2 };

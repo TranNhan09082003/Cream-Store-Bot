@@ -48,6 +48,8 @@ import { closeTicket, createTicket, getOpenTicketByCustomer, getTicketByChannelI
 import { exportTicketTranscript } from '../services/transcriptService.js';
 import { openWarrantyTicket, buildWarrantyCustomerConfirmV2 } from '../services/warrantyService.js';
 import { resolveSelectMenuEmoji, resolveProductEmoji } from '../services/emojiService.js';
+import { handlePartnerApplyStart, handlePartnerApplyModal, handlePartnerApprove, handlePartnerReject, handleCtvApplyStart, handleCtvApplyModal, handleCtvApprove, handleCtvReject } from '../services/partnerAndCtvHandlers.js';
+import { isCustomerCtv } from '../services/ctvService.js';
 import {
   buildCloseConfirmComponents,
   buildCloseConfirmEmbed,
@@ -1585,10 +1587,17 @@ async function handleProductPurchaseFlow(interaction, productId) {
           }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
         }
 
+        const isCtv = isCustomerCtv(interaction.guildId, interaction.user.id);
         const prefix = (product.service_type || 'ticket').toLowerCase();
-        await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
+        
+        if (isCtv) {
+          await channel.setName(`⚡-ctv-${ticket.ticket_code}`).catch(() => null);
+        } else {
+          await channel.setName(buildTicketChannelName(ticket.ticket_code, prefix)).catch(() => null);
+        }
 
-        const price = product.price * quantity;
+        const unitPrice = (isCtv && product.ctv_price !== null) ? product.ctv_price : product.price;
+        const price = unitPrice * quantity;
         const order = createOrder({
           guildId: interaction.guildId,
           ticketId: ticket.id,
@@ -1630,6 +1639,11 @@ async function handleProductPurchaseFlow(interaction, productId) {
         });
         // Ping riêng (content không được dùng với V2 flag)
         await channel.send({ content: `<@${interaction.user.id}> — Đơn hàng **${order.order_code}** đã được tạo!` }).catch(() => null);
+
+        if (isCtv) {
+          const supportPing = [guildConfig.support_role_id && `<@&${guildConfig.support_role_id}>`, guildConfig.shipper_role_id && `<@&${guildConfig.shipper_role_id}>`].filter(Boolean).join(' ');
+          await channel.send({ content: `${supportPing} ⚡ **ĐƠN HÀNG CTV ƯU TIÊN CAO:** CTV <@${interaction.user.id}> vừa lên đơn hàng \`${order.order_code}\` (Sản phẩm: **${product.name}**). Vui lòng ưu tiên xử lý và bàn giao nhanh nhất!` }).catch(() => null);
+        }
 
         // Nếu có tiền → tạo luôn QR PayOS (Bỏ bảng chọn phương thức)
         if (price > 0) {
@@ -2880,6 +2894,16 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      if (interaction.isModalSubmit() && interaction.customId === 'partner:apply:modal') {
+        await handlePartnerApplyModal(interaction);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId === 'ctv:apply:modal') {
+        await handleCtvApplyModal(interaction);
+        return;
+      }
+
       if (interaction.isModalSubmit() && interaction.customId.startsWith('feedback:modal:')) {
         const [, , orderCode, stars] = interaction.customId.split(':');
         await handleFeedbackModalSubmit(interaction, orderCode, stars);
@@ -3441,6 +3465,40 @@ export function registerInteractionHandler(client, commands) {
       }
 
       if (!interaction.isButton()) return;
+
+      if (interaction.customId === 'partner:apply:start') {
+        await handlePartnerApplyStart(interaction);
+        return;
+      }
+
+      if (interaction.customId.startsWith('partner:approve:')) {
+        const appId = interaction.customId.split(':')[2];
+        await handlePartnerApprove(interaction, appId);
+        return;
+      }
+
+      if (interaction.customId.startsWith('partner:reject:')) {
+        const appId = interaction.customId.split(':')[2];
+        await handlePartnerReject(interaction, appId);
+        return;
+      }
+
+      if (interaction.customId === 'ctv:apply:start') {
+        await handleCtvApplyStart(interaction);
+        return;
+      }
+
+      if (interaction.customId.startsWith('ctv:approve:')) {
+        const applicantId = interaction.customId.split(':')[2];
+        await handleCtvApprove(interaction, applicantId);
+        return;
+      }
+
+      if (interaction.customId.startsWith('ctv:reject:')) {
+        const applicantId = interaction.customId.split(':')[2];
+        await handleCtvReject(interaction, applicantId);
+        return;
+      }
 
       if (interaction.customId === 'announcement:toggle_everyone' || interaction.customId === 'announcement:toggle_here') {
           const cacheData = announcementCache.get(interaction.message.id);

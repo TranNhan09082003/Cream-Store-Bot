@@ -638,7 +638,41 @@ export function initDatabase() {
       PRIMARY KEY (discord_id, guild_id)
     );
     CREATE INDEX IF NOT EXISTS idx_oauth_guild ON oauth_backups (guild_id);
+
+    CREATE TABLE IF NOT EXISTS partners (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      partner_guild_id TEXT NOT NULL,
+      partner_name TEXT NOT NULL,
+      invite_link TEXT NOT NULL,
+      member_count INTEGER NOT NULL DEFAULT 0,
+      owner_id TEXT NOT NULL,
+      applicant_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS partner_settings (
+      guild_id TEXT PRIMARY KEY,
+      recruit_channel_id TEXT,
+      approve_channel_id TEXT,
+      partner_role_id TEXT,
+      directory_channel_id TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS ctv_settings (
+      guild_id TEXT PRIMARY KEY,
+      recruit_channel_id TEXT,
+      approve_channel_id TEXT,
+      ctv_role_id TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+
+  ensureColumn('customer_profiles', 'is_ctv', 'INTEGER DEFAULT 0');
+  ensureColumn('customer_profiles', 'ctv_joined_at', 'TEXT');
+  ensureColumn('product_catalog', 'ctv_price', 'INTEGER DEFAULT NULL');
 }
 
 export function nowIso() {

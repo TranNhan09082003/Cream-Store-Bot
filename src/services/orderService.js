@@ -6,7 +6,7 @@ import { syncCustomerStats, getCustomerProfile } from './customerService.js';
 import { normalizeQueueGroup } from '../utils/formatters.js';
 import { broadcastDashboardEvent } from './dashboardMiniServer.js';
 import { encrypt } from '../utils/crypto.js';
-import { awardOrderPoints } from './loyaltyService.js';
+import { awardOrderPoints, refundOrderPoints } from './loyaltyService.js';
 
 function createOrderStmt() {
   return db.prepare(`
@@ -135,7 +135,23 @@ export function markOrderCompleted(orderCode, completedById, timeoutHours = conf
   broadcastDashboardEvent('order_update');
   return updated;
 }
-export function cancelOrder(orderCode, reason = null){const order=getOrderByCode(orderCode); if(!order) return null; cancelOrderStmt().run(nowIso(), reason ?? null, nowIso(), orderCode); clearClaimStmt().run(nowIso(), orderCode); const updated=getOrderByCode(orderCode); syncCustomerStats(updated.guild_id, updated.customer_id); return updated;}
+export function cancelOrder(orderCode, reason = null){
+  const order=getOrderByCode(orderCode); if(!order) return null; 
+  cancelOrderStmt().run(nowIso(), reason ?? null, nowIso(), orderCode); 
+  clearClaimStmt().run(nowIso(), orderCode); 
+  
+  if (order.guild_id !== 'WEB' && order.customer_id !== 'WEB') {
+    try {
+      refundOrderPoints(order.guild_id, order.customer_id, order.order_code);
+    } catch (e) {
+      console.error('[LOYALTY] Lỗi refundOrderPoints trong cancelOrder:', e);
+    }
+  }
+
+  const updated=getOrderByCode(orderCode); 
+  syncCustomerStats(updated.guild_id, updated.customer_id); 
+  return updated;
+}
 export function saveDelivery(orderCode,deliveredById,credentialEmail,credentialPassword,credentialProfile,credentialPin,deliveryLoginUrl,claimNotes,dmChannelId,dmMessageId){const timestamp=nowIso(); saveDeliveryStmt().run(deliveredById,timestamp,credentialEmail!=null?encrypt(credentialEmail):null,credentialPassword!=null?encrypt(credentialPassword):null,credentialProfile!=null?encrypt(credentialProfile):null,credentialPin!=null?encrypt(credentialPin):null,deliveryLoginUrl ?? null,claimNotes ?? null,dmChannelId ?? null,dmMessageId ?? null,timestamp,orderCode); return getOrderByCode(orderCode);}
 
 export function submitFeedback({ orderCode, customerId, stars, content, feedbackChannelId, feedbackMessageId }) {
