@@ -142,13 +142,19 @@ if (process.env.IS_CHILD_BOT === 'true') {
             import('https').then(https => {
               https.get(websiteUrl, (cleanRes) => {
                 console.log(`[DEPLOY-LAUNCHER] cPanel process optimization returned HTTP ${cleanRes.statusCode}`);
+                child1.kill();
+                child2.kill();
                 process.exit(0);
               }).on('error', (cleanErr) => {
                 console.error('[DEPLOY-LAUNCHER] cPanel process optimization fetch failed:', cleanErr.message);
+                child1.kill();
+                child2.kill();
                 process.exit(0);
               });
             }).catch(e => {
               console.error('[DEPLOY-LAUNCHER] Failed to load https module:', e.message);
+              child1.kill();
+              child2.kill();
               process.exit(0);
             });
           }
