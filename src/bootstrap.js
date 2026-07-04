@@ -37,6 +37,13 @@ export async function buildClient() {
         }
       }
     }).catch(err => console.error('Failed to import emojiService for ready event', err));
+
+    // Tự động chạy setup Partner & CTV cho các guild mà bot tham gia
+    import('./services/autoSetupService.js').then(({ autoSetupPartnerAndCtv }) => {
+      autoSetupPartnerAndCtv(readyClient).catch(err => {
+        console.log(`[AUTO-SETUP] Lỗi chạy setup: ${err.message}`);
+      });
+    }).catch(err => console.error('Failed to import autoSetupService', err));
   });
 
   import('./events/messageCreate.js').then((module) => {
