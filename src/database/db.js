@@ -543,6 +543,10 @@ export function initDatabase() {
   ensureColumn('guild_settings', 'boost_panel_channel_id', 'TEXT');
   ensureColumn('guild_settings', 'boost_panel_message_id', 'TEXT');
   ensureColumn('guild_settings', 'boost_log_channel_id', 'TEXT');
+  ensureColumn('boost_server_orders', 'payos_order_code', 'INTEGER');
+  ensureColumn('boost_server_orders', 'payment_checkout_url', 'TEXT');
+  ensureColumn('boost_server_orders', 'payment_link_id', 'TEXT');
+  ensureColumn('boost_server_orders', 'payment_status', 'TEXT NOT NULL DEFAULT "PENDING"');
   // ─────────────────────────────────────────────────────────────────────────
 
   // Add missing columns to oauth_backups for backward compatibility

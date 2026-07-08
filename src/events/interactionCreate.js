@@ -2651,11 +2651,8 @@ async function handleBoostBuyModal(interaction) {
     return;
   }
 
-  const { BOOST_PACKAGES } = await import('../services/boostServerService.js');
+  const { BOOST_PACKAGES, createBoostOrder, sendBoostPaymentDM, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
   const pkg = pkgRaw === '3' ? BOOST_PACKAGES[1] : BOOST_PACKAGES[0];
-
-  const { createBoostOrder, sendBoostPaymentQr, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
-  const guildConfig = getGuildConfig(interaction.guildId);
 
   const order = createBoostOrder({
     guildId: interaction.guildId,
@@ -2669,16 +2666,10 @@ async function handleBoostBuyModal(interaction) {
     amount: pkg.price,
   });
 
-  // DM khách QR thanh toán
+  // DM khách link PayOS
   try {
     const dmChannel = await interaction.user.createDM();
-    await dmChannel.send({
-      content: `⭐ **Đơn hàng của bạn đã được tiếp nhận thành công!**\n\n📋 **Mã đơn hàng của bạn:** \`${order.order_code}\`\n📦 **Gói đăng ký:** ${pkg.label} — Giá: **${Number(pkg.price).toLocaleString('vi-VN')} VND**`,
-    });
-    await sendBoostPaymentQr(dmChannel, order, guildConfig);
-    await dmChannel.send({
-      content: `🔴 Admin sẽ duyệt đơn và boost thủ công cho server của bạn ngay khi nhận được thanh toán.\n-# Chỉ bạn mới có thể thấy tin nhắn này — Bỏ qua tin nhắn`,
-    });
+    await sendBoostPaymentDM(dmChannel, order, interaction.guildId);
   } catch (dmErr) {
     console.warn('[BOOST BUY] Không thể DM khách:', dmErr.message);
   }
@@ -2691,7 +2682,7 @@ async function handleBoostBuyModal(interaction) {
 
   await interaction.editReply(
     `${E('status_check')} Đơn boost **${order.order_code}** đã được tạo!\n` +
-    `Bot vừa gửi thông tin thanh toán qua **DM** cho bạn.\n` +
+    `Bot vừa gửi link thanh toán **PayOS** qua DM cho bạn.\n` +
     `> Nếu không nhận được DM, hãy kiểm tra bạn đã bật tin nhắn từ thành viên server.`
   );
 }
