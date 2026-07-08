@@ -48,7 +48,7 @@ jobs:
       - name: 🔍 Health Check
         run: |
           echo "Checking bot health..."
-          HEALTH=$(curl -s --max-time 10 "http://hcm3.vibehost.vn:20022/api/bot-health" || echo "{}")
+          HEALTH=$(curl -s --max-time 10 "http://hcm3.vibehost.vn:20022/api/bot/health" || echo "{}")
           echo "Health response: $HEALTH"
           if echo "$HEALTH" | grep -q '"ok":true'; then
             echo "✅ Bot is healthy and running!"
