@@ -289,7 +289,6 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
     flags: MessageFlags.IsComponentsV2,
   }).catch(() => null);
 }
-}
 
 // ─── Panel builder — Components V2 ───────────────────────────────────────────
 
