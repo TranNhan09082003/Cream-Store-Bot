@@ -112,12 +112,12 @@ export function updateBoostOrderStatus(code, status, extra = {}) {
   return getBoostOrderByCode(order.order_code);
 }
 
-export function saveBoostPaymentLink(code, { checkoutUrl, paymentLinkId }) {
+export function saveBoostPaymentLink(code, { checkoutUrl, paymentLinkId, qrCode }) {
   db.prepare(`
     UPDATE boost_server_orders
-    SET payment_checkout_url = ?, payment_link_id = ?, updated_at = ?
+    SET payment_checkout_url = ?, payment_link_id = ?, payment_qr_code = ?, updated_at = ?
     WHERE order_code = ?
-  `).run(checkoutUrl ?? null, paymentLinkId ?? null, nowIso(), code);
+  `).run(checkoutUrl ?? null, paymentLinkId ?? null, qrCode ?? null, nowIso(), code);
 }
 
 // ─── PayOS Integration ────────────────────────────────────────────────────────
@@ -167,9 +167,10 @@ export async function createBoostPayOSLink(order) {
 
   const checkoutUrl   = data.data?.checkoutUrl;
   const paymentLinkId = data.data?.paymentLinkId ?? data.data?.id;
-  saveBoostPaymentLink(order.order_code, { checkoutUrl, paymentLinkId });
+  const qrCode        = data.data?.qrCode ?? null; // chuỗi EMVCo thật để render QR hợp lệ
+  saveBoostPaymentLink(order.order_code, { checkoutUrl, paymentLinkId, qrCode });
 
-  return checkoutUrl;
+  return { checkoutUrl, qrCode };
 }
 
 // ─── Webhook: tự động xác nhận khi PayOS báo thanh toán thành công ────────────
@@ -219,36 +220,43 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
   const amountFmt = Number(order.amount).toLocaleString('vi-VN');
 
   let checkoutUrl = order.payment_checkout_url;
+  let qrCodeStr   = order.payment_qr_code ?? null; // chuỗi EMVCo từ PayOS
 
   // Tạo link PayOS nếu chưa có
   if (!checkoutUrl) {
     try {
-      checkoutUrl = await createBoostPayOSLink(order);
+      const result = await createBoostPayOSLink(order);
+      checkoutUrl = result.checkoutUrl;
+      qrCodeStr   = result.qrCode ?? null;
+      // Lấy lại từ DB để chắc chắn có đủ data
       const fresh = getBoostOrderByCode(order.order_code);
       checkoutUrl = fresh?.payment_checkout_url ?? checkoutUrl;
+      qrCodeStr   = fresh?.payment_qr_code ?? qrCodeStr;
     } catch (err) {
       console.error('[BOOST-PAYOS] Không thể tạo link PayOS:', err.message);
     }
   }
 
-  // Render QR trực tiếp từ checkoutUrl — không cần gọi thêm API
-  // api.qrserver.com nhận bất kỳ URL nào và render thành ảnh QR
-  const qrCodeUrl = checkoutUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=350x350&margin=10&data=${encodeURIComponent(checkoutUrl)}`
+  // QR từ chuỗi EMVCo thật (quét được) — fallback sang checkoutUrl nếu không có
+  const qrData   = qrCodeStr || checkoutUrl;
+  const qrImgUrl = qrData
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=15&ecc=M&data=${encodeURIComponent(qrData)}`
     : null;
 
-  const serverDisplay = order.server_name ? `**${order.server_name}**` : `\`${order.server_id}\``;
+  const serverDisplay = order.server_name
+    ? `**${order.server_name}**`
+    : `\`${order.server_id}\``;
 
   const lines = [
     `## <a:tsm_fire:1327553120842158111> Đơn Boost Server Đã Được Tiếp Nhận!`,
     ``,
-    `<:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
-    `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
-    `<:cr_pay:1392750857329705000> **Số tiền:** **${amountFmt} VND**`,
-    `<:cr_muahang:1348622828152426528> **Server:** ${serverDisplay}`,
+    `> <:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
+    `> <:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+    `> <:cr_pay:1392750857329705000> **Số tiền:** **${amountFmt} VND**`,
+    `> <:cr_muahang:1348622828152426528> **Server:** ${serverDisplay}`,
     ``,
     checkoutUrl
-      ? `<a:tickgreen:1384069022831874169> Quét mã QR bên dưới hoặc bấm nút **Thanh Toán PayOS** để hoàn tất!`
+      ? `<a:tickgreen:1384069022831874169> **Quét mã QR** bên dưới hoặc bấm nút để hoàn tất thanh toán!`
       : `<a:tick_red51:1384069065626222632> Không thể tạo link PayOS. Vui lòng liên hệ Admin.`,
     ``,
     `-# <:cr_tim:1366636325352116225> Cenar Store — Bot tự xác nhận khi nhận được thanh toán`,
@@ -256,11 +264,9 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
 
   const container = new ContainerBuilder().setAccentColor(0xEB459E);
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
-
-  // Luôn hiển thị QR nếu có checkoutUrl — fallback banner nếu không tạo được link
   container.addMediaGalleryComponents(
     new MediaGalleryBuilder().addItems(
-      new MediaGalleryItemBuilder().setURL(qrCodeUrl ?? BOOST_BANNER)
+      new MediaGalleryItemBuilder().setURL(qrImgUrl ?? BOOST_BANNER)
     )
   );
 
@@ -282,6 +288,7 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
     components,
     flags: MessageFlags.IsComponentsV2,
   }).catch(() => null);
+}
 }
 
 // ─── Panel builder — Components V2 ───────────────────────────────────────────

@@ -2921,15 +2921,15 @@ async function handleBoostCompleteButton(interaction, code) {
     const dmLines = [
       `## <:cr_green:1366636327415713832> Đơn Boost Đã Hoàn Thành! <a:starxoay:1481141954346483845>`,
       ``,
-      `<a:tickgreen:1384069022831874169> Đơn boost \`${code}\` của bạn đã được **hoàn thành**!`,
+      `> <a:tickgreen:1384069022831874169> Đơn boost \`${code}\` đã được **hoàn thành** thành công!`,
       ``,
-      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
-      `<:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
-      `<:cr_shop:1392749981332541501> **Mã đơn:** \`${code}\``,
+      `> <:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+      `> <:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
+      `> <:cr_shop:1392749981332541501> **Mã đơn:** \`${code}\``,
       ``,
-      `<:muiten:1481124261501337601> Nếu cần bảo hành, dùng nút **Báo Cáo Bảo Hành** trong DM đơn hàng nhé!`,
+      `<:muiten:1481124261501337601> Nếu cần bảo hành, liên hệ shop ngay nhé!`,
       ``,
-      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng sử dụng dịch vụ <:purple_heart_glow:1327541911749263360>`,
+      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng <:purple_heart_glow:1327541911749263360>`,
     ].join('\n');
 
     const dmContainer = new ContainerBuilder().setAccentColor(0x57F287);
@@ -3047,16 +3047,16 @@ async function handleBoostActivateModal(interaction, code) {
     const dmLines = [
       `## <a:tsm_fire:1327553120842158111> Server Của Bạn Đã Được BOOST! <a:tsm_fire:1327553120842158111>`,
       ``,
-      `<a:tickgreen:1384069022831874169> **Cenar Store** đã boost thành công server của bạn!`,
+      `> <a:tickgreen:1384069022831874169> **Cenar Store** đã boost thành công server của bạn!`,
       ``,
-      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
-      `<:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
-      `<a:Dotyellow:1481134440725090315> **Hết hạn:** ${expiryStr}`,
-      `<:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
+      `> <:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+      `> <:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
+      `> <a:Dotyellow:1481134440725090315> **Hết hạn:** ${expiryStr}`,
+      `> <:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
       ``,
-      `<:muiten:1481124261501337601> Liên hệ shop nếu cần hỗ trợ bảo hành nhé!`,
+      `<:muiten:1481124261501337601> Nếu cần bảo hành, liên hệ shop ngay nhé!`,
       ``,
-      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng sử dụng dịch vụ <:purple_heart_glow:1327541911749263360>`,
+      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng <:purple_heart_glow:1327541911749263360>`,
     ].join('\n');
 
     const dmContainer = new ContainerBuilder().setAccentColor(0x57F287);

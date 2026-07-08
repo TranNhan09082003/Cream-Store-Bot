@@ -547,6 +547,7 @@ export function initDatabase() {
   ensureColumn('boost_server_orders', 'payment_checkout_url', 'TEXT');
   ensureColumn('boost_server_orders', 'payment_link_id', 'TEXT');
   ensureColumn('boost_server_orders', 'payment_status', 'TEXT NOT NULL DEFAULT "PENDING"');
+  ensureColumn('boost_server_orders', 'payment_qr_code', 'TEXT');
   // ─────────────────────────────────────────────────────────────────────────
 
   // Add missing columns to oauth_backups for backward compatibility
