@@ -2900,21 +2900,45 @@ async function handleBoostCompleteButton(interaction, code) {
     note: `Hoàn thành bởi ${interaction.user.tag}`,
   });
 
-  // DM khách thông báo hoàn thành
+  // DM khách thông báo hoàn thành — Components V2 + emoji custom
   try {
     const customer = await interaction.client.users.fetch(order.customer_id);
-    await customer.send(
-      `🏁 **Cream Store** — Đơn boost \`${code}\` đã hoàn thành!\n` +
-      `> **Gói:** ${order.package}\n` +
-      `> **Server:** ${order.server_name ?? order.server_id}\n\n` +
-      `Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của Cream Store! 💙`
-    ).catch(() => null);
+    const { ContainerBuilder, TextDisplayBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, MessageFlags: MF } = await import('discord.js');
+
+    const dmLines = [
+      `## <:cr_green:1366636327415713832> Đơn Boost Đã Hoàn Thành! <a:starxoay:1481141954346483845>`,
+      ``,
+      `<a:tickgreen:1384069022831874169> Đơn boost \`${code}\` của bạn đã được **hoàn thành**!`,
+      ``,
+      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+      `<:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
+      `<:cr_shop:1392749981332541501> **Mã đơn:** \`${code}\``,
+      ``,
+      `<:muiten:1481124261501337601> Nếu cần bảo hành, dùng nút **Báo Cáo Bảo Hành** trong DM đơn hàng nhé!`,
+      ``,
+      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng sử dụng dịch vụ <:purple_heart_glow:1327541911749263360>`,
+    ].join('\n');
+
+    const dmContainer = new ContainerBuilder().setAccentColor(0x57F287);
+    dmContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(dmLines));
+    dmContainer.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('https://i.pinimg.com/originals/68/ae/bf/68aebf3739f455687a90e871bdc04a98.gif')
+      )
+    );
+
+    await customer.send({
+      components: [dmContainer],
+      flags: MF.IsComponentsV2,
+    }).catch(() => null);
   } catch {}
 
   await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn hoàn thành', interaction.user.id).catch(() => null);
   refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
 
-  await interaction.editReply(`${E('status_check')} Đã đánh dấu đơn \`${code}\` là **hoàn thành** và gửi DM cho khách.`);
+  await interaction.editReply(
+    `<:cr_green:1366636327415713832> Đã đánh dấu đơn \`${code}\` là **hoàn thành** và gửi DM cho khách.`
+  );
 }
 
 async function handleBoostActivateButton(interaction, code) {
