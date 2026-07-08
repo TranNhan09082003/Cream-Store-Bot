@@ -2574,6 +2574,515 @@ async function handleProductSaleModal(interaction) {
   await safeReply(interaction, { content: replyText, ephemeral: true });
 }
 
+// ═══════════════════════════════════════════════
+// ═════════ BOOST SERVER HANDLERS ═══════════════
+// ═══════════════════════════════════════════════
+
+async function handleBoostBuy(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  const flag = getCustomerFlag(interaction.guildId, interaction.user.id);
+  if (Number(flag.is_blacklisted) === 1) {
+    await safeReply(interaction, { content: `${E('status_cross')} Bạn đang bị chặn.`, ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId('boost:buy:modal')
+    .setTitle('🚀 Đặt Mua Boost Server');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('server_link')
+        .setLabel('Link mời server của bạn')
+        .setPlaceholder('VD: https://discord.gg/abc123')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(200)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('server_id')
+        .setLabel('ID Server (nhấp chuột phải vào server → Copy ID)')
+        .setPlaceholder('VD: 1234567890123456789')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(25)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('server_name')
+        .setLabel('Tên Server (tuỳ chọn)')
+        .setPlaceholder('VD: Cenar Store')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(100)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('package')
+        .setLabel('Gói muốn mua (1 hoặc 3)')
+        .setPlaceholder('1 = Gói 1 Tháng (170k) | 3 = Gói 3 Tháng (320k)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(1)
+    ),
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handleBoostBuyModal(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  await interaction.deferReply({ ephemeral: true });
+
+  const serverLink = interaction.fields.getTextInputValue('server_link')?.trim();
+  const serverId   = interaction.fields.getTextInputValue('server_id')?.trim();
+  const serverName = interaction.fields.getTextInputValue('server_name')?.trim() || null;
+  const pkgRaw     = interaction.fields.getTextInputValue('package')?.trim();
+
+  if (!serverLink || !/discord\.gg\//i.test(serverLink)) {
+    await interaction.editReply(`${E('status_cross')} Link mời không hợp lệ. Vui lòng nhập link dạng \`https://discord.gg/...\``);
+    return;
+  }
+
+  if (!serverId || !/^\d{17,20}$/.test(serverId)) {
+    await interaction.editReply(`${E('status_cross')} ID Server không hợp lệ. ID phải là dãy số 17–20 chữ số.`);
+    return;
+  }
+
+  const { BOOST_PACKAGES } = await import('../services/boostServerService.js');
+  const pkg = pkgRaw === '3' ? BOOST_PACKAGES[1] : BOOST_PACKAGES[0];
+
+  const { createBoostOrder, sendBoostPaymentQr, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
+  const guildConfig = getGuildConfig(interaction.guildId);
+
+  const order = createBoostOrder({
+    guildId: interaction.guildId,
+    customerId: interaction.user.id,
+    customerTag: interaction.user.tag,
+    serverLink,
+    serverId,
+    serverName,
+    pkg: pkg.label,
+    durationMonths: pkg.months,
+    amount: pkg.price,
+  });
+
+  // DM khách QR thanh toán
+  try {
+    const dmChannel = await interaction.user.createDM();
+    await dmChannel.send({
+      content: `⭐ **Đơn hàng của bạn đã được tiếp nhận thành công!**\n\n📋 **Mã đơn hàng của bạn:** \`${order.order_code}\`\n📦 **Gói đăng ký:** ${pkg.label} — Giá: **${Number(pkg.price).toLocaleString('vi-VN')} VND**`,
+    });
+    await sendBoostPaymentQr(dmChannel, order, guildConfig);
+    await dmChannel.send({
+      content: `🔴 Admin sẽ duyệt đơn và boost thủ công cho server của bạn ngay khi nhận được thanh toán.\n-# Chỉ bạn mới có thể thấy tin nhắn này — Bỏ qua tin nhắn`,
+    });
+  } catch (dmErr) {
+    console.warn('[BOOST BUY] Không thể DM khách:', dmErr.message);
+  }
+
+  // Log về kênh admin
+  await sendBoostLog(interaction.client, interaction.guildId, order, 'Đơn mới tạo', interaction.user.id).catch(() => null);
+
+  // Cập nhật panel
+  refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
+
+  await interaction.editReply(
+    `${E('status_check')} Đơn boost **${order.order_code}** đã được tạo!\n` +
+    `Bot vừa gửi thông tin thanh toán qua **DM** cho bạn.\n` +
+    `> Nếu không nhận được DM, hãy kiểm tra bạn đã bật tin nhắn từ thành viên server.`
+  );
+}
+
+async function handleBoostCheck(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrdersByCustomer, buildBoostOrderDetailEmbed, buildBoostOrderActionRows } = await import('../services/boostServerService.js');
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isStaff = isStaffMember(member, guildConfig);
+
+  let orders;
+  if (isStaff) {
+    // Staff xem modal nhập mã đơn
+    const modal = new ModalBuilder()
+      .setCustomId('boost:check:modal_staff')
+      .setTitle('🔍 Kiểm Tra Đơn Boost');
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('order_code')
+          .setLabel('Mã đơn (BST_XXXXXX) hoặc để trống để xem đơn của bạn')
+          .setPlaceholder('VD: BST_123456')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(20)
+      )
+    );
+    await interaction.showModal(modal);
+    return;
+  }
+
+  // Khách xem đơn của mình
+  orders = getBoostOrdersByCustomer(interaction.guildId, interaction.user.id);
+
+  if (!orders.length) {
+    await safeReply(interaction, {
+      content: `${E('status_info')} Bạn chưa có đơn boost nào. Bấm **Mua Boost Server** để đặt đơn!`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const order = orders[0];
+  const embed = buildBoostOrderDetailEmbed(order);
+  const rows = buildBoostOrderActionRows(order, false);
+
+  await safeReply(interaction, {
+    content: orders.length > 1 ? `${E('status_info')} Bạn có **${orders.length}** đơn. Hiển thị đơn mới nhất:` : null,
+    embeds: [embed],
+    components: rows,
+    ephemeral: true,
+  });
+}
+
+async function handleBoostWarrantyPanel(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrdersByCustomer } = await import('../services/boostServerService.js');
+
+  const orders = getBoostOrdersByCustomer(interaction.guildId, interaction.user.id)
+    .filter(o => o.status === 'ACTIVE');
+
+  if (!orders.length) {
+    await safeReply(interaction, {
+      content: `${E('status_warn')} Bạn chưa có đơn boost đang hoạt động nào để báo bảo hành.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const order = orders[0];
+
+  const modal = new ModalBuilder()
+    .setCustomId(`boost:warranty:modal:${order.order_code}`)
+    .setTitle(`Bảo Hành Boost — ${order.order_code}`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel('Mô tả vấn đề gặp phải')
+        .setPlaceholder('VD: Server bị mất boost sau 5 ngày...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(500)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handleBoostCancelButton(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode } = await import('../services/boostServerService.js');
+
+  const order = getBoostOrderByCode(code);
+  if (!order) {
+    await safeReply(interaction, { content: `${E('status_cross')} Không tìm thấy đơn \`${code}\`.`, ephemeral: true });
+    return;
+  }
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isStaff = isStaffMember(member, guildConfig);
+
+  if (order.customer_id !== interaction.user.id && !isStaff) {
+    await safeReply(interaction, { content: `${E('status_cross')} Bạn không có quyền huỷ đơn này.`, ephemeral: true });
+    return;
+  }
+
+  if (!['PENDING', 'ACTIVE'].includes(order.status)) {
+    await safeReply(interaction, { content: `${E('status_warn')} Đơn \`${code}\` không thể huỷ (trạng thái: ${order.status}).`, ephemeral: true });
+    return;
+  }
+
+  // Hiện modal nhập lý do
+  const modal = new ModalBuilder()
+    .setCustomId(`boost:cancel:modal:${code}`)
+    .setTitle(`Huỷ Đơn ${code}`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel('Lý do huỷ đơn')
+        .setPlaceholder('VD: Đổi ý, không cần nữa...')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(200)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handleBoostCancelModal(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode, updateBoostOrderStatus, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const reason = interaction.fields.getTextInputValue('reason')?.trim();
+  const order = getBoostOrderByCode(code);
+
+  if (!order || !['PENDING', 'ACTIVE'].includes(order.status)) {
+    await interaction.editReply(`${E('status_cross')} Không thể huỷ đơn này.`);
+    return;
+  }
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const isStaff = isStaffMember(member, guildConfig);
+
+  if (order.customer_id !== interaction.user.id && !isStaff) {
+    await interaction.editReply(`${E('status_cross')} Bạn không có quyền huỷ đơn này.`);
+    return;
+  }
+
+  const updated = updateBoostOrderStatus(code, 'CANCELLED', {
+    handledBy: interaction.user.id,
+    note: `Huỷ bởi ${interaction.user.tag}: ${reason}`,
+  });
+
+  // DM khách nếu staff huỷ
+  if (isStaff && order.customer_id !== interaction.user.id) {
+    try {
+      const customer = await interaction.client.users.fetch(order.customer_id);
+      await customer.send(`❌ **Cream Store** — Đơn boost \`${code}\` đã bị huỷ.\n> **Lý do:** ${reason}\nLiên hệ shop nếu bạn cần hỗ trợ thêm.`).catch(() => null);
+    } catch {}
+  }
+
+  await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn bị huỷ', interaction.user.id).catch(() => null);
+  refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
+
+  await interaction.editReply(`${E('status_check')} Đã huỷ đơn \`${code}\`.\n> **Lý do:** ${reason}`);
+}
+
+async function handleBoostCancelConfirm(interaction, code) {
+  // Legacy handler — redirect to modal-based cancel
+  await handleBoostCancelButton(interaction, code);
+}
+
+async function handleBoostCompleteButton(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode, updateBoostOrderStatus, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!isStaffMember(member, guildConfig)) {
+    await safeReply(interaction, { content: `${E('status_cross')} Chỉ staff mới có thể đánh dấu đơn hoàn thành.`, ephemeral: true });
+    return;
+  }
+
+  const order = getBoostOrderByCode(code);
+  if (!order || !['PENDING', 'ACTIVE'].includes(order.status)) {
+    await safeReply(interaction, { content: `${E('status_warn')} Không thể hoàn thành đơn \`${code}\` (trạng thái: ${order?.status ?? 'không tìm thấy'}).`, ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const updated = updateBoostOrderStatus(code, 'COMPLETED', {
+    handledBy: interaction.user.id,
+    note: `Hoàn thành bởi ${interaction.user.tag}`,
+  });
+
+  // DM khách thông báo hoàn thành
+  try {
+    const customer = await interaction.client.users.fetch(order.customer_id);
+    await customer.send(
+      `🏁 **Cream Store** — Đơn boost \`${code}\` đã hoàn thành!\n` +
+      `> **Gói:** ${order.package}\n` +
+      `> **Server:** ${order.server_name ?? order.server_id}\n\n` +
+      `Cảm ơn bạn đã tin tưởng sử dụng dịch vụ của Cream Store! 💙`
+    ).catch(() => null);
+  } catch {}
+
+  await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn hoàn thành', interaction.user.id).catch(() => null);
+  refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
+
+  await interaction.editReply(`${E('status_check')} Đã đánh dấu đơn \`${code}\` là **hoàn thành** và gửi DM cho khách.`);
+}
+
+async function handleBoostActivateButton(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode } = await import('../services/boostServerService.js');
+
+  const guildConfig = getGuildConfig(interaction.guildId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!isStaffMember(member, guildConfig)) {
+    await safeReply(interaction, { content: `${E('status_cross')} Chỉ staff mới có thể kích hoạt đơn boost.`, ephemeral: true });
+    return;
+  }
+
+  const order = getBoostOrderByCode(code);
+  if (!order || order.status !== 'PENDING') {
+    await safeReply(interaction, { content: `${E('status_warn')} Đơn \`${code}\` không ở trạng thái chờ để kích hoạt.`, ephemeral: true });
+    return;
+  }
+
+  // Hiện modal nhập thời gian boost
+  const modal = new ModalBuilder()
+    .setCustomId(`boost:activate:modal:${code}`)
+    .setTitle(`Kích Hoạt Boost — ${code}`);
+
+  const now = new Date();
+  const expiryDate = new Date(now);
+  expiryDate.setMonth(expiryDate.getMonth() + (order.duration_months || 1));
+  const defaultExpiry = expiryDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('expires_at')
+        .setLabel('Ngày hết hạn boost (DD/MM/YYYY)')
+        .setPlaceholder(`VD: ${defaultExpiry}`)
+        .setValue(defaultExpiry)
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(15)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('note')
+        .setLabel('Ghi chú (tuỳ chọn)')
+        .setPlaceholder('VD: Đã boost 14 Boosts lúc 10:30 ngày 08/07/2026')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(200)
+    ),
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handleBoostActivateModal(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode, updateBoostOrderStatus, sendBoostLog, refreshBoostPanel } = await import('../services/boostServerService.js');
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const expiresRaw = interaction.fields.getTextInputValue('expires_at')?.trim();
+  const note = interaction.fields.getTextInputValue('note')?.trim() || null;
+
+  // Parse DD/MM/YYYY
+  const match = expiresRaw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  let expiresAt = null;
+  if (match) {
+    expiresAt = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).toISOString();
+  }
+
+  const order = getBoostOrderByCode(code);
+  if (!order) {
+    await interaction.editReply(`${E('status_cross')} Không tìm thấy đơn \`${code}\`.`);
+    return;
+  }
+
+  const updated = updateBoostOrderStatus(code, 'ACTIVE', {
+    boostStartedAt: new Date().toISOString(),
+    boostExpiresAt: expiresAt,
+    handledBy: interaction.user.id,
+    note: note ?? `Kích hoạt bởi ${interaction.user.tag}`,
+  });
+
+  // DM khách
+  try {
+    const customer = await interaction.client.users.fetch(order.customer_id);
+    const expiryStr = expiresAt
+      ? `<t:${Math.floor(new Date(expiresAt).getTime() / 1000)}:F>`
+      : 'Theo gói đã đặt';
+    await customer.send(
+      `🚀 **Cream Store** — Server của bạn đã được **BOOST** thành công!\n\n` +
+      `> 📦 **Gói:** ${order.package}\n` +
+      `> 🖥️ **Server:** ${order.server_name ?? order.server_id}\n` +
+      `> ⏰ **Hết hạn:** ${expiryStr}\n` +
+      `> 📋 **Mã đơn:** \`${order.order_code}\`\n\n` +
+      `Cảm ơn bạn đã sử dụng dịch vụ! Liên hệ shop nếu cần hỗ trợ bảo hành 💙`
+    ).catch(() => null);
+  } catch {}
+
+  await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đã boost — Kích hoạt ACTIVE', interaction.user.id).catch(() => null);
+  refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
+
+  await interaction.editReply(
+    `${E('status_check')} Đã kích hoạt đơn \`${code}\` → **ACTIVE** và DM thông báo cho khách!\n` +
+    (expiresAt ? `> Hết hạn: **${expiresRaw}**` : '')
+  );
+}
+
+async function handleBoostWarrantyReq(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode } = await import('../services/boostServerService.js');
+
+  const order = getBoostOrderByCode(code);
+  if (!order || order.customer_id !== interaction.user.id) {
+    await safeReply(interaction, { content: `${E('status_cross')} Không tìm thấy đơn hoặc bạn không phải chủ đơn.`, ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`boost:warranty:modal:${code}`)
+    .setTitle(`Bảo Hành Boost — ${code}`);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('reason')
+        .setLabel('Mô tả vấn đề gặp phải')
+        .setPlaceholder('VD: Server bị mất boost sau 5 ngày, level 3 về level 0...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(500)
+    )
+  );
+
+  await interaction.showModal(modal).catch(console.error);
+}
+
+async function handleBoostWarrantyModal(interaction, code) {
+  const E = createEmojiResolver(interaction.guildId);
+  const { getBoostOrderByCode, updateBoostOrderStatus, sendBoostLog } = await import('../services/boostServerService.js');
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const reason = interaction.fields.getTextInputValue('reason')?.trim();
+  const order = getBoostOrderByCode(code);
+
+  if (!order || order.customer_id !== interaction.user.id) {
+    await interaction.editReply(`${E('status_cross')} Không tìm thấy đơn hoặc bạn không phải chủ đơn.`);
+    return;
+  }
+
+  const updated = updateBoostOrderStatus(code, 'WARRANTY', {
+    note: `Bảo hành: ${reason}`,
+  });
+
+  await sendBoostLog(interaction.client, interaction.guildId, updated, `Yêu cầu bảo hành: ${reason}`, interaction.user.id).catch(() => null);
+
+  await interaction.editReply(
+    `${E('status_check')} Đã gửi yêu cầu bảo hành cho đơn \`${code}\`!\n` +
+    `> Admin sẽ xem xét và xử lý trong thời gian sớm nhất.`
+  );
+}
+
+// Staff check modal (khi staff dùng boost:check)
+// Handled via isModalSubmit boost:check:modal_staff in the main handler
+
+// ═══════════════════════════════════════════════
+
 async function handleSaleRunModal(interaction) {
   const E = createEmojiResolver(interaction.guildId);
   const parts = interaction.customId.split(':');
@@ -2953,6 +3462,67 @@ export function registerInteractionHandler(client, commands) {
 
       if (interaction.isButton() && interaction.customId.startsWith('sub:renew:')) {
         await handleSubscriptionRenewButton(interaction);
+        return;
+      }
+
+      // ═══════ BOOST SERVER MODAL HANDLERS ═══════
+      if (interaction.isModalSubmit() && interaction.customId === 'boost:buy:modal') {
+        await handleBoostBuyModal(interaction);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:cancel:modal:')) {
+        const code = interaction.customId.split(':').slice(3).join(':');
+        await handleBoostCancelModal(interaction, code);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:activate:modal:')) {
+        const code = interaction.customId.split(':').slice(3).join(':');
+        await handleBoostActivateModal(interaction, code);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:warranty:modal:')) {
+        const code = interaction.customId.split(':').slice(3).join(':');
+        await handleBoostWarrantyModal(interaction, code);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:warranty:modal:')) {
+        const code = interaction.customId.split(':').slice(3).join(':');
+        await handleBoostWarrantyModal(interaction, code);
+        return;
+      }
+
+      // Staff check modal
+      if (interaction.isModalSubmit() && interaction.customId === 'boost:check:modal_staff') {
+        const E_bs = createEmojiResolver(interaction.guildId);
+        const codeInput = interaction.fields.getTextInputValue('order_code')?.trim().toUpperCase();
+        const { getBoostOrderByCode, getBoostOrdersByCustomer, buildBoostOrderDetailEmbed, buildBoostOrderActionRows } = await import('../services/boostServerService.js');
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        const isStaff = isStaffMember(member, guildConfig);
+
+        let order;
+        if (codeInput) {
+          order = getBoostOrderByCode(codeInput);
+          if (!order || order.guild_id !== interaction.guildId) {
+            await interaction.reply({ content: `${E_bs('status_cross')} Không tìm thấy đơn \`${codeInput}\` trong server này.`, ephemeral: true });
+            return;
+          }
+        } else {
+          const orders = getBoostOrdersByCustomer(interaction.guildId, interaction.user.id);
+          if (!orders.length) {
+            await interaction.reply({ content: `${E_bs('status_info')} Bạn chưa có đơn boost nào.`, ephemeral: true });
+            return;
+          }
+          order = orders[0];
+        }
+
+        const embed = buildBoostOrderDetailEmbed(order);
+        const rows = buildBoostOrderActionRows(order, isStaff);
+        await interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
         return;
       }
 
@@ -3831,7 +4401,58 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId.startsWith('feedback:quick:')) {
         const [, , orderCode, stars] = interaction.customId.split(':');
         await handleFeedbackButton(interaction, orderCode, stars);
+        return;
       }
+
+      // ═══════════════════════════════════════════════
+      // ═══════ BOOST SERVER BUTTON HANDLERS ══════════
+      // ═══════════════════════════════════════════════
+
+      if (interaction.customId === 'boost:buy') {
+        await handleBoostBuy(interaction);
+        return;
+      }
+
+      if (interaction.customId === 'boost:check') {
+        await handleBoostCheck(interaction);
+        return;
+      }
+
+      if (interaction.customId === 'boost:warranty') {
+        await handleBoostWarrantyPanel(interaction);
+        return;
+      }
+
+      if (interaction.customId.startsWith('boost:cancel:')) {
+        const code = interaction.customId.split(':').slice(2).join(':');
+        await handleBoostCancelButton(interaction, code);
+        return;
+      }
+
+      if (interaction.customId.startsWith('boost:cancel_confirm:')) {
+        const code = interaction.customId.split(':').slice(2).join(':');
+        await handleBoostCancelConfirm(interaction, code);
+        return;
+      }
+
+      if (interaction.customId.startsWith('boost:complete:')) {
+        const code = interaction.customId.split(':').slice(2).join(':');
+        await handleBoostCompleteButton(interaction, code);
+        return;
+      }
+
+      if (interaction.customId.startsWith('boost:activate:')) {
+        const code = interaction.customId.split(':').slice(2).join(':');
+        await handleBoostActivateButton(interaction, code);
+        return;
+      }
+
+      if (interaction.customId.startsWith('boost:warranty_req:')) {
+        const code = interaction.customId.split(':').slice(2).join(':');
+        await handleBoostWarrantyReq(interaction, code);
+        return;
+      }
+
     } catch (error) {
       if (error.code === 'RATE_LIMITED') {
         const E_rl = createEmojiResolver(interaction.guildId);

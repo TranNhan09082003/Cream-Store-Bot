@@ -505,6 +505,37 @@ export function initDatabase() {
 
   ensureColumn('product_catalog', 'original_price', 'INTEGER DEFAULT 0');
 
+  // ─── Boost Server Live ───────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS boost_server_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_code TEXT UNIQUE NOT NULL,
+      guild_id TEXT NOT NULL,
+      customer_id TEXT NOT NULL,
+      customer_tag TEXT,
+      server_link TEXT NOT NULL,
+      server_id TEXT NOT NULL,
+      server_name TEXT,
+      package TEXT NOT NULL,
+      duration_months INTEGER NOT NULL DEFAULT 1,
+      amount INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      boost_started_at TEXT,
+      boost_expires_at TEXT,
+      note TEXT,
+      handled_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_boost_orders_guild ON boost_server_orders (guild_id, status);
+    CREATE INDEX IF NOT EXISTS idx_boost_orders_customer ON boost_server_orders (customer_id, guild_id);
+    CREATE INDEX IF NOT EXISTS idx_boost_orders_server ON boost_server_orders (server_id, guild_id, status);
+  `);
+  ensureColumn('guild_settings', 'boost_panel_channel_id', 'TEXT');
+  ensureColumn('guild_settings', 'boost_panel_message_id', 'TEXT');
+  ensureColumn('guild_settings', 'boost_log_channel_id', 'TEXT');
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Add missing columns to oauth_backups for backward compatibility
   ensureColumn('oauth_backups', 'guild_id', 'TEXT NOT NULL DEFAULT ""');
   ensureColumn('oauth_backups', 'avatar', 'TEXT');
