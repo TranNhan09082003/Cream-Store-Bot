@@ -2603,7 +2603,7 @@ async function handleBoostBuy(interaction) {
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId('server_id')
-        .setLabel('ID Server (nhấp chuột phải vào server → Copy ID)')
+        .setLabel('ID Server (chuột phải vào server → Copy ID)')
         .setPlaceholder('VD: 1234567890123456789')
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
@@ -2715,7 +2715,7 @@ async function handleBoostCheck(interaction) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('order_code')
-          .setLabel('Mã đơn (BST_XXXXXX) hoặc để trống để xem đơn của bạn')
+          .setLabel('Mã đơn (BST_XXXXXX) — để trống: xem tất cả')
           .setPlaceholder('VD: BST_123456')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
@@ -3480,12 +3480,6 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:activate:modal:')) {
         const code = interaction.customId.split(':').slice(3).join(':');
         await handleBoostActivateModal(interaction, code);
-        return;
-      }
-
-      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:warranty:modal:')) {
-        const code = interaction.customId.split(':').slice(3).join(':');
-        await handleBoostWarrantyModal(interaction, code);
         return;
       }
 

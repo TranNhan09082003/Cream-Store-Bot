@@ -61,81 +61,74 @@ export async function execute(member) {
       }
     }
 
-    // 2. Welcome Components V2 vào kênh #chào-mừng
+    // 2. Welcome vào kênh #chào-mừng
     const welcomeChannel = guild.channels.cache.find(
       c => c.type === ChannelType.GuildText && c.name.includes('chào-mừng')
     );
 
     if (welcomeChannel) {
       const verifyChannel = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText);
-      const thongBaoChan  = guild.channels.cache.find(c => c.name.includes('thông-báo') && c.type === ChannelType.GuildText);
       const bangGiaChan   = guild.channels.cache.find(c => c.name.includes('bảng-giá') && c.type === ChannelType.GuildText);
       const hoTroChan     = guild.channels.cache.find(c => c.name.includes('hỗ-trợ') && c.type === ChannelType.GuildText && !c.name.startsWith('ticket'));
-      const thaoluanChan  = guild.channels.cache.find(c => c.name.includes('thảo-luận') && c.type === ChannelType.GuildText);
 
       const accountAgeDays = Math.floor((Date.now() - user.createdTimestamp) / 86400000);
-      const isNewAccount   = accountAgeDays < 30;
-      const avatar         = user.displayAvatarURL({ forceStatic: false, size: 256 });
+      const accountAgeText = accountAgeDays < 1
+        ? 'Hôm nay'
+        : accountAgeDays < 30
+          ? `${accountAgeDays} ngày trước`
+          : accountAgeDays < 365
+            ? `${Math.floor(accountAgeDays / 30)} tháng trước`
+            : `${Math.floor(accountAgeDays / 365)} năm trước`;
 
-      const headLines = [
-        `## ${E('icon_sparkle')} Chào mừng ${user.username} đến với ${brandName}!`,
-        isServer1
-          ? `> ${E('icon_store')} Bạn vừa bước vào **Cenar Store** — nơi cung cấp tài khoản bản quyền & dịch vụ Discord hàng đầu Việt Nam! ${E('panel_order')}`
-          : `> ${E('icon_store')} Bạn vừa bước vào **Cenar Store 2** — chi nhánh chính thức của Cenar Store! ${E('icon_sparkle')}`,
-        '',
-        `> ${E('ticket_user')} **Tag:** \`${user.tag}\``,
-        `> ${E('icon_calendar')} **Tài khoản tạo:** <t:${Math.floor(user.createdTimestamp / 1000)}:R>`,
-        `> ${E('icon_group')} **Thành viên thứ:** **#${memberCount.toLocaleString('vi-VN')}**`,
-        isNewAccount ? `> ${E('status_warn')} *Tài khoản mới — cần xác minh để truy cập đầy đủ*` : null,
-      ].filter(Boolean);
+      const avatar = user.displayAvatarURL({ forceStatic: false, size: 256 });
 
+      // Header block — khớp ảnh: CHÀO MỪNG THÀNH VIÊN MỚI + mention + số thành viên
+      const headerLines = [
+        `## ${E('icon_fire', '🔥')} CHÀO MỪNG THÀNH VIÊN MỚI ${E('icon_fire', '🔥')}`,
+        `**Hân hoan chào đón <@${user.id}> đến với ${brandName}!**`,
+        ``,
+        `${E('icon_star', '⭐')} Thành viên thứ: **#${memberCount.toLocaleString('vi-VN')}**`,
+        `${E('icon_green', '●')} Tài khoản tạo: **${accountAgeText}**`,
+      ].join('\n');
+
+      // Guide block — khớp ảnh: bullet dạng » # emoji | tên — mô tả
       const guideLines = [
-        `### ${E('icon_clipboard')} Để bắt đầu:`,
-        verifyChannel ? `> ${E('ticket_claim')} ${verifyChannel} — **Xác minh tài khoản** để mở khóa toàn bộ server` : null,
-        thongBaoChan  ? `> ${E('icon_announce')} ${thongBaoChan} — Thông báo & ưu đãi mới nhất` : null,
-        bangGiaChan   ? `> ${E('payment_money')} ${bangGiaChan} — Xem bảng giá tất cả dịch vụ` : null,
-        hoTroChan     ? `> ${E('ticket_open')} ${hoTroChan} — Mở ticket để mua hàng / hỗ trợ` : null,
-        thaoluanChan  ? `> ${E('brand_discord')} ${thaoluanChan} — Chat & giao lưu cùng cộng đồng` : null,
-      ].filter(Boolean);
+        `${E('icon_clipboard', '●')} **Để bắt đầu trải nghiệm:**`,
+        verifyChannel ? `> » ${verifyChannel} — **Xác minh tài khoản** để mở khóa server` : null,
+        bangGiaChan   ? `> » ${bangGiaChan} — Xem bảng giá dịch vụ chi tiết` : null,
+        hoTroChan     ? `> » ${hoTroChan} — Mở ticket để mua hàng & hỗ trợ` : null,
+      ].filter(Boolean).join('\n');
 
-      const serviceLines = [
-        `### ${E('icon_star')} Dịch vụ nổi bật:`,
-        `> ${E('brand_nitro')} **Discord Nitro & Boost** — Nitro giá tốt, Boost Server mọi cấp`,
-        `> ${E('icon_art')} **Decor Discord** — Trang trí profile cực đẹp, giá hạt dẻ`,
-        `> ${E('icon_brain')} **AI Premium** — ChatGPT Plus, Gemini Pro, Claude Pro...`,
-        `> ${E('brand_youtube')} **YouTube Premium** — Xem không quảng cáo, giá siêu rẻ`,
-        `> ${E('brand_discord')} **Setup Discord + Bot Custom** — Combo trọn gói chỉ từ **500k**`,
-        `> ${E('icon_link')} **Website Custom** — Thiết kế web mọi giao diện, giá deal`,
-      ];
+      const footerLine = `-# ${E('icon_star', '⭐')} ${brandName} — Uy Tín • Chất Lượng • Tự Động 24/7`;
 
       const container = new ContainerBuilder().setAccentColor(isServer1 ? 0x7C3AED : 0xF472B6);
 
+      // Section: text trái + thumbnail avatar phải
       container.addSectionComponents(
         new SectionBuilder()
-          .addTextDisplayComponents(new TextDisplayBuilder().setContent(headLines.join('\n')))
+          .addTextDisplayComponents(new TextDisplayBuilder().setContent(headerLines))
           .setThumbnailAccessory(new ThumbnailBuilder().setURL(avatar))
       );
 
-      if (guideLines.length > 1) {
+      // Guide channels
+      if (guideLines) {
         container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guideLines.join('\n')));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guideLines));
       }
 
-      container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(serviceLines.join('\n')));
-
+      // Banner gif
       const banner = isServer1 ? WELCOME_BANNER.s1 : WELCOME_BANNER.s2;
       container.addMediaGalleryComponents(
         new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner))
       );
 
+      // Footer
       container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`-# ${E('icon_heart_purple')} ${brandName} — Uy Tín • Chất Lượng • Giá Tốt Nhất`)
+        new TextDisplayBuilder().setContent(footerLine)
       );
 
-      const extraComponents = [];
+      // Buttons
       const btnRow = new ActionRowBuilder();
-
       if (verifyChannel) {
         const verifyBtn = new ButtonBuilder()
           .setLabel('Xác Minh Ngay')
@@ -145,7 +138,6 @@ export async function execute(member) {
         if (emo) verifyBtn.setEmoji(emo);
         btnRow.addComponents(verifyBtn);
       }
-
       if (bangGiaChan) {
         const priceBtn = new ButtonBuilder()
           .setLabel('Xem Bảng Giá')
@@ -156,7 +148,7 @@ export async function execute(member) {
         btnRow.addComponents(priceBtn);
       }
 
-      if (btnRow.components.length > 0) extraComponents.push(btnRow);
+      const extraComponents = btnRow.components.length > 0 ? [btnRow] : [];
 
       await welcomeChannel.send({
         components: [container, ...extraComponents],
@@ -165,33 +157,29 @@ export async function execute(member) {
       }).catch(e => console.error('[WELCOME] Thất bại:', e.message));
     }
 
-    // 3. Thông báo vào kênh #thảo-luận — Components V2
+    // 3. Thông báo vào kênh #thảo-luận — compact như ảnh 2
     const chatChannel = guild.channels.cache.find(
       c => c.name.includes('thảo-luận') && c.type === ChannelType.GuildText
     );
 
     if (chatChannel) {
-      const verifyId = guild.channels.cache.find(c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText)?.id;
+      const verifyId = guild.channels.cache.find(
+        c => c.name.includes('xác-minh') && c.type === ChannelType.GuildText
+      )?.id;
 
-      const chatLines = isServer1
-        ? [
-            `## ${E('payment_success')} Thành Viên Mới Gia Nhập!`,
-            `> ${E('panel_order')} Hân hoan chào đón <@${user.id}> đến với **${brandName}**!`,
-            verifyId ? `> ${E('ticket_claim')} Ghé <#${verifyId}> để xác minh & mở khóa toàn bộ server nhé!` : null,
-            '',
-            `-# ${E('icon_gem')} **${memberCount.toLocaleString('vi-VN')}** thành viên — ${brandName}`,
-          ].filter(Boolean)
-        : [
-            `## ${E('payment_success')} Thành Viên Mới Gia Nhập!`,
-            `> ${E('panel_order')} Chào mừng <@${user.id}> đến với **${brandName} 2**!`,
-            `> ${E('status_check')} Bạn đã được cấp role **Thành Viên Mới** — hãy xem bảng giá và mở ticket nếu cần hỗ trợ!`,
-            '',
-            `-# ${E('icon_gem')} **${memberCount.toLocaleString('vi-VN')}** thành viên — ${brandName}`,
-          ];
+      const chatLines = [
+        `## ${E('icon_star', '🌟')} THÀNH VIÊN MỚI!`,
+        `> ${E('panel_order', '●')} Chào mừng <@${user.id}> đã tham gia **${brandName}**!`,
+        verifyId
+          ? `> » <#${verifyId}> để xác minh & mở khóa các phòng chat nhé!`
+          : null,
+        ``,
+        `-# ${E('icon_gem', '●')} Hiện tại có **${memberCount.toLocaleString('vi-VN')}** thành viên.`,
+      ].filter(Boolean).join('\n');
 
       const chatContainer = new ContainerBuilder().setAccentColor(isServer1 ? 0x7C3AED : 0xF472B6);
       chatContainer.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(chatLines.join('\n'))
+        new TextDisplayBuilder().setContent(chatLines)
       );
 
       await chatChannel.send({
@@ -208,8 +196,8 @@ export async function execute(member) {
       );
 
       const dmLines = [
-        `## ${E('icon_sparkle')} Chào mừng đến ${brandName}!`,
-        `Xin chào **${user.username}**! Cảm ơn bạn đã tham gia **${brandName}** ${E('status_check')}`,
+        `## ${E('icon_sparkle', '✨')} Chào mừng đến ${brandName}!`,
+        `Xin chào **${user.username}**! Cảm ơn bạn đã tham gia **${brandName}** ${E('status_check', '✅')}`,
         '',
         '**Để truy cập đầy đủ server, bạn cần xác minh tài khoản:**',
         `> 1. Vào kênh ${verifyChannel ? `**#${verifyChannel.name}**` : '**#xac-minh**'}`,
@@ -217,17 +205,16 @@ export async function execute(member) {
         `> 3. Xác nhận qua Discord OAuth2 (chỉ 5 giây)`,
         '',
         '**Sau khi xác minh bạn sẽ thấy:**',
-        `> ${E('payment_money')} Bảng giá sản phẩm & dịch vụ`,
-        `> ${E('brand_discord')} Phòng chat thành viên`,
-        `> ${E('ticket_open')} Hệ thống mua hàng & hỗ trợ tự động`,
-        `> ${E('brand_discord')} Dịch vụ Setup Discord + Bot Custom`,
+        `> ${E('payment_money', '💰')} Bảng giá sản phẩm & dịch vụ`,
+        `> ${E('brand_discord', '💬')} Phòng chat thành viên`,
+        `> ${E('ticket_open', '🎫')} Hệ thống mua hàng & hỗ trợ tự động`,
         '',
         `**Dịch vụ nổi bật:**`,
-        `> ${E('brand_nitro')} Nitro Boost từ **50k** — ${E('icon_art')} Decor từ **23k**`,
-        `> ${E('icon_brain')} AI Premium (ChatGPT/Gemini/Claude)`,
-        `> ${E('brand_discord')} Combo Setup Discord + Bot + Boost chỉ **500k**`,
+        `> ${E('brand_nitro', '💎')} Nitro Boost từ **50k** — ${E('icon_art', '🎨')} Decor từ **23k**`,
+        `> ${E('icon_brain', '🧠')} AI Premium (ChatGPT/Gemini/Claude)`,
+        `> ${E('brand_discord', '💬')} Combo Setup Discord + Bot + Boost chỉ **500k**`,
         '',
-        `-# ${E('icon_heart_purple')} ${brandName} — Uy Tín • Chất Lượng • Giá Tốt Nhất`,
+        `-# ${E('icon_heart_purple', '💜')} ${brandName} — Uy Tín • Chất Lượng • Giá Tốt Nhất`,
       ];
 
       const dmContainer = new ContainerBuilder().setAccentColor(0x7C3AED);
