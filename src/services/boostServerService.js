@@ -467,10 +467,20 @@ export async function refreshBoostPanel(client, guildId) {
 
 // ─── Log helper ───────────────────────────────────────────────────────────────
 
+// Kênh log boost mặc định (Server 1) — fallback nếu DB chưa config
+const DEFAULT_BOOST_LOG_CHANNEL = '1524232964928438455';
+
+const BOOST_STATUS_LABEL = {
+  PENDING:   '<a:Dotyellow:1481134440725090315> Chờ xử lý',
+  ACTIVE:    '<a:tickgreen:1384069022831874169> Đang boost',
+  COMPLETED: '<:cr_green:1366636327415713832> Hoàn thành',
+  CANCELLED: '<a:tick_red51:1384069065626222632> Đã huỷ',
+  WARRANTY:  '<:cr_tim:1366636325352116225> Bảo hành',
+};
+
 export async function sendBoostLog(client, guildId, order, action, actorId = null) {
   const cfg = getGuildConfig(guildId);
-  const logChannelId = cfg?.boost_log_channel_id;
-  if (!logChannelId) return;
+  const logChannelId = cfg?.boost_log_channel_id || DEFAULT_BOOST_LOG_CHANNEL;
 
   const guild = client.guilds.cache.get(guildId);
   if (!guild) return;
@@ -478,39 +488,65 @@ export async function sendBoostLog(client, guildId, order, action, actorId = nul
   const channel = await guild.channels.fetch(logChannelId).catch(() => null);
   if (!channel) return;
 
-  const { EmbedBuilder } = await import('discord.js');
-  const colorMap = { PENDING: 0x5865F2, ACTIVE: 0x57F287, COMPLETED: 0x95A5A6, CANCELLED: 0xED4245, WARRANTY: 0xFEE75C };
+  const colorMap = {
+    PENDING:   0x5865F2,
+    ACTIVE:    0x57F287,
+    COMPLETED: 0x95A5A6,
+    CANCELLED: 0xED4245,
+    WARRANTY:  0xFEE75C,
+  };
+
+  const statusLabel   = BOOST_STATUS_LABEL[order.status] ?? order.status;
+  const paymentLabel  = order.payment_status === 'PAID'
+    ? '<a:tickgreen:1384069022831874169> Đã thanh toán'
+    : '<a:Dotyellow:1481134440725090315> Chờ thanh toán';
 
   const fields = [
-    { name: 'Mã đơn',     value: `\`${order.order_code}\``,     inline: true },
-    { name: 'Khách',      value: `<@${order.customer_id}>`,     inline: true },
-    { name: 'Gói',        value: order.package,                  inline: true },
-    { name: 'Thanh toán', value: order.payment_status === 'PAID' ? '✅ Đã TT' : '⏳ Chờ TT', inline: true },
-    { name: 'Server',     value: order.server_name ? `${order.server_name} (\`${order.server_id}\`)` : `\`${order.server_id}\``, inline: true },
-    { name: 'Trạng thái', value: order.status,                  inline: true },
+    { name: '<:cr_shop:1392749981332541501> Mã đơn',     value: `\`${order.order_code}\``,                                                                   inline: true },
+    { name: '<:verifybadge:1481127479702847646> Khách',  value: `<@${order.customer_id}>`,                                                                   inline: true },
+    { name: '<:cr_carttt:1348626032747614268> Gói',      value: order.package,                                                                                inline: true },
+    { name: '<:cr_pay:1392750857329705000> Thanh toán',  value: paymentLabel,                                                                                 inline: true },
+    { name: '<:cr_muahang:1348622828152426528> Server',  value: order.server_name ? `**${order.server_name}**\n\`${order.server_id}\`` : `\`${order.server_id}\``, inline: true },
+    { name: '<a:starxoay:1481141954346483845> Trạng thái', value: statusLabel,                                                                               inline: true },
   ];
-  if (actorId) fields.push({ name: 'Xử lý bởi', value: `<@${actorId}>`, inline: true });
-  if (order.note) fields.push({ name: 'Ghi chú', value: order.note, inline: false });
 
-  // Thêm nút kích hoạt nếu đã thanh toán nhưng chưa ACTIVE
+  if (actorId) fields.push({ name: '<:muiten:1481124261501337601> Xử lý bởi', value: `<@${actorId}>`, inline: true });
+  if (order.note) fields.push({ name: '<:cr_voucher:1392749775794737286> Ghi chú', value: order.note, inline: false });
+
+  // Nút hành động tuỳ trạng thái
   const components = [];
+  const actionRow = new ActionRowBuilder();
+
   if (order.payment_status === 'PAID' && order.status === 'PENDING') {
-    components.push(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`boost:activate:${order.order_code}`)
-          .setLabel('Kích Hoạt Boost Ngay')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('🚀')
-      )
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`boost:activate:${order.order_code}`)
+        .setLabel('Kích Hoạt Boost Ngay')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji({ id: '1384069022831874169', name: 'tickgreen', animated: true })
     );
   }
 
+  if (order.status === 'PENDING' || order.status === 'ACTIVE') {
+    actionRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`boost:complete:${order.order_code}`)
+        .setLabel('Hoàn Thành')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji({ id: '1366636327415713832', name: 'cr_green' })
+    );
+  }
+
+  if (actionRow.components.length > 0) components.push(actionRow);
+
   const embed = new EmbedBuilder()
     .setColor(colorMap[order.status] ?? 0xEB459E)
-    .setTitle(`🚀 [BOOST LOG] ${action}`)
+    .setTitle(`<a:tsm_fire:1327553120842158111> [BOOST LOG] ${action}`)
     .addFields(fields)
+    .setFooter({ text: 'Cenar Store — Boost Server' })
     .setTimestamp();
 
-  await channel.send({ embeds: [embed], components }).catch(() => null);
+  await channel.send({ embeds: [embed], components }).catch(e =>
+    console.error('[BOOST LOG] Gửi log thất bại:', e.message)
+  );
 }

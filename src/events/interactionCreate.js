@@ -2848,18 +2848,27 @@ async function handleBoostCancelModal(interaction, code) {
     note: `Huỷ bởi ${interaction.user.tag}: ${reason}`,
   });
 
-  // DM khách nếu staff huỷ
-  if (isStaff && order.customer_id !== interaction.user.id) {
-    try {
-      const customer = await interaction.client.users.fetch(order.customer_id);
-      await customer.send(`❌ **Cream Store** — Đơn boost \`${code}\` đã bị huỷ.\n> **Lý do:** ${reason}\nLiên hệ shop nếu bạn cần hỗ trợ thêm.`).catch(() => null);
-    } catch {}
-  }
+  // DM khách — luôn gửi, dù là tự huỷ hay staff huỷ
+  try {
+    const customer = await interaction.client.users.fetch(order.customer_id);
+    const cancelledByStaff = isStaff && order.customer_id !== interaction.user.id;
+    await customer.send([
+      `<a:tsm_fire:1327553120842158111> **Cenar Store** — Đơn boost \`${code}\` đã bị huỷ.`,
+      ``,
+      `<:cr_tim:1366636325352116225> **Gói:** ${order.package}`,
+      `<:muiten:1481124261501337601> **Lý do:** ${reason}`,
+      cancelledByStaff ? `<:verifybadge:1481127479702847646> **Huỷ bởi:** Admin/Staff` : `<:verifybadge:1481127479702847646> **Huỷ bởi:** Bạn`,
+      ``,
+      `-# <:cr_shop:1392749981332541501> Liên hệ shop nếu cần hỗ trợ thêm — Cenar Store`,
+    ].join('\n')).catch(() => null);
+  } catch {}
 
   await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn bị huỷ', interaction.user.id).catch(() => null);
   refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
 
-  await interaction.editReply(`${E('status_check')} Đã huỷ đơn \`${code}\`.\n> **Lý do:** ${reason}`);
+  await interaction.editReply(
+    `<a:tickgreen:1384069022831874169> Đã huỷ đơn \`${code}\`.\n> <:muiten:1481124261501337601> **Lý do:** ${reason}`
+  );
 }
 
 async function handleBoostCancelConfirm(interaction, code) {
