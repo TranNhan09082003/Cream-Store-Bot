@@ -4,6 +4,7 @@ import {
   normalizeOrderCode,
   syncPaymentCodeIfPossible,
 } from './paymentOrderMatcher.js';
+import { markOrderPaid } from './orderService.js';
 
 export function extractPayOSData(payload) {
   const data = payload?.data ?? {};
@@ -35,22 +36,13 @@ export function getOrderByPaymentPayload(payment) {
 }
 
 export function markOrderPaidFromWebhook(orderCode, paymentMeta = {}) {
-  const timestamp = nowIso();
-  const amount = Number(paymentMeta.amountPaid ?? paymentMeta.amount ?? 0);
-
-  db.prepare(`
-    UPDATE orders
-    SET payment_status = 'PAID',
-        status = CASE
-          WHEN status = 'PENDING_PAYMENT' THEN 'PROCESSING'
-          ELSE status
-        END,
-        total_amount = CASE WHEN total_amount IS NULL OR total_amount = 0 THEN ? ELSE total_amount END,
-        updated_at = ?
-    WHERE order_code = ?
-  `).run(amount, timestamp, orderCode);
-
-  return db.prepare('SELECT * FROM orders WHERE order_code = ?').get(orderCode) ?? null;
+  // Dùng markOrderPaid từ orderService để đảm bảo ghi đủ audit fields:
+  // paid_transaction_id, paid_transaction_content, paid_at, syncCustomerStats, broadcastDashboard
+  return markOrderPaid(orderCode, {
+    amountPaid: Number(paymentMeta.amountPaid ?? paymentMeta.amount ?? 0),
+    transactionId: paymentMeta.reference ?? null,
+    transactionContent: paymentMeta.description ?? null,
+  });
 }
 
 export function insertPaymentAuditLog({ orderCode, payload, matchedBy = null }) {

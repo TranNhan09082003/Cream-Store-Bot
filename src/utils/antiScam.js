@@ -91,7 +91,7 @@ async function scanImageWithGemini(url, mimeType) {
       }
     });
 
-    const text = modelResponse.text?.();
+    const text = modelResponse.text;
     if (text) {
       const result = JSON.parse(text);
       console.log(`[Anti-Scam] Gemini scan result:`, result);

@@ -61,26 +61,26 @@ async function uploadToGoogleDrive(accessToken, filePath, folderId = null) {
   const fileContent = fs.readFileSync(filePath);
   
   const boundary = 'google_drive_backup_boundary';
-  const delimiter = `\r\n--${boundary}\r\n`;
-  const closeDelimiter = `\r\n--${boundary}--`;
-  
-  const multipartRequestBody =
-    delimiter +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+
+  // Build multipart body entirely as Buffers — never convert binary to string
+  // (toString('binary') round-trip corrupts bytes >0x7F in some Node versions)
+  const metaPart = Buffer.from(
+    `\r\n--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
     JSON.stringify(metadata) +
-    delimiter +
-    'Content-Type: application/octet-stream\r\n\r\n' +
-    fileContent.toString('binary') +
-    closeDelimiter;
+    `\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    'utf8'
+  );
+  const closePart = Buffer.from(`\r\n--${boundary}--`, 'utf8');
+  const body = Buffer.concat([metaPart, fileContent, closePart]);
 
   const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': `multipart/related; boundary=${boundary}`,
-      'Content-Length': String(Buffer.byteLength(multipartRequestBody, 'binary'))
+      'Content-Length': String(body.length)
     },
-    body: Buffer.from(multipartRequestBody, 'binary')
+    body,
   });
 
   const data = await res.json();
@@ -148,7 +148,13 @@ function cleanOldBackups(maxKeep) {
 
     if (files.length > maxKeep) {
       for (let i = maxKeep; i < files.length; i++) {
-        fs.unlinkSync(path.join(BACKUP_DIR, files[i].name));
+        const base = path.join(BACKUP_DIR, files[i].name);
+        fs.unlinkSync(base);
+        // Xóa luôn WAL/SHM sidecar nếu tồn tại
+        for (const ext of ['-wal', '-shm']) {
+          const sidecar = base + ext;
+          if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
+        }
         console.log(`[BACKUP] Đã xóa bản backup cũ: ${files[i].name}`);
       }
     }

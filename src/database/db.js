@@ -18,13 +18,22 @@ db.close = function(...args) {
   console.log('[DB-CLOSE] db.close was called! Stack trace:', new Error().stack);
   return originalClose.apply(db, args);
 };
-db.pragma('journal_mode = WAL');       // WAL: cho phép concurrent reads + 1 writer, tránh "database is locked"
-db.pragma('busy_timeout = 5000');      // Chờ tối đa 5 giây nếu DB đang bị lock trước khi báo lỗi
+db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 db.pragma('foreign_keys = ON');
-db.pragma('synchronous = NORMAL');     // Cân bằng tốc độ và an toàn
-db.pragma('cache_size = -8000');       // 8MB cache
-db.pragma('temp_store = MEMORY');      // Temp tables in memory
-db.pragma('mmap_size = 268435456');    // 256MB memory-mapped I/O
+db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -8000');
+db.pragma('temp_store = MEMORY');
+db.pragma('mmap_size = 268435456');
+
+// Kiểm tra integrity khi khởi động — phát hiện DB corrupt sau crash
+const integrityResult = db.pragma('integrity_check');
+if (integrityResult[0]?.integrity_check !== 'ok') {
+  console.error('[DB-INIT] ❌ INTEGRITY CHECK FAILED:', integrityResult);
+  console.error('[DB-INIT] DB file có thể bị corrupt. Khôi phục từ backup trước khi tiếp tục.');
+  process.exit(1);
+}
+console.log('[DB-INIT] ✅ Integrity check passed.');
 
 
 function ensureColumn(tableName, columnName, definitionSql) {
