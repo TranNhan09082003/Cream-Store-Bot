@@ -68,6 +68,10 @@ export async function sendBoostAnnouncement(client) {
   );
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(footer));
 
+  // @everyone phải nằm trong TextDisplay riêng — không dùng content field với Components V2
+  const everyoneRow = new ContainerBuilder().setAccentColor(0xEB459E);
+  everyoneRow.addTextDisplayComponents(new TextDisplayBuilder().setContent('@everyone'));
+
   const btnRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setLabel('Đặt Boost Ngay')
@@ -77,8 +81,7 @@ export async function sendBoostAnnouncement(client) {
   );
 
   await channel.send({
-    content: '@everyone',
-    components: [container, btnRow],
+    components: [everyoneRow, container, btnRow],
     flags: MessageFlags.IsComponentsV2,
     allowedMentions: { parse: ['everyone'] },
   });

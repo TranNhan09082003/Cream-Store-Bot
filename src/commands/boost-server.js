@@ -143,7 +143,6 @@ export async function execute(interaction) {
       );
 
       await channel.send({
-        content: '@everyone',
         components: [container, btnRow],
         flags: MessageFlags.IsComponentsV2,
         allowedMentions: { parse: ['everyone'] },
