@@ -195,12 +195,16 @@ export async function handleBoostPayOSWebhook({ client, payosOrderCode, amount, 
   // DM khách báo đã nhận tiền
   try {
     const user = await client.users.fetch(order.customer_id);
-    await user.send(
-      `✅ **Cenar Store** — Đã nhận thanh toán cho đơn \`${order.order_code}\`!\n` +
-      `> 📦 Gói: **${order.package}**\n` +
-      `> 🖥️ Server: **${order.server_name ?? order.server_id}**\n\n` +
-      `Admin sẽ boost server của bạn trong thời gian sớm nhất. Cảm ơn bạn! 💙`
-    ).catch(() => null);
+    await user.send([
+      `<a:tickgreen:1384069022831874169> **Cenar Store** — Đã nhận thanh toán cho đơn \`${order.order_code}\`!`,
+      ``,
+      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+      `<:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
+      `<:cr_pay:1392750857329705000> **Số tiền:** ${Number(order.amount).toLocaleString('vi-VN')} VND`,
+      ``,
+      `<:muiten:1481124261501337601> Admin sẽ boost server của bạn trong thời gian sớm nhất!`,
+      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng sử dụng dịch vụ`,
+    ].join('\n')).catch(() => null);
   } catch {}
 
   // Refresh panel
@@ -212,52 +216,93 @@ export async function handleBoostPayOSWebhook({ client, payosOrderCode, amount, 
 // ─── DM Payment — gửi link PayOS kèm nút bấm ────────────────────────────────
 
 export async function sendBoostPaymentDM(dmChannel, order, guildId) {
-  const E = createEmojiResolver(guildId);
   const amountFmt = Number(order.amount).toLocaleString('vi-VN');
 
   let checkoutUrl = order.payment_checkout_url;
+  let qrCodeUrl   = null;
 
   // Tạo link PayOS nếu chưa có
   if (!checkoutUrl) {
     try {
       checkoutUrl = await createBoostPayOSLink(order);
+      // Lấy lại order sau khi save để có qrCode nếu PayOS trả về
+      const fresh = getBoostOrderByCode(order.order_code);
+      checkoutUrl = fresh?.payment_checkout_url ?? checkoutUrl;
     } catch (err) {
       console.error('[BOOST-PAYOS] Không thể tạo link PayOS:', err.message);
     }
   }
 
+  // Tạo QR VietQR từ checkoutUrl của PayOS
+  // PayOS checkoutUrl dạng: https://pay.payos.vn/web/<id>
+  // Dùng VietQR API để render QR từ thông tin đơn
+  if (checkoutUrl) {
+    try {
+      const { config: cfg } = await import('../config.js');
+      // Lấy qrCode từ PayOS info nếu có
+      const payosCode = order.payos_order_code;
+      if (payosCode && cfg.payosClientId && cfg.payosApiKey) {
+        const infoRes = await fetch(`https://api-merchant.payos.vn/v2/payment-requests/${payosCode}`, {
+          headers: {
+            'x-client-id': cfg.payosClientId,
+            'x-api-key':   cfg.payosApiKey,
+          },
+        });
+        const infoData = await infoRes.json();
+        if (infoData.code === '00' && infoData.data?.qrCode) {
+          // qrCode là chuỗi VietQR — render thành ảnh qua api.qrserver.com
+          const qrContent = encodeURIComponent(infoData.data.qrCode);
+          qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrContent}`;
+        }
+      }
+    } catch (err) {
+      console.error('[BOOST-PAYOS] Không thể lấy QR code:', err.message);
+    }
+  }
+
+  const serverDisplay = order.server_name ? `**${order.server_name}**` : `\`${order.server_id}\``;
+
   const lines = [
-    `## ${E('icon_fire', '🔥')} Đơn Boost Server Đã Được Tiếp Nhận!`,
+    `## <a:tsm_fire:1327553120842158111> Đơn Boost Server Đã Được Tiếp Nhận!`,
     ``,
-    `${E('order_id', '🆔')} **Mã đơn:** \`${order.order_code}\``,
-    `${E('brand_boost', '🚀')} **Gói:** ${order.package}`,
-    `${E('payment_money', '💰')} **Số tiền:** **${amountFmt} VND**`,
-    `${E('icon_store', '🏪')} **Server:** ${order.server_name ? `**${order.server_name}**` : `\`${order.server_id}\``}`,
+    `<:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
+    `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+    `<:cr_pay:1392750857329705000> **Số tiền:** **${amountFmt} VND**`,
+    `<:cr_muahang:1348622828152426528> **Server:** ${serverDisplay}`,
     ``,
     checkoutUrl
-      ? `${E('status_check', '✅')} Bấm nút **Thanh Toán PayOS** bên dưới để hoàn tất đơn hàng.`
-      : `${E('status_warn', '⚠️')} Không thể tạo link PayOS. Vui lòng liên hệ Admin để hỗ trợ.`,
+      ? `<a:tickgreen:1384069022831874169> Quét mã QR bên dưới hoặc bấm nút **Thanh Toán PayOS** để hoàn tất!`
+      : `<a:tick_red51:1384069065626222632> Không thể tạo link PayOS. Vui lòng liên hệ Admin.`,
     ``,
-    `-# ${E('icon_heart_purple', '💜')} Cenar Store — Bot sẽ tự xác nhận khi nhận được thanh toán`,
+    `-# <:cr_tim:1366636325352116225> Cenar Store — Bot tự xác nhận khi nhận được thanh toán`,
   ].join('\n');
 
   const container = new ContainerBuilder().setAccentColor(0xEB459E);
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
-  container.addMediaGalleryComponents(
-    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(BOOST_BANNER))
-  );
+
+  // Hiển thị QR trực tiếp nếu có
+  if (qrCodeUrl) {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(qrCodeUrl))
+    );
+  } else {
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(BOOST_BANNER))
+    );
+  }
 
   const components = [container];
 
   if (checkoutUrl) {
-    const btnRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('Thanh Toán PayOS')
-        .setStyle(ButtonStyle.Link)
-        .setURL(checkoutUrl)
-        .setEmoji('💳')
+    components.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Thanh Toán PayOS')
+          .setStyle(ButtonStyle.Link)
+          .setURL(checkoutUrl)
+          .setEmoji({ id: '1392750857329705000', name: 'cr_pay' })
+      )
     );
-    components.push(btnRow);
   }
 
   await dmChannel.send({
@@ -269,36 +314,33 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
 // ─── Panel builder — Components V2 ───────────────────────────────────────────
 
 export function buildBoostPanelEmbed(guildId) {
-  // Vẫn dùng EmbedBuilder cho panel vì sendBoostPanel dùng msg.edit với embeds[]
-  // Components V2 không support msg.edit trên panel cũ dễ dàng
   const activeOrders = getActiveBoostOrders(guildId);
-  const E = createEmojiResolver(guildId);
 
   const embed = new EmbedBuilder()
     .setColor(0xEB459E)
-    .setTitle(`${E('brand_boost', '🚀')} HỆ THỐNG BOOST SERVER TỰ ĐỘNG ${E('brand_boost', '🚀')}`)
+    .setTitle('<a:tsm_fire:1327553120842158111> HỆ THỐNG BOOST SERVER TỰ ĐỘNG <a:tsm_fire:1327553120842158111>')
     .setDescription([
       'Nâng cấp server của bạn đạt ngay **Level 3** cực xịn xò!',
       'Thanh toán tự động qua **PayOS** — xác nhận ngay lập tức.',
       '',
-      `## ${E('payment_money', '💰')} Bảng Giá Dịch Vụ:`,
-      `> ${E('brand_boost', '🚀')} **Gói 1 Tháng (14 Boosts):** ~~250k~~ **170.000 VND**`,
-      `> ${E('brand_boost', '🚀')} **Gói 3 Tháng (14 Boosts):** ~~600k~~ **320.000 VND**`,
+      '## <:cr_pay:1392750857329705000> Bảng Giá Dịch Vụ:',
+      '> <a:starxoay:1481141954346483845> **Gói 1 Tháng (14 Boosts):** ~~250k~~ **170.000 VND**',
+      '> <a:starxoay:1481141954346483845> **Gói 3 Tháng (14 Boosts):** ~~600k~~ **320.000 VND**',
       '',
-      `## ${E('icon_clipboard', '📋')} Quy Trình Đặt Hàng:`,
-      `> **1.** Nhấn **"Mua Boost Server"** bên dưới`,
-      `> **2.** Điền link mời + ID server + gói muốn mua`,
-      `> **3.** Thanh toán qua link **PayOS** bot gửi vào DM`,
-      `> **4.** Bot tự xác nhận — Admin boost thủ công và duyệt`,
-      `> **5.** Nhận thông báo hoàn thành qua DM`,
+      '## <:cr_muahang:1348622828152426528> Quy Trình Đặt Hàng:',
+      '> <:muiten:1481124261501337601> **1.** Nhấn **"Mua Boost Server"** bên dưới',
+      '> <:muiten:1481124261501337601> **2.** Điền link mời + ID server + gói muốn mua',
+      '> <:muiten:1481124261501337601> **3.** Bot gửi mã QR + link **PayOS** vào DM',
+      '> <:muiten:1481124261501337601> **4.** Bot tự xác nhận sau khi nhận tiền',
+      '> <:muiten:1481124261501337601> **5.** Admin boost thủ công → nhận thông báo qua DM',
     ].join('\n'));
 
   const liveSection = buildLiveListSection(activeOrders);
   embed.addFields({
-    name: `${E('icon_fire', '🔥')} Server Đang Boost Live (${activeOrders.length})`,
+    name: `<a:tsm_fire:1327553120842158111> Server Đang Boost Live (${activeOrders.length})`,
     value: liveSection,
   });
-  embed.setFooter({ text: `${E('icon_heart_purple', '💙')} Cenar Store — Uy Tín • Tự Động 24/7` });
+  embed.setFooter({ text: 'Cenar Store — Uy Tín • Chất Lượng • Tự Động 24/7' });
   embed.setTimestamp();
 
   return embed;
@@ -306,14 +348,14 @@ export function buildBoostPanelEmbed(guildId) {
 
 function buildLiveListSection(activeOrders) {
   if (!activeOrders.length) {
-    return '*Chưa có server nào đang boost. Hãy là người đầu tiên!*';
+    return '<a:Dotyellow:1481134440725090315> *Chưa có server nào đang boost. Hãy là người đầu tiên!*';
   }
   const lines = activeOrders.slice(0, 15).map((o, i) => {
     const expiry = o.boost_expires_at
       ? `<t:${Math.floor(new Date(o.boost_expires_at).getTime() / 1000)}:R>`
       : 'Đang boost';
     const name = o.server_name ? `**${o.server_name}**` : `\`${o.server_id}\``;
-    return `> **${i + 1}.** ${name} — \`${o.package}\` — Hết hạn ${expiry}`;
+    return `> <a:chamxanh:1481124932447371374> **${i + 1}.** ${name} — \`${o.package}\` — ${expiry}`;
   });
   return lines.join('\n');
 }
