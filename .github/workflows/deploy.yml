@@ -46,13 +46,14 @@ jobs:
         run: sleep 25
 
       - name: 📋 Register Slash Commands
+        continue-on-error: true
         run: |
           echo "📋 Registering slash commands via bot API..."
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "http://hcm3.vibehost.vn:20022/api/bot/deploy-commands" \
             -H "x-bot-api-key: ${{ secrets.BOT_API_KEY }}" \
             -H "Content-Type: application/json" \
-            --max-time 60)
+            --max-time 60 || echo "curl_failed\n000")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
@@ -63,7 +64,7 @@ jobs:
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Slash commands registered!"
           else
-            echo "⚠️ Could not register commands via API — check bot logs"
+            echo "⚠️ Could not register commands via API (code: $HTTP_CODE) — bot may still be starting"
           fi
 
       - name: 🔍 Health Check
