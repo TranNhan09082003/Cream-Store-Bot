@@ -17,12 +17,14 @@ if (process.env.IS_CHILD_BOT === 'true') {
     try {
       await startBot();
     } catch (error) {
-      if (error.code === 'TokenInvalid' || error.message?.includes('token') || error.message?.includes('Token')) {
+      // Log lỗi thật để debug
+      console.error(`[BOOT] [${process.env.ENV_FILE}] Lỗi khởi động:`, error.code, error.message);
+      if (error.code === 'TokenInvalid' || error.message === 'An invalid token was provided.') {
         console.warn(`[BOOT] [${process.env.ENV_FILE}] Discord Token không hợp lệ. Khởi động Web Server ở chế độ độc lập...`);
         initDatabase();
         await startWebhookServer(null);
       } else {
-        console.error(`[BOOT] [${process.env.ENV_FILE}] Bot khởi động thất bại:`, error);
+        console.error(`[BOOT] [${process.env.ENV_FILE}] Bot khởi động thất bại (không phải lỗi token):`, error);
         process.exit(1);
       }
     }
