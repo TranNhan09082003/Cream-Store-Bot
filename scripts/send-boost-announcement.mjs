@@ -26,23 +26,21 @@ for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
   process.env[k] = v;
 }
 
-const TARGET_GUILD_ID   = process.env.GUILD_ID;   // Server 1
-const BOOST_CHANNEL_ID  = '1282637033340403754';   // kênh #boost-server (thay nếu khác)
-const ANNOUNCE_CHANNEL_NAME = 'thông-báo';        // tìm theo tên
+const TARGET_GUILD_ID  = process.env.GUILD_ID;
+const BOOST_CHANNEL_ID = '1282637033340403754';   // kênh #boost-server
+const ANNOUNCE_CHANNEL_ID = '1514598369597587546'; // kênh #thông-báo
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
 client.once('ready', async () => {
   console.log(`[ANNOUNCE] Logged in as ${client.user.tag}`);
 
-  const guild = client.guilds.cache.get(TARGET_GUILD_ID);
-  if (!guild) { console.error('Guild not found'); process.exit(1); }
-
-  // Tìm kênh thông-báo
-  const channel = guild.channels.cache.find(
-    c => c.type === ChannelType.GuildText && c.name.includes('thông-báo')
-  );
-  if (!channel) { console.error('Kênh thông-báo không tìm thấy'); process.exit(1); }
+  // Fetch channel trực tiếp bằng ID — không phụ thuộc cache hay tên kênh
+  const channel = await client.channels.fetch(ANNOUNCE_CHANNEL_ID).catch(e => {
+    console.error('[ANNOUNCE] Không fetch được kênh:', e.message);
+    return null;
+  });
+  if (!channel) { console.error('Kênh thông-báo không tìm thấy — kiểm tra ANNOUNCE_CHANNEL_ID'); process.exit(1); }
 
   // ── Nội dung thông báo ──────────────────────────────────────────────────
   const header = [
