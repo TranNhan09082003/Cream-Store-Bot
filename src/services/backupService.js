@@ -9,9 +9,48 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..', '..');
 const BACKUP_DIR = path.resolve(projectRoot, 'backups');
 
-/**
- * Tạo Google Drive OAuth2 Access Token từ Service Account credentials bằng JWT thủ công
- */
+// ─── Telegram Backup ──────────────────────────────────────────────────────────
+
+async function sendBackupToTelegram(filePath) {
+  const botToken = process.env.TELEGRAM_BACKUP_TOKEN;
+  const chatId   = process.env.TELEGRAM_BACKUP_CHAT_ID;
+  if (!botToken || !chatId) return;
+
+  const fileName   = path.basename(filePath);
+  const fileBuffer = fs.readFileSync(filePath);
+  const fileSize   = (fileBuffer.length / 1024).toFixed(1);
+  const dateStr    = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+  // Multipart form-data gửi file
+  const boundary = `tg_backup_${Date.now()}`;
+  const caption  = `🗄 *Cenar Store — Auto Backup*\n📁 \`${fileName}\`\n📦 ${fileSize} KB\n🕐 ${dateStr} (GMT+7)`;
+
+  const metaCaption = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n` +
+    `--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n` +
+    `--${boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nMarkdown\r\n` +
+    `--${boundary}\r\nContent-Disposition: form-data; name="document"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    'utf8'
+  );
+  const closePart = Buffer.from(`\r\n--${boundary}--`, 'utf8');
+  const body = Buffer.concat([metaCaption, fileBuffer, closePart]);
+
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length),
+    },
+    body,
+  });
+
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.description || 'Telegram API error');
+  return data;
+}
+
+// ─── Google Drive Backup ──────────────────────────────────────────────────────
+
 async function getGoogleAccessToken(clientEmail, privateKey) {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
@@ -20,50 +59,38 @@ async function getGoogleAccessToken(clientEmail, privateKey) {
     scope: 'https://www.googleapis.com/auth/drive.file',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
-    iat: now
+    iat: now,
   };
-  
+
   const base64Header = Buffer.from(JSON.stringify(header)).toString('base64url');
-  const base64Claim = Buffer.from(JSON.stringify(claim)).toString('base64url');
-  
+  const base64Claim  = Buffer.from(JSON.stringify(claim)).toString('base64url');
+
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(`${base64Header}.${base64Claim}`);
   const signature = sign.sign(privateKey, 'base64url');
-  
+
   const jwt = `${base64Header}.${base64Claim}.${signature}`;
-  
+
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt
-    })
+      assertion: jwt,
+    }),
   });
-  
+
   const data = await res.json();
-  if (data.error) {
-    throw new Error(`Google OAuth error: ${data.error_description || data.error}`);
-  }
+  if (data.error) throw new Error(`Google OAuth error: ${data.error_description || data.error}`);
   return data.access_token;
 }
 
-/**
- * Upload file lên Google Drive qua REST API
- */
 async function uploadToGoogleDrive(accessToken, filePath, folderId = null) {
-  const fileName = path.basename(filePath);
-  const metadata = {
-    name: fileName,
-    parents: folderId ? [folderId] : []
-  };
-
+  const fileName    = path.basename(filePath);
+  const metadata    = { name: fileName, parents: folderId ? [folderId] : [] };
   const fileContent = fs.readFileSync(filePath);
-  
-  const boundary = 'google_drive_backup_boundary';
+  const boundary    = 'google_drive_backup_boundary';
 
-  // Build multipart body entirely as Buffers — never convert binary to string
-  // (toString('binary') round-trip corrupts bytes >0x7F in some Node versions)
   const metaPart = Buffer.from(
     `\r\n--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
     JSON.stringify(metadata) +
@@ -78,17 +105,17 @@ async function uploadToGoogleDrive(accessToken, filePath, folderId = null) {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': `multipart/related; boundary=${boundary}`,
-      'Content-Length': String(body.length)
+      'Content-Length': String(body.length),
     },
     body,
   });
 
   const data = await res.json();
-  if (data.error) {
-    throw new Error(data.error.message || 'Google Drive REST Upload Error');
-  }
+  if (data.error) throw new Error(data.error.message || 'Google Drive REST Upload Error');
   return data;
 }
+
+// ─── Main backup function ─────────────────────────────────────────────────────
 
 export async function backupDatabase() {
   return new Promise((resolve, reject) => {
@@ -97,33 +124,42 @@ export async function backupDatabase() {
         fs.mkdirSync(BACKUP_DIR, { recursive: true });
       }
 
-      const dbPath = getDatabasePath();
-      const dateStr = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const dateStr    = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const backupPath = path.join(BACKUP_DIR, `shopbot-${dateStr}.sqlite`);
 
-      // SQLite online backup mechanism
       db.backup(backupPath)
         .then(async () => {
           console.log(`[BACKUP] Sao lưu database thành công (Cục bộ): ${backupPath}`);
-          cleanOldBackups(14); // Giữ tối đa 14 ngày sao lưu cục bộ
+          cleanOldBackups(14);
 
-          // Tự động sao lưu lên Google Drive nếu cấu hình đầy đủ credentials
-          const clientEmail = process.env.GD_CLIENT_EMAIL;
+          // 1. Telegram backup
+          const tgToken  = process.env.TELEGRAM_BACKUP_TOKEN;
+          const tgChatId = process.env.TELEGRAM_BACKUP_CHAT_ID;
+          if (tgToken && tgChatId) {
+            try {
+              await sendBackupToTelegram(backupPath);
+              console.log('[BACKUP-TG] Đã gửi backup lên Telegram thành công!');
+            } catch (tgErr) {
+              console.error('[BACKUP-TG] Thất bại khi gửi lên Telegram:', tgErr.message);
+            }
+          } else {
+            console.log('[BACKUP-TG] Bỏ qua Telegram (Thiếu TELEGRAM_BACKUP_TOKEN hoặc TELEGRAM_BACKUP_CHAT_ID trong .env)');
+          }
+
+          // 2. Google Drive backup (nếu có cấu hình)
+          const clientEmail   = process.env.GD_CLIENT_EMAIL;
           const privateKeyRaw = process.env.GD_PRIVATE_KEY;
-          const folderId = process.env.GD_FOLDER_ID;
-
+          const folderId      = process.env.GD_FOLDER_ID;
           if (clientEmail && privateKeyRaw && folderId) {
             try {
               console.log('[BACKUP-GD] Bắt đầu đồng bộ bản sao lưu lên Google Drive...');
-              const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+              const privateKey  = privateKeyRaw.replace(/\\n/g, '\n');
               const accessToken = await getGoogleAccessToken(clientEmail, privateKey);
-              const gdResult = await uploadToGoogleDrive(accessToken, backupPath, folderId);
+              const gdResult    = await uploadToGoogleDrive(accessToken, backupPath, folderId);
               console.log(`[BACKUP-GD] Đồng bộ lên Google Drive thành công! File ID: ${gdResult.id}`);
             } catch (gdErr) {
               console.error('[BACKUP-GD] Thất bại khi đồng bộ lên Google Drive:', gdErr.message);
             }
-          } else {
-            console.log('[BACKUP-GD] Bỏ qua đồng bộ Google Drive (Thiếu GD_CLIENT_EMAIL, GD_PRIVATE_KEY hoặc GD_FOLDER_ID trong .env)');
           }
 
           resolve(backupPath);
@@ -139,6 +175,8 @@ export async function backupDatabase() {
   });
 }
 
+// ─── Cleanup ──────────────────────────────────────────────────────────────────
+
 function cleanOldBackups(maxKeep) {
   try {
     const files = fs.readdirSync(BACKUP_DIR)
@@ -150,7 +188,6 @@ function cleanOldBackups(maxKeep) {
       for (let i = maxKeep; i < files.length; i++) {
         const base = path.join(BACKUP_DIR, files[i].name);
         fs.unlinkSync(base);
-        // Xóa luôn WAL/SHM sidecar nếu tồn tại
         for (const ext of ['-wal', '-shm']) {
           const sidecar = base + ext;
           if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
