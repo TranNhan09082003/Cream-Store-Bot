@@ -117,6 +117,9 @@ async function uploadToGoogleDrive(accessToken, filePath, folderId = null) {
 
 // ─── Main backup function ─────────────────────────────────────────────────────
 
+// Theo dõi ngày đã gửi Telegram để tránh spam mỗi 5 phút
+let lastTelegramSentDate = null;
+
 export async function backupDatabase() {
   return new Promise((resolve, reject) => {
     try {
@@ -124,6 +127,7 @@ export async function backupDatabase() {
         fs.mkdirSync(BACKUP_DIR, { recursive: true });
       }
 
+      const todayStr   = new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
       const dateStr    = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
       const backupPath = path.join(BACKUP_DIR, `shopbot-${dateStr}.sqlite`);
 
@@ -132,18 +136,18 @@ export async function backupDatabase() {
           console.log(`[BACKUP] Sao lưu database thành công (Cục bộ): ${backupPath}`);
           cleanOldBackups(14);
 
-          // 1. Telegram backup
-          const tgToken  = process.env.TELEGRAM_BACKUP_TOKEN || '7983484857:AAFQKOi_WpPKIhz8WWqjqMVKmMr0J3hKChk';
-          const tgChatId = process.env.TELEGRAM_BACKUP_CHAT_ID || '6359798303';
-          if (tgToken && tgChatId) {
+          // 1. Telegram backup — chỉ gửi 1 lần/ngày
+          const alreadySentToday = lastTelegramSentDate === todayStr;
+          if (!alreadySentToday) {
             try {
               await sendBackupToTelegram(backupPath);
-              console.log('[BACKUP-TG] Đã gửi backup lên Telegram thành công!');
+              lastTelegramSentDate = todayStr;
+              console.log(`[BACKUP-TG] Đã gửi backup lên Telegram thành công! (${todayStr})`);
             } catch (tgErr) {
               console.error('[BACKUP-TG] Thất bại khi gửi lên Telegram:', tgErr.message);
             }
           } else {
-            console.log('[BACKUP-TG] Bỏ qua Telegram (Thiếu TELEGRAM_BACKUP_TOKEN hoặc TELEGRAM_BACKUP_CHAT_ID trong .env)');
+            console.log(`[BACKUP-TG] Bỏ qua — đã gửi Telegram hôm nay (${todayStr})`);
           }
 
           // 2. Google Drive backup (nếu có cấu hình)
