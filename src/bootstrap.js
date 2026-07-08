@@ -44,6 +44,19 @@ export async function buildClient() {
         console.log(`[AUTO-SETUP] Lỗi chạy setup: ${err.message}`);
       });
     }).catch(err => console.error('Failed to import autoSetupService', err));
+
+    // Gửi thông báo ra mắt Boost Server — chỉ gửi 1 lần (kiểm tra flag file)
+    import('node:fs').then(({ existsSync, writeFileSync }) => {
+      const flagPath = '/home/container/data/.boost_announce_sent';
+      if (!existsSync(flagPath)) {
+        import('./services/boostAnnounceService.js').then(({ sendBoostAnnouncement }) => {
+          sendBoostAnnouncement(readyClient).then(() => {
+            writeFileSync(flagPath, new Date().toISOString());
+            console.log('[BOOST-ANNOUNCE] Đã gửi thông báo ra mắt Boost Server!');
+          }).catch(e => console.error('[BOOST-ANNOUNCE] Thất bại:', e.message));
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   });
 
   import('./events/messageCreate.js').then((module) => {
