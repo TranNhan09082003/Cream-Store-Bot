@@ -34,8 +34,7 @@ export async function execute(interaction) {
 
       // Đăng panel mới vào kênh hiện tại
       const embed = buildBoostPanelEmbed(interaction.guildId);
-      const rows = buildBoostPanelRows();
-
+      const rows  = buildBoostPanelRows(interaction.guildId);
       const msg = await interaction.channel.send({ embeds: [embed], components: rows });
 
       upsertGuildConfig({

@@ -219,13 +219,11 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
   const amountFmt = Number(order.amount).toLocaleString('vi-VN');
 
   let checkoutUrl = order.payment_checkout_url;
-  let qrCodeUrl   = null;
 
   // Tạo link PayOS nếu chưa có
   if (!checkoutUrl) {
     try {
       checkoutUrl = await createBoostPayOSLink(order);
-      // Lấy lại order sau khi save để có qrCode nếu PayOS trả về
       const fresh = getBoostOrderByCode(order.order_code);
       checkoutUrl = fresh?.payment_checkout_url ?? checkoutUrl;
     } catch (err) {
@@ -233,32 +231,11 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
     }
   }
 
-  // Tạo QR VietQR từ checkoutUrl của PayOS
-  // PayOS checkoutUrl dạng: https://pay.payos.vn/web/<id>
-  // Dùng VietQR API để render QR từ thông tin đơn
-  if (checkoutUrl) {
-    try {
-      const { config: cfg } = await import('../config.js');
-      // Lấy qrCode từ PayOS info nếu có
-      const payosCode = order.payos_order_code;
-      if (payosCode && cfg.payosClientId && cfg.payosApiKey) {
-        const infoRes = await fetch(`https://api-merchant.payos.vn/v2/payment-requests/${payosCode}`, {
-          headers: {
-            'x-client-id': cfg.payosClientId,
-            'x-api-key':   cfg.payosApiKey,
-          },
-        });
-        const infoData = await infoRes.json();
-        if (infoData.code === '00' && infoData.data?.qrCode) {
-          // qrCode là chuỗi VietQR — render thành ảnh qua api.qrserver.com
-          const qrContent = encodeURIComponent(infoData.data.qrCode);
-          qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrContent}`;
-        }
-      }
-    } catch (err) {
-      console.error('[BOOST-PAYOS] Không thể lấy QR code:', err.message);
-    }
-  }
+  // Render QR trực tiếp từ checkoutUrl — không cần gọi thêm API
+  // api.qrserver.com nhận bất kỳ URL nào và render thành ảnh QR
+  const qrCodeUrl = checkoutUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=350x350&margin=10&data=${encodeURIComponent(checkoutUrl)}`
+    : null;
 
   const serverDisplay = order.server_name ? `**${order.server_name}**` : `\`${order.server_id}\``;
 
@@ -280,16 +257,12 @@ export async function sendBoostPaymentDM(dmChannel, order, guildId) {
   const container = new ContainerBuilder().setAccentColor(0xEB459E);
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
 
-  // Hiển thị QR trực tiếp nếu có
-  if (qrCodeUrl) {
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(qrCodeUrl))
-    );
-  } else {
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(BOOST_BANNER))
-    );
-  }
+  // Luôn hiển thị QR nếu có checkoutUrl — fallback banner nếu không tạo được link
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(
+      new MediaGalleryItemBuilder().setURL(qrCodeUrl ?? BOOST_BANNER)
+    )
+  );
 
   const components = [container];
 

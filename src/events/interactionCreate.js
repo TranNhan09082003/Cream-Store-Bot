@@ -2848,19 +2848,32 @@ async function handleBoostCancelModal(interaction, code) {
     note: `Huỷ bởi ${interaction.user.tag}: ${reason}`,
   });
 
-  // DM khách — luôn gửi, dù là tự huỷ hay staff huỷ
+  // DM khách — Components V2 + emoji custom
   try {
     const customer = await interaction.client.users.fetch(order.customer_id);
     const cancelledByStaff = isStaff && order.customer_id !== interaction.user.id;
-    await customer.send([
-      `<a:tsm_fire:1327553120842158111> **Cenar Store** — Đơn boost \`${code}\` đã bị huỷ.`,
+    const { ContainerBuilder, TextDisplayBuilder, MessageFlags: MF } = await import('discord.js');
+
+    const dmLines = [
+      `## <a:tick_red51:1384069065626222632> Đơn Boost Đã Bị Huỷ`,
       ``,
-      `<:cr_tim:1366636325352116225> **Gói:** ${order.package}`,
+      `<:cr_shop:1392749981332541501> **Mã đơn:** \`${code}\``,
+      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
       `<:muiten:1481124261501337601> **Lý do:** ${reason}`,
-      cancelledByStaff ? `<:verifybadge:1481127479702847646> **Huỷ bởi:** Admin/Staff` : `<:verifybadge:1481127479702847646> **Huỷ bởi:** Bạn`,
+      cancelledByStaff
+        ? `<:verifybadge:1481127479702847646> **Huỷ bởi:** Admin/Staff`
+        : `<:verifybadge:1481127479702847646> **Huỷ bởi:** Bạn`,
       ``,
-      `-# <:cr_shop:1392749981332541501> Liên hệ shop nếu cần hỗ trợ thêm — Cenar Store`,
-    ].join('\n')).catch(() => null);
+      `-# <:cr_tim:1366636325352116225> Liên hệ shop nếu cần hỗ trợ thêm — Cenar Store`,
+    ].join('\n');
+
+    const dmContainer = new ContainerBuilder().setAccentColor(0xED4245);
+    dmContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(dmLines));
+
+    await customer.send({
+      components: [dmContainer],
+      flags: MF.IsComponentsV2,
+    }).catch(() => null);
   } catch {}
 
   await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn bị huỷ', interaction.user.id).catch(() => null);
