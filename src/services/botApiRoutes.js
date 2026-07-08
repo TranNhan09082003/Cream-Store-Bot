@@ -1237,5 +1237,18 @@ export function registerBotApiRoutes(app) {
         }
     });
 
+    // Deploy slash commands — gọi từ GitHub Actions sau mỗi lần deploy
+    app.post('/api/bot/deploy-commands', requireApiKey, async (req, res) => {
+        try {
+            const { deployCommands } = await import('../bootstrap.js');
+            const total = await deployCommands();
+            console.log(`[BOT_API] Deployed ${total} slash commands via API`);
+            res.json({ ok: true, total, message: `Đã đăng ký ${total} slash commands` });
+        } catch (e) {
+            console.error('[BOT_API] deploy-commands error:', e.message);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
     console.log('[BOT_API] Registered /api/bot/* routes');
 }

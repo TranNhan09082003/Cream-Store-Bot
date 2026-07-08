@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Cho phép click deploy thủ công từ giao diện Actions
+  workflow_dispatch:
 
 concurrency:
   group: deploy-bot-${{ github.ref }}
@@ -28,13 +28,13 @@ jobs:
             -H "x-bot-api-key: ${{ secrets.BOT_API_KEY }}" \
             -H "Content-Type: application/json" \
             --max-time 30)
-          
+
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -1)
-          
+
           echo "HTTP Status: $HTTP_CODE"
           echo "Response: $BODY"
-          
+
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Deploy triggered successfully!"
           else
@@ -42,8 +42,29 @@ jobs:
             exit 1
           fi
 
-      - name: ⏳ Wait for bot to restart (20s)
-        run: sleep 20
+      - name: ⏳ Wait for bot to restart (25s)
+        run: sleep 25
+
+      - name: 📋 Register Slash Commands
+        run: |
+          echo "📋 Registering slash commands via bot API..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "http://hcm3.vibehost.vn:20022/api/bot/deploy-commands" \
+            -H "x-bot-api-key: ${{ secrets.BOT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 60)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Slash commands registered!"
+          else
+            echo "⚠️ Could not register commands via API — check bot logs"
+          fi
 
       - name: 🔍 Health Check
         run: |
