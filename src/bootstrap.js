@@ -18,7 +18,7 @@ export async function buildClient() {
   initErrorLogger(client);
   registerInteractionHandler(client, commands);
 
-  client.once(Events.ClientReady, (readyClient) => {
+  client.once(Events.ClientReady, async (readyClient) => {
     console.log(`[READY] Logged in as ${readyClient.user.tag}`);
     console.log(`[READY] Loaded ${commands.size} slash commands`);
 
@@ -45,18 +45,26 @@ export async function buildClient() {
       });
     }).catch(err => console.error('Failed to import autoSetupService', err));
 
-    // Gửi thông báo ra mắt Boost Server — chỉ gửi 1 lần (kiểm tra flag file)
-    import('node:fs').then(({ existsSync, writeFileSync }) => {
+    // Gửi thông báo ra mắt Boost Server 1 lần duy nhất
+    // Chỉ chạy trên Store 1 (guild 1282637033340403754) — kiểm tra qua guild cache
+    const SERVER1_GUILD_ID = '1282637033340403754';
+    const isStore1 = readyClient.guilds.cache.has(SERVER1_GUILD_ID);
+    if (isStore1) {
+      const { existsSync, writeFileSync } = await import('node:fs').then(m => m).catch(() => ({ existsSync: () => true, writeFileSync: () => {} }));
       const flagPath = '/home/container/data/.boost_announce_sent';
       if (!existsSync(flagPath)) {
-        import('./services/boostAnnounceService.js').then(({ sendBoostAnnouncement }) => {
-          sendBoostAnnouncement(readyClient).then(() => {
-            writeFileSync(flagPath, new Date().toISOString());
-            console.log('[BOOST-ANNOUNCE] Đã gửi thông báo ra mắt Boost Server!');
-          }).catch(e => console.error('[BOOST-ANNOUNCE] Thất bại:', e.message));
-        }).catch(() => {});
+        try {
+          const { sendBoostAnnouncement } = await import('./services/boostAnnounceService.js');
+          await sendBoostAnnouncement(readyClient);
+          writeFileSync(flagPath, new Date().toISOString());
+          console.log('[BOOST-ANNOUNCE] ✅ Đã gửi thông báo ra mắt Boost Server!');
+        } catch (e) {
+          console.error('[BOOST-ANNOUNCE] ❌ Thất bại:', e.message, e.stack);
+        }
+      } else {
+        console.log('[BOOST-ANNOUNCE] Đã gửi trước đó — bỏ qua.');
       }
-    }).catch(() => {});
+    }
   });
 
   import('./events/messageCreate.js').then((module) => {
