@@ -46,12 +46,19 @@ export async function buildClient() {
     }).catch(err => console.error('Failed to import autoSetupService', err));
 
     // Gửi thông báo ra mắt Boost Server 1 lần duy nhất
-    // Chỉ chạy trên Store 1 (guild 1282637033340403754) — kiểm tra qua guild cache
     const SERVER1_GUILD_ID = '1282637033340403754';
+    const guildIds = [...readyClient.guilds.cache.keys()].join(', ');
+    console.log(`[BOOST-ANNOUNCE] Guild cache: ${guildIds}`);
+
+    // Chỉ chạy trên instance có Store 1
     const isStore1 = readyClient.guilds.cache.has(SERVER1_GUILD_ID);
+    console.log(`[BOOST-ANNOUNCE] isStore1=${isStore1}`);
+
     if (isStore1) {
-      const { existsSync, writeFileSync } = await import('node:fs').then(m => m).catch(() => ({ existsSync: () => true, writeFileSync: () => {} }));
+      const { existsSync, writeFileSync } = await import('node:fs');
       const flagPath = '/home/container/data/.boost_announce_sent';
+      console.log(`[BOOST-ANNOUNCE] Flag exists: ${existsSync(flagPath)}`);
+
       if (!existsSync(flagPath)) {
         try {
           const { sendBoostAnnouncement } = await import('./services/boostAnnounceService.js');
