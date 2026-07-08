@@ -2998,28 +2998,50 @@ async function handleBoostActivateModal(interaction, code) {
     note: note ?? `Kích hoạt bởi ${interaction.user.tag}`,
   });
 
-  // DM khách
+  // DM khách — Components V2 + emoji custom
   try {
     const customer = await interaction.client.users.fetch(order.customer_id);
     const expiryStr = expiresAt
       ? `<t:${Math.floor(new Date(expiresAt).getTime() / 1000)}:F>`
       : 'Theo gói đã đặt';
-    await customer.send(
-      `🚀 **Cream Store** — Server của bạn đã được **BOOST** thành công!\n\n` +
-      `> 📦 **Gói:** ${order.package}\n` +
-      `> 🖥️ **Server:** ${order.server_name ?? order.server_id}\n` +
-      `> ⏰ **Hết hạn:** ${expiryStr}\n` +
-      `> 📋 **Mã đơn:** \`${order.order_code}\`\n\n` +
-      `Cảm ơn bạn đã sử dụng dịch vụ! Liên hệ shop nếu cần hỗ trợ bảo hành 💙`
-    ).catch(() => null);
+
+    const { ContainerBuilder, TextDisplayBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, MessageFlags: MF } = await import('discord.js');
+
+    const dmLines = [
+      `## <a:tsm_fire:1327553120842158111> Server Của Bạn Đã Được BOOST! <a:tsm_fire:1327553120842158111>`,
+      ``,
+      `<a:tickgreen:1384069022831874169> **Cenar Store** đã boost thành công server của bạn!`,
+      ``,
+      `<:cr_carttt:1348626032747614268> **Gói:** ${order.package}`,
+      `<:cr_muahang:1348622828152426528> **Server:** ${order.server_name ?? order.server_id}`,
+      `<a:Dotyellow:1481134440725090315> **Hết hạn:** ${expiryStr}`,
+      `<:cr_shop:1392749981332541501> **Mã đơn:** \`${order.order_code}\``,
+      ``,
+      `<:muiten:1481124261501337601> Liên hệ shop nếu cần hỗ trợ bảo hành nhé!`,
+      ``,
+      `-# <:cr_tim:1366636325352116225> Cenar Store — Cảm ơn bạn đã tin tưởng sử dụng dịch vụ <:purple_heart_glow:1327541911749263360>`,
+    ].join('\n');
+
+    const dmContainer = new ContainerBuilder().setAccentColor(0x57F287);
+    dmContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(dmLines));
+    dmContainer.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('https://i.pinimg.com/originals/68/ae/bf/68aebf3739f455687a90e871bdc04a98.gif')
+      )
+    );
+
+    await customer.send({
+      components: [dmContainer],
+      flags: MF.IsComponentsV2,
+    }).catch(() => null);
   } catch {}
 
   await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đã boost — Kích hoạt ACTIVE', interaction.user.id).catch(() => null);
   refreshBoostPanel(interaction.client, interaction.guildId).catch(() => null);
 
   await interaction.editReply(
-    `${E('status_check')} Đã kích hoạt đơn \`${code}\` → **ACTIVE** và DM thông báo cho khách!\n` +
-    (expiresAt ? `> Hết hạn: **${expiresRaw}**` : '')
+    `<a:tickgreen:1384069022831874169> Đã kích hoạt đơn \`${code}\` → **ACTIVE** và DM thông báo cho khách!` +
+    (expiresAt ? `\n> <a:Dotyellow:1481134440725090315> Hết hạn: **${expiresRaw}**` : '')
   );
 }
 
