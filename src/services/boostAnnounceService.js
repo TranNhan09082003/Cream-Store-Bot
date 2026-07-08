@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 
 const ANNOUNCE_CHANNEL_ID = '1514598369597587546';
-const BOOST_CHANNEL_ID    = '1282637033340403754';
+const BOOST_CHANNEL_ID    = '1524080488233435336';
 const SERVER1_ID          = '1282637033340403754';
 
 export async function sendBoostAnnouncement(client) {

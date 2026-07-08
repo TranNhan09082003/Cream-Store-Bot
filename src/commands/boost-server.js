@@ -11,7 +11,7 @@ import {
 } from '../services/boostServerService.js';
 
 const ANNOUNCE_CHANNEL_ID = '1514598369597587546';
-const BOOST_CHANNEL_ID    = '1282637033340403754';
+const BOOST_CHANNEL_ID    = '1524080488233435336';
 
 export const data = new SlashCommandBuilder()
   .setName('boost-server')
