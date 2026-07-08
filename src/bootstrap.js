@@ -45,31 +45,16 @@ export async function buildClient() {
       });
     }).catch(err => console.error('Failed to import autoSetupService', err));
 
-    // Gửi thông báo ra mắt Boost Server 1 lần duy nhất
+    // Gửi thông báo ra mắt Boost Server — chạy 1 lần mỗi session, không dùng flag file
     const SERVER1_GUILD_ID = '1282637033340403754';
-    const guildIds = [...readyClient.guilds.cache.keys()].join(', ');
-    console.log(`[BOOST-ANNOUNCE] Guild cache: ${guildIds}`);
-
-    // Chỉ chạy trên instance có Store 1
     const isStore1 = readyClient.guilds.cache.has(SERVER1_GUILD_ID);
-    console.log(`[BOOST-ANNOUNCE] isStore1=${isStore1}`);
-
     if (isStore1) {
-      const { existsSync, writeFileSync } = await import('node:fs');
-      const flagPath = '/home/container/data/.boost_announce_sent';
-      console.log(`[BOOST-ANNOUNCE] Flag exists: ${existsSync(flagPath)}`);
-
-      if (!existsSync(flagPath)) {
-        try {
-          const { sendBoostAnnouncement } = await import('./services/boostAnnounceService.js');
-          await sendBoostAnnouncement(readyClient);
-          writeFileSync(flagPath, new Date().toISOString());
-          console.log('[BOOST-ANNOUNCE] ✅ Đã gửi thông báo ra mắt Boost Server!');
-        } catch (e) {
-          console.error('[BOOST-ANNOUNCE] ❌ Thất bại:', e.message, e.stack);
-        }
-      } else {
-        console.log('[BOOST-ANNOUNCE] Đã gửi trước đó — bỏ qua.');
+      try {
+        const { sendBoostAnnouncement } = await import('./services/boostAnnounceService.js');
+        await sendBoostAnnouncement(readyClient);
+        console.log('[BOOST-ANNOUNCE] ✅ Đã gửi thông báo ra mắt Boost Server!');
+      } catch (e) {
+        console.error('[BOOST-ANNOUNCE] ❌ Thất bại:', e.message);
       }
     }
   });
