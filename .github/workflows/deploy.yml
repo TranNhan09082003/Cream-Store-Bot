@@ -20,6 +20,21 @@ jobs:
       - name: 📦 Checkout code
         uses: actions/checkout@v4
 
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📥 Install dependencies
+        run: npm install --omit=dev --prefer-offline
+
+      - name: 📋 Register Slash Commands
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+        run: node src/deploy-commands.js && echo "✅ Slash commands registered!" || echo "⚠️ Deploy commands failed"
+
       - name: 🚀 Trigger VibeHost Deploy Webhook
         run: |
           echo "📡 Sending deploy request to VibeHost..."
@@ -45,35 +60,8 @@ jobs:
       - name: ⏳ Wait for bot to restart (25s)
         run: sleep 25
 
-      - name: 📋 Register Slash Commands
-        continue-on-error: true
-        run: |
-          echo "📋 Registering slash commands via bot API..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "http://hcm3.vibehost.vn:20022/api/bot/deploy-commands" \
-            -H "x-bot-api-key: ${{ secrets.BOT_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            --max-time 60 || echo "curl_failed\n000")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
-
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $BODY"
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Slash commands registered!"
-          else
-            echo "⚠️ Could not register commands via API (code: $HTTP_CODE) — bot may still be starting"
-          fi
-
       - name: 🔍 Health Check
         run: |
-          echo "Checking bot health..."
           HEALTH=$(curl -s --max-time 10 "http://hcm3.vibehost.vn:20022/api/bot/health" || echo "{}")
-          echo "Health response: $HEALTH"
-          if echo "$HEALTH" | grep -q '"ok":true'; then
-            echo "✅ Bot is healthy and running!"
-          else
-            echo "⚠️ Bot still starting up — check VibeHost logs if needed"
-          fi
+          echo "Health: $HEALTH"
+          echo "$HEALTH" | grep -q '"ok":true' && echo "✅ Bot healthy!" || echo "⚠️ Still starting"
