@@ -349,96 +349,136 @@ export function buildBoostPanelRows(guildId) {
 
 export function buildBoostOrderDetailEmbed(order) {
   const statusMap = {
-    PENDING: { label: '⏳ Chờ xử lý', color: 0xFEE75C },
-    ACTIVE:  { label: '✅ Đang boost', color: 0x57F287 },
-    COMPLETED: { label: '🏁 Hoàn thành', color: 0x95A5A6 },
-    CANCELLED: { label: '❌ Đã huỷ',    color: 0xED4245 },
-    WARRANTY:  { label: '🛡️ Bảo hành', color: 0x5865F2 },
+    PENDING:   { label: '<a:Dotyellow:1481134440725090315> Chờ xử lý',  color: 0xFEE75C },
+    ACTIVE:    { label: '<a:tickgreen:1384069022831874169> Đang boost',  color: 0x57F287 },
+    COMPLETED: { label: '<:cr_green:1366636327415713832> Hoàn thành',   color: 0x95A5A6 },
+    CANCELLED: { label: '<a:tick_red51:1384069065626222632> Đã huỷ',    color: 0xED4245 },
+    WARRANTY:  { label: '<:cr_tim:1366636325352116225> Bảo hành',       color: 0x5865F2 },
   };
-  const paymentLabel = order.payment_status === 'PAID' ? '✅ Đã thanh toán' : '⏳ Chờ thanh toán';
+
+  const paymentLabel = order.payment_status === 'PAID'
+    ? '<a:tickgreen:1384069022831874169> Đã thanh toán'
+    : '<a:Dotyellow:1481134440725090315> Chờ thanh toán';
+
   const s = statusMap[order.status] ?? { label: order.status, color: 0xEB459E };
+  const amountFmt = Number(order.amount).toLocaleString('vi-VN');
 
   const embed = new EmbedBuilder()
     .setColor(s.color)
-    .setTitle(`🚀 Đơn Boost Server — \`${order.order_code}\``)
+    .setTitle(`<a:tsm_fire:1327553120842158111> Đơn Boost Server — \`${order.order_code}\``)
     .addFields(
-      { name: '📦 Gói',         value: `\`${order.package}\``,                                                  inline: true },
-      { name: '💰 Số tiền',     value: `\`${Number(order.amount).toLocaleString('vi-VN')} VND\``,               inline: true },
-      { name: '📊 Trạng thái',  value: s.label,                                                                  inline: true },
-      { name: '💳 Thanh toán',  value: paymentLabel,                                                             inline: true },
-      { name: '🖥️ Server',      value: order.server_name ? `**${order.server_name}**\nID: \`${order.server_id}\`` : `\`${order.server_id}\``, inline: false },
+      { name: '<:cr_carttt:1348626032747614268> Gói',       value: `\`${order.package}\``,  inline: true },
+      { name: '<:cr_pay:1392750857329705000> Số tiền',      value: `**${amountFmt} VND**`,  inline: true },
+      { name: '<a:starxoay:1481141954346483845> Trạng thái', value: s.label,                inline: true },
+      { name: '<:cr_vcb:1348627024859889676> Thanh toán',   value: paymentLabel,            inline: true },
+      {
+        name: '<:cr_muahang:1348622828152426528> Server',
+        value: order.server_name
+          ? `**${order.server_name}**\n\`${order.server_id}\``
+          : `\`${order.server_id}\``,
+        inline: false,
+      },
     );
 
-  if (order.boost_started_at) embed.addFields({ name: '🚀 Bắt đầu', value: `<t:${Math.floor(new Date(order.boost_started_at).getTime() / 1000)}:F>`, inline: true });
-  if (order.boost_expires_at) embed.addFields({ name: '⏰ Hết hạn', value: `<t:${Math.floor(new Date(order.boost_expires_at).getTime() / 1000)}:R>`, inline: true });
-  if (order.note)              embed.addFields({ name: '📝 Ghi chú', value: order.note, inline: false });
-
-  embed.addFields({ name: '📅 Ngày đặt', value: `<t:${Math.floor(new Date(order.created_at).getTime() / 1000)}:F>`, inline: false });
-
-  // Thêm nút thanh toán nếu chưa trả tiền
-  if (order.payment_status !== 'PAID' && order.payment_checkout_url) {
-    embed.addFields({ name: '🔗 Link thanh toán', value: `[Bấm để thanh toán PayOS](${order.payment_checkout_url})`, inline: false });
+  if (order.boost_started_at) {
+    embed.addFields({
+      name: '<a:chamxanh:1481124932447371374> Bắt đầu boost',
+      value: `<t:${Math.floor(new Date(order.boost_started_at).getTime() / 1000)}:F>`,
+      inline: true,
+    });
+  }
+  if (order.boost_expires_at) {
+    embed.addFields({
+      name: '<a:Dotyellow:1481134440725090315> Hết hạn',
+      value: `<t:${Math.floor(new Date(order.boost_expires_at).getTime() / 1000)}:R>`,
+      inline: true,
+    });
+  }
+  if (order.note) {
+    embed.addFields({
+      name: '<:cr_voucher:1392749775794737286> Ghi chú',
+      value: order.note,
+      inline: false,
+    });
   }
 
-  embed.setFooter({ text: '💙 Cenar Store — Dịch Vụ Đáng Tin Cậy' });
+  embed.addFields({
+    name: '<:cr_tim:1366636325352116225> Ngày đặt',
+    value: `<t:${Math.floor(new Date(order.created_at).getTime() / 1000)}:F>`,
+    inline: false,
+  });
+
+  if (order.payment_status !== 'PAID' && order.payment_checkout_url) {
+    embed.addFields({
+      name: '<:cr_pay:1392750857329705000> Link thanh toán',
+      value: `[**Bấm để thanh toán qua PayOS**](${order.payment_checkout_url})`,
+      inline: false,
+    });
+  }
+
+  embed.setFooter({ text: 'Cenar Store — Dịch Vụ Đáng Tin Cậy' })
+       .setThumbnail('https://i.imgur.com/tDGzLH0.png');
+
   return embed;
 }
 
 export function buildBoostOrderActionRows(order, isStaff = false) {
   const rows = [];
 
-  if (['PENDING', 'ACTIVE', 'WARRANTY'].includes(order.status)) {
-    const row1 = new ActionRowBuilder();
+  if (!['PENDING', 'ACTIVE', 'WARRANTY'].includes(order.status)) return rows;
 
-    // Nút thanh toán PayOS nếu chưa trả tiền
-    if (order.payment_status !== 'PAID' && order.payment_checkout_url) {
-      row1.addComponents(
-        new ButtonBuilder()
-          .setLabel('Thanh Toán PayOS')
-          .setStyle(ButtonStyle.Link)
-          .setURL(order.payment_checkout_url)
-          .setEmoji('💳')
-      );
-    }
+  const row1 = new ActionRowBuilder();
 
-    if (['PENDING', 'ACTIVE'].includes(order.status)) {
-      row1.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`boost:cancel:${order.order_code}`)
-          .setLabel('Huỷ Đơn')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('❌')
-      );
-    }
-
-    if (isStaff && ['PENDING', 'ACTIVE'].includes(order.status)) {
-      row1.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`boost:complete:${order.order_code}`)
-          .setLabel('Hoàn Thành')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('✅'),
-        new ButtonBuilder()
-          .setCustomId(`boost:activate:${order.order_code}`)
-          .setLabel('Đã Boost (Kích Hoạt)')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('🚀')
-      );
-    }
-
-    if (order.status === 'ACTIVE') {
-      row1.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`boost:warranty_req:${order.order_code}`)
-          .setLabel('Báo Cáo Bảo Hành')
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji('🛡️')
-      );
-    }
-
-    if (row1.components.length > 0) rows.push(row1);
+  // Nút thanh toán PayOS — hiển thị đầu tiên nếu chưa trả
+  if (order.payment_status !== 'PAID' && order.payment_checkout_url) {
+    row1.addComponents(
+      new ButtonBuilder()
+        .setLabel('Thanh Toán PayOS')
+        .setStyle(ButtonStyle.Link)
+        .setURL(order.payment_checkout_url)
+        .setEmoji({ id: '1392750857329705000', name: 'cr_pay' })
+    );
   }
 
+  // Huỷ đơn
+  if (['PENDING', 'ACTIVE'].includes(order.status)) {
+    row1.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`boost:cancel:${order.order_code}`)
+        .setLabel('Huỷ Đơn')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji({ id: '1384069065626222632', name: 'tick_red51', animated: true })
+    );
+  }
+
+  // Staff actions
+  if (isStaff && ['PENDING', 'ACTIVE'].includes(order.status)) {
+    row1.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`boost:activate:${order.order_code}`)
+        .setLabel('Đã Boost (Kích Hoạt)')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji({ id: '1384069022831874169', name: 'tickgreen', animated: true }),
+      new ButtonBuilder()
+        .setCustomId(`boost:complete:${order.order_code}`)
+        .setLabel('Hoàn Thành')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji({ id: '1366636327415713832', name: 'cr_green' })
+    );
+  }
+
+  // Bảo hành
+  if (order.status === 'ACTIVE') {
+    row1.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`boost:warranty_req:${order.order_code}`)
+        .setLabel('Báo Cáo Bảo Hành')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji({ id: '1366636325352116225', name: 'cr_tim' })
+    );
+  }
+
+  if (row1.components.length > 0) rows.push(row1);
   return rows;
 }
 
