@@ -45,17 +45,11 @@ export async function buildClient() {
       });
     }).catch(err => console.error('Failed to import autoSetupService', err));
 
-    // Gửi thông báo ra mắt Boost Server — chạy 1 lần mỗi session, không dùng flag file
+        // Gửi thông báo ra mắt Boost Server - Đã bị tắt theo yêu cầu để tránh spam tag @everyone khi restart
     const SERVER1_GUILD_ID = '1282637033340403754';
     const isStore1 = readyClient.guilds.cache.has(SERVER1_GUILD_ID);
     if (isStore1) {
-      try {
-        const { sendBoostAnnouncement } = await import('./services/boostAnnounceService.js');
-        await sendBoostAnnouncement(readyClient);
-        console.log('[BOOST-ANNOUNCE] ✅ Đã gửi thông báo ra mắt Boost Server!');
-      } catch (e) {
-        console.error('[BOOST-ANNOUNCE] ❌ Thất bại:', e.message);
-      }
+      console.log('[BOOST-ANNOUNCE] Tính năng tự động thông báo Boost Server khi khởi động đã bị tắt để tránh phiền khách hàng.');
     }
   });
 
