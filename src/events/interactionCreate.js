@@ -3926,7 +3926,7 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
-      if (interaction.isModalSubmit() && interaction.customId === 'youtube_warranty_modal') {
+      if (interaction.isModalSubmit() && interaction.customId === 'ytb:warranty:modal') {
         await interaction.deferReply({ ephemeral: true });
         const E_wl = createEmojiResolver(interaction.guildId);
         try {
@@ -4136,12 +4136,12 @@ export function registerInteractionHandler(client, commands) {
 
       if (!interaction.isButton()) return;
 
-      if (interaction.customId === 'youtube_warranty_click') {
+      if (interaction.customId === 'ytb:warranty:apply') {
         const E_wl = createEmojiResolver(interaction.guildId);
         try {
           const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
           const modal = new ModalBuilder()
-            .setCustomId('youtube_warranty_modal')
+            .setCustomId('ytb:warranty:modal')
             .setTitle('Yêu Cầu Bảo Hành YouTube');
 
           const orderInput = new TextInputBuilder()
