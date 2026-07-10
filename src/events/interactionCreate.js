@@ -3926,6 +3926,53 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      if (interaction.isModalSubmit() && interaction.customId === 'youtube_warranty_modal') {
+        await interaction.deferReply({ ephemeral: true });
+        const E_wl = createEmojiResolver(interaction.guildId);
+        try {
+          const orderCode = interaction.fields.getTextInputValue('warranty_order_code')?.trim().toUpperCase();
+          const customerGmail = interaction.fields.getTextInputValue('warranty_customer_gmail')?.trim();
+          const familyOwnerGmail = interaction.fields.getTextInputValue('warranty_family_owner_gmail')?.trim() || 'Không cung cấp';
+
+          if (!orderCode) {
+            await interaction.editReply({ content: E_wl('status_warn') + ' Vui lòng điền mã đơn hàng.' });
+            return;
+          }
+
+          const order = getOrderByCode(orderCode);
+          if (!order || order.customer_id !== interaction.user.id) {
+            await interaction.editReply({ content: E_wl('status_cross') + ' Không tìm thấy đơn hàng hoặc bạn không phải chủ sở hữu.' });
+            return;
+          }
+
+          const result = await openWarrantyTicket({
+            guild: interaction.guild,
+            customerId: interaction.user.id,
+            actorId: interaction.user.id,
+            orderCode,
+            reason: 'Bảo hành YouTube Premium (Tự động)',
+            formData: {
+              productType: 'YouTube Premium',
+              accountInfo: customerGmail,
+              password: 'Chủ Family cũ: ' + familyOwnerGmail,
+              purchaseDate: 'N/A',
+              dateExpired: 'N/A'
+            }
+          });
+
+          await updateOrderLogMessage(interaction.guild, result.order);
+          await interaction.editReply({
+            content: result.reused 
+              ? E_wl('status_info') + ' Kênh bảo hành của bạn đã tồn tại tại ' + result.channel + '.'
+              : E_wl('status_check') + ' Đã mở kênh bảo hành tại ' + result.channel + '. Vui lòng truy cập để được hỗ trợ!'
+          });
+        } catch (err) {
+          console.error('[YOUTUBE-WARRANTY-MODAL] Error:', err.message);
+          await interaction.editReply({ content: E_wl('status_cross') + ' Đã xảy ra lỗi: ' + err.message });
+        }
+        return;
+      }
+
       if (interaction.isModalSubmit() && interaction.customId === 'ticket:warranty:panel:modal') {
         // Legacy fallback – không nên xảy ra nhưng giữ để tương thích
         const orderCode = interaction.fields.getTextInputValue('warranty_order_code')?.trim().toUpperCase();
@@ -4088,6 +4135,52 @@ export function registerInteractionHandler(client, commands) {
       }
 
       if (!interaction.isButton()) return;
+
+      if (interaction.customId === 'youtube_warranty_click') {
+        const E_wl = createEmojiResolver(interaction.guildId);
+        try {
+          const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+          const modal = new ModalBuilder()
+            .setCustomId('youtube_warranty_modal')
+            .setTitle('Yêu Cầu Bảo Hành YouTube');
+
+          const orderInput = new TextInputBuilder()
+            .setCustomId('warranty_order_code')
+            .setLabel('Mã đơn hàng (ví dụ: CN_123456)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder('CN_xxxxxx hoặc BST_xxxxxx')
+            .setMaxLength(20);
+
+          const gmailInput = new TextInputBuilder()
+            .setCustomId('warranty_customer_gmail')
+            .setLabel('Gmail cần bảo hành của bạn')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder('gmailcua-ban@gmail.com')
+            .setMaxLength(100);
+
+          const familyInput = new TextInputBuilder()
+            .setCustomId('warranty_family_owner_gmail')
+            .setLabel('Gmail chủ Family cũ (nếu có)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setPlaceholder('gmail-chu-family@gmail.com')
+            .setMaxLength(100);
+
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(orderInput),
+            new ActionRowBuilder().addComponents(gmailInput),
+            new ActionRowBuilder().addComponents(familyInput)
+          );
+
+          await interaction.showModal(modal);
+        } catch (err) {
+          console.error('[YOUTUBE-WARRANTY-CLICK] Error:', err.message);
+          await interaction.reply({ content: E_wl('status_cross') + ' Không thể hiển thị modal bảo hành: ' + err.message, ephemeral: true }).catch(() => null);
+        }
+        return;
+      }
 
       if (interaction.customId === 'partner:apply:start') {
         await handlePartnerApplyStart(interaction);
