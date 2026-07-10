@@ -2870,10 +2870,19 @@ async function handleBoostCancelModal(interaction, code) {
     const dmContainer = new ContainerBuilder().setAccentColor(0xED4245);
     dmContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent(dmLines));
 
-    await customer.send({
-      components: [dmContainer],
-      flags: MF.IsComponentsV2,
-    }).catch(() => null);
+    // Tạo thanh nút bấm đánh giá từ 1 đến 5 sao
+      const feedbackRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`boost:feedback:start:${code}:1`).setLabel('1 ⭐').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`boost:feedback:start:${code}:2`).setLabel('2 ⭐').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`boost:feedback:start:${code}:3`).setLabel('3 ⭐').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`boost:feedback:start:${code}:4`).setLabel('4 ⭐').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`boost:feedback:start:${code}:5`).setLabel('5 ⭐').setStyle(ButtonStyle.Primary)
+      );
+
+      await customer.send({
+        components: [dmContainer, feedbackRow],
+        flags: MF.IsComponentsV2,
+      }).catch(() => null);
   } catch {}
 
   await sendBoostLog(interaction.client, interaction.guildId, updated, 'Đơn bị huỷ', interaction.user.id).catch(() => null);
@@ -4135,6 +4144,51 @@ export function registerInteractionHandler(client, commands) {
       }
 
       if (!interaction.isButton()) return;
+
+      // Xử lý khi khách bấm nút sao feedback đơn boost
+      if (interaction.customId.startsWith('boost:feedback:start:')) {
+        const parts = interaction.customId.split(':');
+        const orderCode = parts[3];
+        const starsRaw = parts[4];
+        const stars = parseInt(starsRaw, 10) || 5;
+
+        const E = createEmojiResolver(interaction.guildId);
+        const { getBoostOrderByCode } = await import('../services/boostServerService.js');
+        const order = getBoostOrderByCode(orderCode);
+
+        if (!order) {
+          await interaction.reply({ content: E('status_cross') + ' Không tìm thấy đơn hàng boost.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        if (order.customer_id !== interaction.user.id) {
+          await interaction.reply({ content: E('status_cross') + ' Bạn không phải chủ sở hữu đơn hàng này.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        if (order.note && order.note.includes('[FEEDBACK_SUBMITTED]')) {
+          await interaction.reply({ content: E('status_info') + ' Đơn hàng này đã được đánh giá rồi. Cảm ơn bạn!', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        // Hiện modal đánh giá
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+        const modal = new ModalBuilder()
+          .setCustomId(`boost:feedback:modal:${orderCode}:${stars}`)
+          .setTitle(`Đánh Giá Đơn Boost ${orderCode}`);
+
+        const textInput = new TextInputBuilder()
+          .setCustomId('feedback_content')
+          .setLabel(`Cảm nhận của bạn (${stars}/5 sao)`)
+          .setStyle(TextInputStyle.Paragraph)
+          .setPlaceholder('Nhập ý kiến đóng góp của bạn về dịch vụ...')
+          .setRequired(true)
+          .setMaxLength(500);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(textInput));
+        await interaction.showModal(modal).catch(console.error);
+        return;
+      }
 
       if (interaction.customId === 'ytb:warranty:apply') {
         const E_wl = createEmojiResolver(interaction.guildId);

@@ -394,9 +394,11 @@ export function buildBoostOrderDetailEmbed(order) {
       { name: '<:cr_vcb:1348627024859889676> Thanh toán',   value: paymentLabel,            inline: true },
       {
         name: '<:cr_muahang:1348622828152426528> Server',
-        value: order.server_name
-          ? `**${order.server_name}**\n\`${order.server_id}\``
-          : `\`${order.server_id}\``,
+        value: [
+          order.server_name ? `**${order.server_name}**` : null,
+          `ID: \`${order.server_id}\``,
+          order.server_link ? `Link: [**Bấm vào để vào server**](${order.server_link})` : null
+        ].filter(Boolean).join('\n'),
         inline: false,
       },
     );
@@ -567,7 +569,7 @@ export async function sendBoostLog(client, guildId, order, action, actorId = nul
     { name: '<:verifybadge:1481127479702847646> Khách',  value: `<@${order.customer_id}>`,                                                                   inline: true },
     { name: '<:cr_carttt:1348626032747614268> Gói',      value: order.package,                                                                                inline: true },
     { name: '<:cr_pay:1392750857329705000> Thanh toán',  value: paymentLabel,                                                                                 inline: true },
-    { name: '<:cr_muahang:1348622828152426528> Server',  value: order.server_name ? `**${order.server_name}**\n\`${order.server_id}\`` : `\`${order.server_id}\``, inline: true },
+    { name: '<:cr_muahang:1348622828152426528> Server',  value: [order.server_name ? `**${order.server_name}**` : null, `ID: \`${order.server_id}\``, order.server_link ? `Link: [**Vào Server**](${order.server_link})` : null].filter(Boolean).join('\n'), inline: true },
     { name: '<a:starxoay:1481141954346483845> Trạng thái', value: statusLabel,                                                                               inline: true },
   ];
 
