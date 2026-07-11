@@ -4710,7 +4710,8 @@ export function registerInteractionHandler(client, commands) {
                 `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
                 `> <a:tickgreen:1384069022831874169> **Trạng thái:** Thành công\n\n` +
                 `🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>!\n` +
-                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!`
+                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!\n\n` +
+                `⏳ **Lưu ý:** Luồng hỗ trợ này sẽ **tự động đóng và lưu trữ sau 1 phút**.`
               )
               .setTimestamp()
               .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
@@ -4731,6 +4732,44 @@ export function registerInteractionHandler(client, commands) {
               )
             ]
           }).catch(() => null);
+
+          // Tự động đóng ticket sau 1 phút (60000 ms)
+          setTimeout(async () => {
+            try {
+              const thread = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+              if (thread) {
+                // Đóng ticket trong DB
+                closeTicket(ticket.id, interaction.client.user.id);
+
+                const closeEmbed = new EmbedBuilder()
+                  .setColor(0xED4245)
+                  .setTitle(`<a:tick_red51:1384069065626222632> TICKET ĐÃ ĐÓNG`)
+                  .setDescription(
+                    `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
+                    `> <a:tick_red51:1384069065626222632> **Trạng thái:** Đóng tự động sau 1 phút duyệt thành công.\n\n` +
+                    `Luồng hỗ trợ này sẽ tự động lưu trữ / xóa trong giây lát...`
+                  )
+                  .setTimestamp();
+                
+                await thread.send({ embeds: [closeEmbed] }).catch(() => null);
+
+                // Xuất transcript
+                const transcriptResult = await exportTicketTranscript(thread).catch(() => null);
+                if (transcriptResult) {
+                  await deliverTranscript({ guild: interaction.guild, ticket, transcriptResult, closedById: interaction.client.user.id });
+                }
+
+                // Xóa thread hoặc lưu trữ
+                setTimeout(async () => {
+                  await thread.delete('Tự động xóa sau 1 phút duyệt thành công').catch(async () => {
+                    await thread.setArchived(true, 'Tự động lưu trữ sau 1 phút duyệt thành công').catch(() => null);
+                  });
+                }, 2000);
+              }
+            } catch (e) {
+              console.error('[AUTO-CLOSE-APPEAL] Lỗi tự động đóng:', e.message);
+            }
+          }, 60000);
 
         } catch (err) {
           console.error('[YTB-APPEAL-APPROVE] Error:', err.message);
