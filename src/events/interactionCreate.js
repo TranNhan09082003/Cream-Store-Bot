@@ -357,6 +357,10 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
 
   const normalizedType = String(ticketType || 'ORDER').toUpperCase();
 
+  if (normalizedType === 'APPEAL') {
+    await interaction.deferReply({ ephemeral: true }).catch(() => null);
+  }
+
   // Khóa chống click đúp tạo 2 ticket
   const lockKey = `${interaction.guildId}:${interaction.user.id}:${normalizedType}`;
   if (activeTicketCreations.has(lockKey)) {
