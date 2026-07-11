@@ -4305,6 +4305,8 @@ export function registerInteractionHandler(client, commands) {
           return;
         }
 
+        await interaction.deferUpdate().catch(() => null);
+
         try {
           // Truy vấn database SQLite lấy thông tin ticket
           const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
@@ -4480,7 +4482,7 @@ export function registerInteractionHandler(client, commands) {
               .setColor(0x57F287)
               .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ DUYỆT]')
               .setDescription((oldEmbed.description || '') + `\n\n${E('status_check')} **Đã duyệt bảo hành bởi:** <@${interaction.user.id}>`);
-            await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+            await interaction.editReply({ embeds: [embed], components: [] }).catch(() => null);
           } else {
             // Đây là V2 Container!
             const { ContainerBuilder, TextDisplayBuilder } = await import('discord.js');
@@ -4497,14 +4499,14 @@ export function registerInteractionHandler(client, commands) {
             const container = new ContainerBuilder().setAccentColor(0x57F287);
             container.addTextDisplayComponents(new TextDisplayBuilder().setContent(updatedContent));
             
-            await interaction.update({
+            await interaction.editReply({
               components: [container],
               flags: MessageFlags.IsComponentsV2
             }).catch(() => null);
           }
         } catch (err) {
           console.error('[YTB-APPROVE] Error:', err.stack || err);
-          await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
+          await safeReply(interaction, { content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true });
         }
         return;
       }
@@ -4522,6 +4524,8 @@ export function registerInteractionHandler(client, commands) {
           await interaction.reply({ content: E('status_cross') + ' Chỉ Staff mới có quyền từ chối bảo hành.', ephemeral: true }).catch(() => null);
           return;
         }
+
+        await interaction.deferUpdate().catch(() => null);
 
         try {
           const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
@@ -4681,7 +4685,7 @@ export function registerInteractionHandler(client, commands) {
               .setColor(0xED4245)
               .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ TỪ CHỐI]')
               .setDescription((oldEmbed.description || '') + `\n\n${E('status_cross')} **Đã từ chối bảo hành bởi:** <@${interaction.user.id}>`);
-            await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+            await interaction.editReply({ embeds: [embed], components: [] }).catch(() => null);
           } else {
             // Đây là V2 Container!
             const { ContainerBuilder, TextDisplayBuilder } = await import('discord.js');
@@ -4698,14 +4702,14 @@ export function registerInteractionHandler(client, commands) {
             const container = new ContainerBuilder().setAccentColor(0xED4245);
             container.addTextDisplayComponents(new TextDisplayBuilder().setContent(updatedContent));
             
-            await interaction.update({
+            await interaction.editReply({
               components: [container],
               flags: MessageFlags.IsComponentsV2
             }).catch(() => null);
           }
         } catch (err) {
           console.error('[YTB-REJECT] Error:', err.stack || err);
-          await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
+          await safeReply(interaction, { content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true });
         }
         return;
       }
@@ -4729,6 +4733,8 @@ export function registerInteractionHandler(client, commands) {
           await interaction.reply({ content: E('status_cross') + ' Chỉ Staff mới có quyền duyệt kháng.', ephemeral: true }).catch(() => null);
           return;
         }
+
+        await interaction.deferUpdate().catch(() => null);
 
         try {
           const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
@@ -4793,7 +4799,7 @@ export function registerInteractionHandler(client, commands) {
           }
 
           // Cập nhật nút bấm thành trạng thái đã duyệt
-          await interaction.update({
+          await interaction.editReply({
             components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -4849,7 +4855,7 @@ export function registerInteractionHandler(client, commands) {
 
         } catch (err) {
           console.error('[YTB-APPEAL-APPROVE] Error:', err.message);
-          await interaction.reply({ content: E('status_cross') + ' Lỗi: ' + err.message, ephemeral: true }).catch(() => null);
+          await safeReply(interaction, { content: E('status_cross') + ' Lỗi: ' + err.message, ephemeral: true });
         }
         return;
       }
@@ -4867,6 +4873,8 @@ export function registerInteractionHandler(client, commands) {
           await interaction.reply({ content: E('status_cross') + ' Chỉ Staff mới có quyền thao tác.', ephemeral: true }).catch(() => null);
           return;
         }
+
+        await interaction.deferUpdate().catch(() => null);
 
         try {
           const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
@@ -4916,7 +4924,7 @@ export function registerInteractionHandler(client, commands) {
           }
 
           // Cập nhật nút bấm thành trạng thái đã từ chối
-          await interaction.update({
+          await interaction.editReply({
             components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -4929,9 +4937,9 @@ export function registerInteractionHandler(client, commands) {
             ]
           }).catch(() => null);
 
-        } catch (err) {
+         } catch (err) {
           console.error('[YTB-APPEAL-REJECT] Error:', err.message);
-          await interaction.reply({ content: E('status_cross') + ' Lỗi: ' + err.message, ephemeral: true }).catch(() => null);
+          await safeReply(interaction, { content: E('status_cross') + ' Lỗi: ' + err.message, ephemeral: true });
         }
         return;
       }
