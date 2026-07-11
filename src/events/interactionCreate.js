@@ -4499,12 +4499,33 @@ export function registerInteractionHandler(client, commands) {
 
           // Cập nhật tin nhắn trong kênh duyệt
           const oldEmbed = interaction.message.embeds[0];
-          const embed = EmbedBuilder.from(oldEmbed)
-            .setColor(0x57F287)
-            .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ DUYỆT]')
-            .setDescription((oldEmbed.description || '') + `\n\n${E('status_check')} **Đã duyệt bảo hành bởi:** <@${interaction.user.id}>`);
-
-          await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+          if (oldEmbed) {
+            const embed = EmbedBuilder.from(oldEmbed)
+              .setColor(0x57F287)
+              .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ DUYỆT]')
+              .setDescription((oldEmbed.description || '') + `\n\n${E('status_check')} **Đã duyệt bảo hành bởi:** <@${interaction.user.id}>`);
+            await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+          } else {
+            // Đây là V2 Container!
+            const { ContainerBuilder, TextDisplayBuilder } = await import('discord.js');
+            let originalContent = '';
+            if (interaction.message.components && interaction.message.components[0]) {
+              const row = interaction.message.components[0];
+              const comp = row.components && row.components[0];
+              if (comp) {
+                originalContent = comp.content || (comp.data && comp.data.content) || '';
+              }
+            }
+            
+            const updatedContent = originalContent + `\n\n${E('status_check')} **Đã duyệt bảo hành bởi:** <@${interaction.user.id}>`;
+            const container = new ContainerBuilder().setAccentColor(0x57F287);
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(updatedContent));
+            
+            await interaction.update({
+              components: [container],
+              flags: MessageFlags.IsComponentsV2
+            }).catch(() => null);
+          }
         } catch (err) {
           console.error('[YTB-APPROVE] Error:', err.stack || err);
           await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
@@ -4679,12 +4700,33 @@ export function registerInteractionHandler(client, commands) {
 
           // Cập nhật tin nhắn trong kênh duyệt
           const oldEmbed = interaction.message.embeds[0];
-          const embed = EmbedBuilder.from(oldEmbed)
-            .setColor(0xED4245)
-            .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ TỪ CHỐI]')
-            .setDescription((oldEmbed.description || '') + `\n\n${E('status_cross')} **Đã từ chối bảo hành bởi:** <@${interaction.user.id}>`);
-
-          await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+          if (oldEmbed) {
+            const embed = EmbedBuilder.from(oldEmbed)
+              .setColor(0xED4245)
+              .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ TỪ CHỐI]')
+              .setDescription((oldEmbed.description || '') + `\n\n${E('status_cross')} **Đã từ chối bảo hành bởi:** <@${interaction.user.id}>`);
+            await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+          } else {
+            // Đây là V2 Container!
+            const { ContainerBuilder, TextDisplayBuilder } = await import('discord.js');
+            let originalContent = '';
+            if (interaction.message.components && interaction.message.components[0]) {
+              const row = interaction.message.components[0];
+              const comp = row.components && row.components[0];
+              if (comp) {
+                originalContent = comp.content || (comp.data && comp.data.content) || '';
+              }
+            }
+            
+            const updatedContent = originalContent + `\n\n${E('status_cross')} **Đã từ chối bảo hành bởi:** <@${interaction.user.id}>`;
+            const container = new ContainerBuilder().setAccentColor(0xED4245);
+            container.addTextDisplayComponents(new TextDisplayBuilder().setContent(updatedContent));
+            
+            await interaction.update({
+              components: [container],
+              flags: MessageFlags.IsComponentsV2
+            }).catch(() => null);
+          }
         } catch (err) {
           console.error('[YTB-REJECT] Error:', err.stack || err);
           await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
