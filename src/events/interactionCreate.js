@@ -322,7 +322,7 @@ function getTicketCategoryId(guildConfig, ticketType) {
   }
 }
 
-async function handleTicketCreate(interaction, ticketType = 'ORDER') {
+async function handleTicketCreate(interaction, ticketType = 'ORDER', gmailAddress = null) {
   const E = createEmojiResolver(interaction.guildId);
   if (!interaction.inGuild()) {
     await safeReply(interaction, { content: 'Ticket chỉ tạo được trong server.', ephemeral: true });
@@ -443,9 +443,24 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
       const mentionParts = [`<@${interaction.user.id}>`];
       if (guildConfig.support_role_id) mentionParts.push(`<@&${guildConfig.support_role_id}>`);
       if (guildConfig.manager_role_id) mentionParts.push(`<@&${guildConfig.manager_role_id}>`);
+      
+      // Tag thêm admin manager và owner nếu là server chính
+      if (interaction.guildId === '1282637033340403754') {
+        mentionParts.push('<@&1348638945793019945>'); // ｜ Admin Manager
+        mentionParts.push('<@&1282638119497109524>'); // Owner
+      }
+
       await thread.send({
         content: mentionParts.join(' '),
-        allowedMentions: { users: [interaction.user.id], roles: [guildConfig.support_role_id, guildConfig.manager_role_id].filter(Boolean) }
+        allowedMentions: { 
+          users: [interaction.user.id], 
+          roles: [
+            guildConfig.support_role_id, 
+            guildConfig.manager_role_id,
+            interaction.guildId === '1282637033340403754' ? '1348638945793019945' : null,
+            interaction.guildId === '1282637033340403754' ? '1282638119497109524' : null
+          ].filter(Boolean) 
+        }
       }).catch(() => null);
 
       const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
@@ -457,9 +472,10 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
           `Xin chào <@${interaction.user.id}>!`,
           `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\``,
           `> <a:redload:1459179959158571119> **Thời gian:** <t:${Math.floor(Date.now() / 1000)}:R>`,
+          gmailAddress ? `> 📧 **Gmail yêu cầu kháng:** \`${gmailAddress}\`` : '',
           '',
           `**Yêu cầu kháng cáo giới hạn 12 tháng gia đình YouTube của bạn đã được tiếp nhận. Vui lòng đọc kỹ các quy định sau và chuẩn bị phối hợp cùng Admin.**`,
-        ].join('\n'))
+        ].filter(Boolean).join('\n'))
         .addFields(
           {
             name: `<a:tsm_fire:1327553120842158111> 1. Luôn online`,
@@ -3617,6 +3633,12 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
+      if (interaction.isModalSubmit() && interaction.customId === 'ytb:appeal:modal') {
+        const gmail = interaction.fields.getTextInputValue('gmail');
+        await handleTicketCreate(interaction, 'APPEAL', gmail);
+        return;
+      }
+
       if (interaction.isModalSubmit() && interaction.customId === 'partner:apply:modal') {
         await handlePartnerApplyModal(interaction);
         return;
@@ -4714,9 +4736,24 @@ export function registerInteractionHandler(client, commands) {
         return;
       }
 
-      // Xử lý khi khách bấm nút Kháng 12 Tháng YT
+      // Xử lý khi khách bấm nút Kháng 12 Tháng YT - Hiện Modal nhập Gmail
       if (interaction.customId === 'ytb:appeal:apply') {
-        await handleTicketCreate(interaction, 'APPEAL');
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+        const modal = new ModalBuilder()
+          .setCustomId('ytb:appeal:modal')
+          .setTitle('YÊU CẦU KHÁNG YT 12 THÁNG');
+
+        const gmailInput = new TextInputBuilder()
+          .setCustomId('gmail')
+          .setLabel('Địa chỉ Gmail bị dính 12 tháng')
+          .setPlaceholder('nhap_gmail_cua_ban@gmail.com')
+          .setStyle(TextInputStyle.Short)
+          .setMinLength(5)
+          .setMaxLength(100)
+          .setRequired(true);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(gmailInput));
+        await interaction.showModal(modal).catch(() => null);
         return;
       }
 
