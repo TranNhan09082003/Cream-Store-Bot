@@ -386,50 +386,15 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
     let ticket;
 
     if (normalizedType === 'APPEAL') {
-      // Find or create the 'kháng-yt-12-tháng' channel
-      let parentChannel = interaction.guild.channels.cache.find(
-        c => (c.name === 'kháng-yt-12-tháng' || c.name === 'khang-yt-12-thang') && c.type === ChannelType.GuildText
-      );
-      
+      // Tìm kênh hướng dẫn youtube để làm parent channel cho thread
+      let parentChannel = await interaction.guild.channels.fetch('1524057155022491679').catch(() => null);
       if (!parentChannel) {
-        const overwrites = [
-          {
-            id: interaction.guild.roles.everyone.id,
-            allow: [PermissionFlagsBits.ViewChannel],
-            deny: [PermissionFlagsBits.SendMessages],
-          },
-          {
-            id: interaction.client.user.id,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory,
-              PermissionFlagsBits.ManageChannels,
-              PermissionFlagsBits.ManageThreads,
-              PermissionFlagsBits.SendMessagesInThreads
-            ],
-          }
-        ];
-        
-        if (guildConfig.support_role_id) {
-          overwrites.push({
-            id: guildConfig.support_role_id,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ManageThreads,
-              PermissionFlagsBits.SendMessagesInThreads
-            ]
-          });
-        }
-        
-        const categoryId = guildConfig.warranty_category_id || guildConfig.ticket_category_id;
-        parentChannel = await interaction.guild.channels.create({
-          name: 'kháng-yt-12-tháng',
-          type: ChannelType.GuildText,
-          parent: categoryId,
-          permissionOverwrites: overwrites,
-        });
+        parentChannel = interaction.guild.channels.cache.find(
+          c => (c.name === 'hướng-dẫn-youtube' || c.name === 'huong-dan-youtube') && c.type === ChannelType.GuildText
+        );
+      }
+      if (!parentChannel) {
+        parentChannel = interaction.channel; // fallback
       }
 
       ticket = createTicket({
@@ -609,10 +574,17 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
       relatedTicketCode: ticket.ticket_code,
     });
 
-    await safeReply(interaction, {
-      content: `${E('status_check')} Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
-      ephemeral: true,
-    });
+    if (normalizedType === 'APPEAL') {
+      await safeReply(interaction, {
+        content: `<a:tickgreen:1384069022831874169> **Yêu cầu Kháng 12 Tháng YouTube của bạn đã được tạo thành công!**\n> ➡️ Vui lòng nhấn vào luồng hỗ trợ riêng tư của bạn tại đây để làm việc cùng Staff nhé: <#${channel.id}>`,
+        ephemeral: true,
+      });
+    } else {
+      await safeReply(interaction, {
+        content: `${E('status_check')} Ticket **${normalizedType}** của bạn đã được tạo: ${channel}`,
+        ephemeral: true,
+      });
+    }
   } catch (error) {
     if (error.code === 'RATE_LIMITED') {
       await safeReply(interaction, { content: `${E('status_warn')} ${error.message}`, ephemeral: true });
