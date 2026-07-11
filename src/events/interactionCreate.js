@@ -4744,14 +4744,20 @@ export function registerInteractionHandler(client, commands) {
           if (customer) {
             const embedDm = new EmbedBuilder()
               .setColor(0x57F287)
-              .setTitle(`<a:tickgreen:1384069022831874169> KHÁNG CÁO 12 THÁNG THÀNH CÔNG`)
-              .setDescription(
-                `Chào <@${ticket.customer_id}>,\n\n` +
-                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
-                `> <a:tickgreen:1384069022831874169> **Trạng thái:** Thành công\n\n` +
-                `🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>!\n` +
-                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!`
-              )
+              .setTitle(`<a:tickgreen:1384069022831874169> **KHÁNG CÁO 12 THÁNG THÀNH CÔNG**`)
+              .setDescription([
+                `Chào <@${ticket.customer_id}>,`,
+                '',
+                `> **THÔNG TIN CHI TIẾT**`,
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\``,
+                `> <a:tickgreen:1384069022831874169> **Trạng thái:** \`Thành công\``,
+                `> <a:starxoay:1481141954346483845> **Người duyệt:** <@${interaction.user.id}>`,
+                '',
+                `<a:tsm_fire:1327553120842158111> **Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công!**`,
+                `Vui lòng kiểm tra hộp thư **Gmail** của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!`,
+                '',
+                `-# <:purple_heart_glow:1327541911749263360> *Cảm ơn bạn đã tin tưởng Cenar Store!*`
+              ].join('\n'))
               .setTimestamp()
               .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
 
@@ -4763,17 +4769,25 @@ export function registerInteractionHandler(client, commands) {
           if (ticketChannel?.isTextBased()) {
             const embedChannel = new EmbedBuilder()
               .setColor(0x57F287)
-              .setTitle(`<a:tickgreen:1384069022831874169> KHÁNG CÁO 12 THÁNG THÀNH CÔNG`)
-              .setDescription(
-                `Chào <@${ticket.customer_id}>,\n\n` +
-                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
-                `> <a:tickgreen:1384069022831874169> **Trạng thái:** Thành công\n\n` +
-                `🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>!\n` +
-                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!\n\n` +
-                `⏳ **Lưu ý:** Luồng hỗ trợ này sẽ **tự động đóng và lưu trữ sau 1 phút**.`
-              )
+              .setTitle(`<a:tickgreen:1384069022831874169> **KHÁNG CÁO 12 THÁNG THÀNH CÔNG**`)
+              .setDescription([
+                `### <a:starxoay:1481141954346483845> THÔNG TIN DUYỆT KHÁNG`,
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\``,
+                `> <a:tickgreen:1384069022831874169> **Trạng thái:** \`Đã hoàn tất\``,
+                `> <a:starxoay:1481141954346483845> **Admin xử lý:** <@${interaction.user.id}>`,
+                '',
+                `**Chào <@${ticket.customer_id}>,**`,
+                `*Yêu cầu kháng 12 tháng gia đình YouTube Premium của bạn đã được phê duyệt thành công.*`,
+                '',
+                `📬 **HƯỚNG DẪN:**`,
+                `* Vui lòng truy cập ngay vào hộp thư **Gmail** của bạn.`,
+                `* Tìm thư mời gia đình mới và bấm **Chấp nhận lời mời** để khôi phục Premium.`,
+                '',
+                `⚠️ **LƯU Ý QUAN TRỌNG:**`,
+                `> <a:redload:1459179959158571119> Luồng hỗ trợ riêng tư này sẽ **tự động đóng và lưu trữ sau 1 phút**.`
+              ].join('\n'))
               .setTimestamp()
-              .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+              .setFooter({ text: `${interaction.guild.name} · Hỗ Trợ Kháng Cáo`, iconURL: interaction.guild.iconURL() });
 
             await ticketChannel.send({ content: `<@${ticket.customer_id}>`, embeds: [embedChannel] }).catch(() => null);
           }
@@ -4802,13 +4816,16 @@ export function registerInteractionHandler(client, commands) {
 
                 const closeEmbed = new EmbedBuilder()
                   .setColor(0xED4245)
-                  .setTitle(`<a:tick_red51:1384069065626222632> TICKET ĐÃ ĐÓNG`)
-                  .setDescription(
-                    `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
-                    `> <a:tick_red51:1384069065626222632> **Trạng thái:** Đóng tự động sau 1 phút duyệt thành công.\n\n` +
-                    `Luồng hỗ trợ này sẽ tự động lưu trữ / xóa trong giây lát...`
-                  )
-                  .setTimestamp();
+                  .setTitle(`<a:tick_red51:1384069065626222632> **LUỒNG KHÁNG CÁO ĐÃ ĐÓNG**`)
+                  .setDescription([
+                    `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\``,
+                    `> <a:tick_red51:1384069065626222632> **Trạng thái:** \`Đóng tự động sau 1 phút duyệt thành công\``,
+                    '',
+                    `Luồng hỗ trợ này đã hoàn thành nhiệm vụ và hiện đang được hệ thống tự động lưu trữ / xóa.`,
+                    `Bản lưu tin nhắn (transcript) đã được xuất và gửi về trung tâm điều hành.`
+                  ].join('\n'))
+                  .setTimestamp()
+                  .setFooter({ text: thread.guild.name, iconURL: thread.guild.iconURL() });
                 
                 await thread.send({ embeds: [closeEmbed] }).catch(() => null);
 
