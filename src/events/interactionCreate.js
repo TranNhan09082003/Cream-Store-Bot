@@ -382,80 +382,223 @@ async function handleTicketCreate(interaction, ticketType = 'ORDER') {
       closeTicket(existingTicket.id, interaction.client.user.id);
     }
 
-    const overwrites = [
-      { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
-      {
-        id: interaction.client.user.id,
-        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels],
-      },
-    ];
-
-    if (guildConfig.support_role_id) {
-      overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
-    }
-
-    const categoryId = getTicketCategoryId(guildConfig, normalizedType);
-    const channel = await interaction.guild.channels.create({
-      name: `ticket-${Math.random().toString().slice(2, 8)}`,
-      type: ChannelType.GuildText,
-      parent: categoryId,
-      permissionOverwrites: overwrites,
-    });
-
-    const ticket = createTicket({
-      guildId: interaction.guildId,
-      channelId: channel.id,
-      customerId: interaction.user.id,
-      openedById: interaction.user.id,
-      ticketType: normalizedType,
-    });
-
-    const hub = getCenarHub();
-    if (hub) {
-      hub.upsertUser({
-        discord_id: interaction.user.id,
-        discord_username: interaction.user.username,
-        display_name: interaction.member?.displayName,
-      }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
-    }
-
-    let channelPrefix = 'ticket';
-    if (normalizedType === 'APPEAL') channelPrefix = 'khang-12t';
-    await channel.setName(buildTicketChannelName(ticket.ticket_code, channelPrefix)).catch(() => null);
-    
-    const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
-      ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
-    );
-    
-    const components = [
-      welcomeV2,
-      ...buildTicketControlComponents(ticket.id, interaction.user.id)
-    ];
+    let channel;
+    let ticket;
 
     if (normalizedType === 'APPEAL') {
-      const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = await import('discord.js');
+      // Find or create the 'kháng-yt-12-tháng' channel
+      let parentChannel = interaction.guild.channels.cache.find(
+        c => (c.name === 'kháng-yt-12-tháng' || c.name === 'khang-yt-12-thang') && c.type === ChannelType.GuildText
+      );
+      
+      if (!parentChannel) {
+        const overwrites = [
+          {
+            id: interaction.guild.roles.everyone.id,
+            allow: [PermissionFlagsBits.ViewChannel],
+            deny: [PermissionFlagsBits.SendMessages],
+          },
+          {
+            id: interaction.client.user.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory,
+              PermissionFlagsBits.ManageChannels,
+              PermissionFlagsBits.ManageThreads,
+              PermissionFlagsBits.SendMessagesInThreads
+            ],
+          }
+        ];
+        
+        if (guildConfig.support_role_id) {
+          overwrites.push({
+            id: guildConfig.support_role_id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ManageThreads,
+              PermissionFlagsBits.SendMessagesInThreads
+            ]
+          });
+        }
+        
+        const categoryId = guildConfig.warranty_category_id || guildConfig.ticket_category_id;
+        parentChannel = await interaction.guild.channels.create({
+          name: 'kháng-yt-12-tháng',
+          type: ChannelType.GuildText,
+          parent: categoryId,
+          permissionOverwrites: overwrites,
+        });
+      }
+
+      ticket = createTicket({
+        guildId: interaction.guildId,
+        channelId: 'PENDING',
+        customerId: interaction.user.id,
+        openedById: interaction.user.id,
+        ticketType: normalizedType,
+      });
+
+      const threadName = `khang-12t-${ticket.ticket_code}`;
+      const thread = await parentChannel.threads.create({
+        name: threadName,
+        autoArchiveDuration: 10080,
+        type: ChannelType.GuildPrivateThread,
+        reason: `Ticket Kháng 12 Tháng cho ${interaction.user.username}`,
+      }).catch(async (err) => {
+        console.error('[THREAD-CREATE] Failed to create private thread, falling back to public:', err.message);
+        return await parentChannel.threads.create({
+          name: threadName,
+          autoArchiveDuration: 10080,
+          type: ChannelType.GuildPublicThread,
+          reason: `Ticket Kháng 12 Tháng cho ${interaction.user.username}`,
+        });
+      });
+
+      db.prepare("UPDATE tickets SET channel_id = ? WHERE id = ?").run(thread.id, ticket.id);
+      channel = thread;
+      ticket.channel_id = thread.id;
+
+      await thread.members.add(interaction.user.id).catch(() => null);
+
+      const hub = getCenarHub();
+      if (hub) {
+        hub.upsertUser({
+          discord_id: interaction.user.id,
+          discord_username: interaction.user.username,
+          display_name: interaction.member?.displayName,
+        }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+      }
+
+      const mentionParts = [`<@${interaction.user.id}>`];
+      if (guildConfig.support_role_id) mentionParts.push(`<@&${guildConfig.support_role_id}>`);
+      if (guildConfig.manager_role_id) mentionParts.push(`<@&${guildConfig.manager_role_id}>`);
+      await thread.send({
+        content: mentionParts.join(' '),
+        allowedMentions: { users: [interaction.user.id], roles: [guildConfig.support_role_id, guildConfig.manager_role_id].filter(Boolean) }
+      }).catch(() => null);
+
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle(`<:cr_baohanh:1348625535512870965> TICKET KHÁNG 12 THÁNG YOUTUBE PREMIUM`)
+        .setDescription([
+          `Xin chào <@${interaction.user.id}>!`,
+          `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\``,
+          `> <a:redload:1459179959158571119> **Thời gian:** <t:${Math.floor(Date.now() / 1000)}:R>`,
+          '',
+          `**Yêu cầu kháng cáo giới hạn 12 tháng gia đình YouTube của bạn đã được tiếp nhận. Vui lòng đọc kỹ các quy định sau và chuẩn bị phối hợp cùng Admin.**`,
+        ].join('\n'))
+        .addFields(
+          {
+            name: `<a:tsm_fire:1327553120842158111> 1. Luôn online`,
+            value: `> Bạn cần duy trì online. Khi Admin/Chủ shop tag tên, bạn cần phản hồi ngay lập tức để tiến hành kháng.`,
+            inline: false
+          },
+          {
+            name: `<a:redload:1459179959158571119> 2. Kế hoạch dự phòng`,
+            value: `> Nếu không kháng được, bắt buộc phải đổi email khác hoặc chờ 7 - 15 ngày để bắt đầu lượt kháng thứ 2.`,
+            inline: false
+          },
+          {
+            name: `<:money:1442876095442714748> 3. Phí dịch vụ (Khách vãng lai)`,
+            value: `> Miễn phí nếu mua YouTube tại shop. Phí 20,000đ/lượt thành công đối với khách vãng lai.`,
+            inline: false
+          }
+        )
+        .setTimestamp()
+        .setFooter({ text: `${interaction.guild.name} · Hỗ Trợ Kháng Cáo`, iconURL: interaction.guild.iconURL() });
+
       const btnApprove = new ButtonBuilder()
         .setCustomId(`ytb:appeal:approve:${ticket.id}`)
         .setLabel('Duyệt Kháng Thành Công')
         .setStyle(ButtonStyle.Success)
-        .setEmoji('✅');
+        .setEmoji('1384069022831874169');
+
       const btnReject = new ButtonBuilder()
         .setCustomId(`ytb:appeal:reject:${ticket.id}`)
         .setLabel('Thất Bại / Đổi Mail')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('❌');
-      
-      const appealRow = new ActionRowBuilder().addComponents(btnApprove, btnReject);
-      components.push(appealRow);
-    }
+        .setEmoji('1384069065626222632');
 
-    await channel.send({
-      components: components,
-      flags: welcomeV2Flags,
-    });
-    // Ping user separately (no content allowed with V2)
-    await channel.send({ content: `<@${interaction.user.id}> — Ticket của bạn đã được tạo!` }).catch(() => null);
+      const btnClose = new ButtonBuilder()
+        .setCustomId(`ticket:close:${ticket.id}`)
+        .setLabel('Đóng Ticket')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('1384069065626222632');
+
+      const btnMute = new ButtonBuilder()
+        .setCustomId(`ticket:mute:${interaction.user.id}`)
+        .setLabel('Mute User')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('1367140105248047114');
+
+      const appealRow = new ActionRowBuilder().addComponents(btnApprove, btnReject);
+      const controlRow = new ActionRowBuilder().addComponents(btnClose, btnMute);
+
+      await thread.send({
+        embeds: [welcomeEmbed],
+        components: [appealRow, controlRow]
+      });
+
+    } else {
+      const overwrites = [
+        { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: interaction.user.id, allow: TICKET_MEMBER_PERMISSIONS },
+        {
+          id: interaction.client.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels],
+        },
+      ];
+
+      if (guildConfig.support_role_id) {
+        overwrites.push({ id: guildConfig.support_role_id, allow: TICKET_MEMBER_PERMISSIONS });
+      }
+
+      const categoryId = getTicketCategoryId(guildConfig, normalizedType);
+      channel = await interaction.guild.channels.create({
+        name: `ticket-${Math.random().toString().slice(2, 8)}`,
+        type: ChannelType.GuildText,
+        parent: categoryId,
+        permissionOverwrites: overwrites,
+      });
+
+      ticket = createTicket({
+        guildId: interaction.guildId,
+        channelId: channel.id,
+        customerId: interaction.user.id,
+        openedById: interaction.user.id,
+        ticketType: normalizedType,
+      });
+
+      const hub = getCenarHub();
+      if (hub) {
+        hub.upsertUser({
+          discord_id: interaction.user.id,
+          discord_username: interaction.user.username,
+          display_name: interaction.member?.displayName,
+        }).catch(e => console.error('[HUB] Lỗi upsertUser:', e.message));
+      }
+
+      await channel.setName(buildTicketChannelName(ticket.ticket_code, 'ticket')).catch(() => null);
+      
+      const { container: welcomeV2, flags: welcomeV2Flags } = buildTicketWelcomeV2(
+        ticket.ticket_code, interaction.user.id, normalizedType, null, null, interaction.guildId
+      );
+      
+      const components = [
+        welcomeV2,
+        ...buildTicketControlComponents(ticket.id, interaction.user.id)
+      ];
+
+      await channel.send({
+        components: components,
+        flags: welcomeV2Flags,
+      });
+      await channel.send({ content: `<@${interaction.user.id}> — Ticket của bạn đã được tạo!` }).catch(() => null);
+    }
 
     await emitStaffLog(interaction.client, {
       guildId: interaction.guildId,
@@ -4535,28 +4678,56 @@ export function registerInteractionHandler(client, commands) {
             return;
           }
 
+          const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = await import('discord.js');
+
           // Gửi tin nhắn thông báo thành công cho khách hàng qua DM
           const customer = await interaction.client.users.fetch(ticket.customer_id).catch(() => null);
           if (customer) {
-            await customer.send({
-              content: `🎉 Yêu cầu kháng 12 tháng của bạn đã thành công! Vui lòng kiểm tra hộp thư gmail của bạn để tham gia vào nhóm gia đình youtube nhé!`
-            }).catch(() => null);
+            const embedDm = new EmbedBuilder()
+              .setColor(0x57F287)
+              .setTitle(`<a:tickgreen:1384069022831874169> KHÁNG CÁO 12 THÁNG THÀNH CÔNG`)
+              .setDescription(
+                `Chào <@${ticket.customer_id}>,\n\n` +
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
+                `> <a:tickgreen:1384069022831874169> **Trạng thái:** Thành công\n\n` +
+                `🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>!\n` +
+                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!`
+              )
+              .setTimestamp()
+              .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+            await customer.send({ embeds: [embedDm] }).catch(() => null);
           }
 
           // Gửi thông báo vào kênh ticket
           const ticketChannel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
           if (ticketChannel?.isTextBased()) {
-            await ticketChannel.send({
-              content: `<@${ticket.customer_id}> 🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>! Vui lòng kiểm tra hộp thư gmail của bạn để tham gia vào nhóm gia đình nhé!`
-            }).catch(() => null);
+            const embedChannel = new EmbedBuilder()
+              .setColor(0x57F287)
+              .setTitle(`<a:tickgreen:1384069022831874169> KHÁNG CÁO 12 THÁNG THÀNH CÔNG`)
+              .setDescription(
+                `Chào <@${ticket.customer_id}>,\n\n` +
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
+                `> <a:tickgreen:1384069022831874169> **Trạng thái:** Thành công\n\n` +
+                `🎉 Yêu cầu kháng 12 tháng của bạn đã được duyệt thành công bởi <@${interaction.user.id}>!\n` +
+                `Vui lòng kiểm tra hộp thư Gmail của bạn để tham gia vào nhóm gia đình YouTube Premium mới nhé!`
+              )
+              .setTimestamp()
+              .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+            await ticketChannel.send({ content: `<@${ticket.customer_id}>`, embeds: [embedChannel] }).catch(() => null);
           }
 
           // Cập nhật nút bấm thành trạng thái đã duyệt
-          const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = await import('discord.js');
           await interaction.update({
             components: [
               new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('disabled_approved').setLabel('Đã Duyệt Kháng Thành Công').setStyle(ButtonStyle.Success).setDisabled(true)
+                new ButtonBuilder()
+                  .setCustomId('disabled_approved')
+                  .setLabel('Đã Duyệt Kháng Thành Công')
+                  .setStyle(ButtonStyle.Success)
+                  .setEmoji('1384069022831874169')
+                  .setDisabled(true)
               )
             ]
           }).catch(() => null);
@@ -4589,28 +4760,56 @@ export function registerInteractionHandler(client, commands) {
             return;
           }
 
+          const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } = await import('discord.js');
+
           // Gửi tin nhắn thông báo thất bại cho khách hàng qua DM
           const customer = await interaction.client.users.fetch(ticket.customer_id).catch(() => null);
           if (customer) {
-            await customer.send({
-              content: `❌ Yêu cầu kháng 12 tháng của bạn không thành công. Vui lòng liên hệ staff để thực hiện đổi Gmail khác hoặc chờ 7 - 15 ngày để tiến hành kháng lượt tiếp theo.`
-            }).catch(() => null);
+            const embedDm = new EmbedBuilder()
+              .setColor(0xED4245)
+              .setTitle(`<a:tick_red51:1384069065626222632> KHÁNG CÁO 12 THÁNG THẤT BẠI`)
+              .setDescription(
+                `Chào <@${ticket.customer_id}>,\n\n` +
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
+                `> <a:tick_red51:1384069065626222632> **Trạng thái:** Thất bại / Yêu cầu đổi Mail\n\n` +
+                `❌ Rất tiếc, lượt kháng cáo này không thành công.\n` +
+                `Bạn bắt buộc phải **đổi sang Gmail mới** hoặc **chờ 7 - 15 ngày** để bắt đầu lượt kháng tiếp theo.`
+              )
+              .setTimestamp()
+              .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+            await customer.send({ embeds: [embedDm] }).catch(() => null);
           }
 
           // Gửi thông báo vào kênh ticket
           const ticketChannel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
           if (ticketChannel?.isTextBased()) {
-            await ticketChannel.send({
-              content: `<@${ticket.customer_id}> ❌ Rất tiếc, lượt kháng cáo này không thành công. Bạn bắt buộc phải **đổi Gmail mới** hoặc **chờ 7 - 15 ngày** để bắt đầu lượt kháng tiếp theo.`
-            }).catch(() => null);
+            const embedChannel = new EmbedBuilder()
+              .setColor(0xED4245)
+              .setTitle(`<a:tick_red51:1384069065626222632> KHÁNG CÁO 12 THÁNG THẤT BẠI`)
+              .setDescription(
+                `Chào <@${ticket.customer_id}>,\n\n` +
+                `> <:cr_shop:1392749981332541501> **Mã Ticket:** \`${ticket.ticket_code}\`\n` +
+                `> <a:tick_red51:1384069065626222632> **Trạng thái:** Thất bại / Yêu cầu đổi Mail\n\n` +
+                `❌ Rất tiếc, lượt kháng cáo này không thành công.\n` +
+                `Bạn bắt buộc phải **đổi sang Gmail mới** hoặc **chờ 7 - 15 ngày** để bắt đầu lượt kháng tiếp theo.`
+              )
+              .setTimestamp()
+              .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+            await ticketChannel.send({ content: `<@${ticket.customer_id}>`, embeds: [embedChannel] }).catch(() => null);
           }
 
           // Cập nhật nút bấm thành trạng thái đã từ chối
-          const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = await import('discord.js');
           await interaction.update({
             components: [
               new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('disabled_rejected').setLabel('Đã Từ Chối / Yêu Cầu Đổi Mail').setStyle(ButtonStyle.Danger).setDisabled(true)
+                new ButtonBuilder()
+                  .setCustomId('disabled_rejected')
+                  .setLabel('Đã Từ Chối / Yêu Cầu Đổi Mail')
+                  .setStyle(ButtonStyle.Danger)
+                  .setEmoji('1384069065626222632')
+                  .setDisabled(true)
               )
             ]
           }).catch(() => null);
