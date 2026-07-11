@@ -4339,47 +4339,65 @@ export function registerInteractionHandler(client, commands) {
 
           let orderCode = ticket.related_order_code;
           if (!orderCode) {
-            // Thử trích xuất từ tên channel của ticket
-            const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
-            if (channel && channel.name) {
-              const match = channel.name.match(/bao-hanh-([a-z0-9_-]+)/i);
-              if (match && match[1]) {
-                const suffix = match[1].toUpperCase();
-                // Thử tìm đơn hàng kết thúc bằng suffix này trong db hiện tại
-                let foundOrder = null;
-                if (suffix.includes('_')) {
-                  foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
-                } else {
-                  foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
-                }
-
-                if (!foundOrder) {
-                  // Thử tìm trong database của store còn lại
-                  const pathMod = await import('node:path');
-                  const fsMod = await import('node:fs');
-                  const DatabaseClass = (await import('better-sqlite3')).default;
-                  
-                  const projectRoot = pathMod.resolve(pathMod.dirname(fileURLToPath(import.meta.url)), '..', '..');
-                  const dbPath1 = pathMod.resolve(projectRoot, 'data/shopbot.sqlite');
-                  const dbPath2 = pathMod.resolve(projectRoot, 'data/shopbot-store2.sqlite');
-                  
-                  const otherDbPath = db.name.includes('store2') ? dbPath1 : dbPath2;
-                  if (fsMod.existsSync(otherDbPath)) {
-                    try {
-                      const tempDb = new DatabaseClass(otherDbPath);
-                      if (suffix.includes('_')) {
-                        foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
-                      } else {
-                        foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
-                      }
-                      tempDb.close();
-                    } catch (e) {
-                      console.error('[DB-CROSS] Lỗi đọc db phụ khi trích xuất code:', e.message);
+            // 1. Thử trích xuất từ nội dung tin nhắn log (nếu có)
+            if (interaction.message && interaction.message.components) {
+              for (const row of interaction.message.components) {
+                const list = row.components || [];
+                for (const comp of list) {
+                  const content = comp.content || (comp.data && comp.data.content);
+                  if (content) {
+                    const orderMatch = content.match(/\*\*Mã đơn hàng:\*\*\s*\*\*([a-zA-Z0-9_-]+)\*\*/i) ||
+                                       content.match(/Mã đơn hàng:\s*\*\*([a-zA-Z0-9_-]+)\*\*/i) ||
+                                       content.match(/\*\*Mã đơn hàng:\*\*\s*([a-zA-Z0-9_-]+)/i);
+                    if (orderMatch && orderMatch[1]) {
+                      orderCode = orderMatch[1].toUpperCase();
+                      break;
                     }
                   }
                 }
-                if (foundOrder) {
-                  orderCode = foundOrder.order_code;
+                if (orderCode) break;
+              }
+            }
+
+            // 2. Thử trích xuất từ tên channel của ticket làm fallback tiếp theo
+            if (!orderCode) {
+              const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+              if (channel && channel.name) {
+                const match = channel.name.match(/bao-hanh-([a-z0-9_-]+)/i);
+                if (match && match[1]) {
+                  const suffix = match[1].toUpperCase();
+                  let foundOrder = null;
+                  if (suffix.includes('_')) {
+                    foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
+                  } else {
+                    foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
+                  }
+
+                  if (!foundOrder) {
+                    const pathMod = await import('node:path');
+                    const fsMod = await import('node:fs');
+                    const DatabaseClass = (await import('better-sqlite3')).default;
+                    const projectRoot = pathMod.resolve(pathMod.dirname(fileURLToPath(import.meta.url)), '..', '..');
+                    const dbPath1 = pathMod.resolve(projectRoot, 'data/shopbot.sqlite');
+                    const dbPath2 = pathMod.resolve(projectRoot, 'data/shopbot-store2.sqlite');
+                    const otherDbPath = db.name.includes('store2') ? dbPath1 : dbPath2;
+                    if (fsMod.existsSync(otherDbPath)) {
+                      try {
+                        const tempDb = new DatabaseClass(otherDbPath);
+                        if (suffix.includes('_')) {
+                          foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
+                        } else {
+                          foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
+                        }
+                        tempDb.close();
+                      } catch (e) {
+                        console.error('[DB-CROSS] Lỗi đọc db phụ khi trích xuất code:', e.message);
+                      }
+                    }
+                  }
+                  if (foundOrder) {
+                    orderCode = foundOrder.order_code;
+                  }
                 }
               }
             }
@@ -4517,50 +4535,73 @@ export function registerInteractionHandler(client, commands) {
 
           let orderCode = ticket.related_order_code;
           if (!orderCode) {
-            // Thử trích xuất từ tên channel của ticket
-            const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
-            if (channel && channel.name) {
-              const match = channel.name.match(/bao-hanh-([a-z0-9_-]+)/i);
-              if (match && match[1]) {
-                const suffix = match[1].toUpperCase();
-                // Thử tìm đơn hàng kết thúc bằng suffix này trong db hiện tại
-                let foundOrder = null;
-                if (suffix.includes('_')) {
-                  foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
-                } else {
-                  foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
-                }
-
-                if (!foundOrder) {
-                  // Thử tìm trong database của store còn lại
-                  const pathMod = await import('node:path');
-                  const fsMod = await import('node:fs');
-                  const DatabaseClass = (await import('better-sqlite3')).default;
-                  
-                  const projectRoot = pathMod.resolve(pathMod.dirname(fileURLToPath(import.meta.url)), '..', '..');
-                  const dbPath1 = pathMod.resolve(projectRoot, 'data/shopbot.sqlite');
-                  const dbPath2 = pathMod.resolve(projectRoot, 'data/shopbot-store2.sqlite');
-                  
-                  const otherDbPath = db.name.includes('store2') ? dbPath1 : dbPath2;
-                  if (fsMod.existsSync(otherDbPath)) {
-                    try {
-                      const tempDb = new DatabaseClass(otherDbPath);
-                      if (suffix.includes('_')) {
-                        foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
-                      } else {
-                        foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
-                      }
-                      tempDb.close();
-                    } catch (e) {
-                      console.error('[DB-CROSS] Lỗi đọc db phụ khi trích xuất code:', e.message);
+            // 1. Thử trích xuất từ nội dung tin nhắn log (nếu có)
+            if (interaction.message && interaction.message.components) {
+              for (const row of interaction.message.components) {
+                const list = row.components || [];
+                for (const comp of list) {
+                  const content = comp.content || (comp.data && comp.data.content);
+                  if (content) {
+                    const orderMatch = content.match(/\*\*Mã đơn hàng:\*\*\s*\*\*([a-zA-Z0-9_-]+)\*\*/i) ||
+                                       content.match(/Mã đơn hàng:\s*\*\*([a-zA-Z0-9_-]+)\*\*/i) ||
+                                       content.match(/\*\*Mã đơn hàng:\*\*\s*([a-zA-Z0-9_-]+)/i);
+                    if (orderMatch && orderMatch[1]) {
+                      orderCode = orderMatch[1].toUpperCase();
+                      break;
                     }
                   }
                 }
-                if (foundOrder) {
-                  orderCode = foundOrder.order_code;
+                if (orderCode) break;
+              }
+            }
+
+            // 2. Thử trích xuất từ tên channel của ticket làm fallback tiếp theo
+            if (!orderCode) {
+              const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+              if (channel && channel.name) {
+                const match = channel.name.match(/bao-hanh-([a-z0-9_-]+)/i);
+                if (match && match[1]) {
+                  const suffix = match[1].toUpperCase();
+                  let foundOrder = null;
+                  if (suffix.includes('_')) {
+                    foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
+                  } else {
+                    foundOrder = db.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
+                  }
+
+                  if (!foundOrder) {
+                    const pathMod = await import('node:path');
+                    const fsMod = await import('node:fs');
+                    const DatabaseClass = (await import('better-sqlite3')).default;
+                    const projectRoot = pathMod.resolve(pathMod.dirname(fileURLToPath(import.meta.url)), '..', '..');
+                    const dbPath1 = pathMod.resolve(projectRoot, 'data/shopbot.sqlite');
+                    const dbPath2 = pathMod.resolve(projectRoot, 'data/shopbot-store2.sqlite');
+                    const otherDbPath = db.name.includes('store2') ? dbPath1 : dbPath2;
+                    if (fsMod.existsSync(otherDbPath)) {
+                      try {
+                        const tempDb = new DatabaseClass(otherDbPath);
+                        if (suffix.includes('_')) {
+                          foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code = ?").get(suffix);
+                        } else {
+                          foundOrder = tempDb.prepare("SELECT order_code FROM orders WHERE order_code LIKE ?").get(`%_${suffix}`);
+                        }
+                        tempDb.close();
+                      } catch (e) {
+                        console.error('[DB-CROSS] Lỗi đọc db phụ khi trích xuất code:', e.message);
+                      }
+                    }
+                  }
+                  if (foundOrder) {
+                    orderCode = foundOrder.order_code;
+                  }
                 }
               }
             }
+          }
+
+          if (!orderCode) {
+            await interaction.reply({ content: E('status_cross') + ' Không tìm thấy mã đơn hàng liên quan đến ticket này.', ephemeral: true }).catch(() => null);
+            return;
           }
 
           // Tìm order trong cả 2 database
