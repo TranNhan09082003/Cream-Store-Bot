@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MessageFlags } from 'discord.js';
+import { ChannelType, PermissionFlagsBits, ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getGuildConfig } from './guildConfigService.js';
 import { getOrderByCode, setOrderStatus } from './orderService.js';
 import { createTicket, getOpenWarrantyTicket, getTicketByChannelId } from './ticketService.js';
@@ -148,7 +148,21 @@ export function buildWarrantyLogV2({ order, ticket, channel, formData, actorId, 
     )
   );
 
-  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+  const btnApprove = new ButtonBuilder()
+    .setCustomId(`ytb:approve:${ticket.id}`)
+    .setLabel('Duyệt Bảo Hành')
+    .setStyle(ButtonStyle.Success)
+    .setEmoji(E('status_check') ? (E('status_check').match(/\d+/)?.[0] || '✅') : '✅');
+
+  const btnReject = new ButtonBuilder()
+    .setCustomId(`ytb:reject:${ticket.id}`)
+    .setLabel('Từ Chối Bảo Hành')
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji(E('status_cross') ? (E('status_cross').match(/\d+/)?.[0] || '❌') : '❌');
+
+  const row = new ActionRowBuilder().addComponents(btnApprove, btnReject);
+
+  return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
 }
 
 /**
