@@ -4145,6 +4145,139 @@ export function registerInteractionHandler(client, commands) {
 
       if (!interaction.isButton()) return;
 
+      // Xử lý duyệt bảo hành YouTube Premium - Đồng Ý
+      if (interaction.customId.startsWith('ytb:approve:')) {
+        const parts = interaction.customId.split(':');
+        const ticketId = parseInt(parts[2], 10);
+
+        const E = createEmojiResolver(interaction.guildId);
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        
+        if (!isStaffMember(member, guildConfig)) {
+          await interaction.reply({ content: E('status_cross') + ' Chỉ Staff mới có quyền duyệt bảo hành.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        try {
+          // Truy vấn database SQLite lấy thông tin ticket
+          const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
+          if (!ticket) {
+            await interaction.reply({ content: E('status_cross') + ' Không tìm thấy ticket bảo hành tương ứng trong database.', ephemeral: true }).catch(() => null);
+            return;
+          }
+
+          const orderCode = ticket.related_order_code;
+          const order = getOrderByCode(orderCode);
+          if (!order) {
+            await interaction.reply({ content: E('status_cross') + ` Không tìm thấy đơn hàng \`${orderCode}\` tương ứng.`, ephemeral: true }).catch(() => null);
+            return;
+          }
+
+          // Cập nhật trạng thái đơn hàng về COMPLETED
+          const updatedOrder = setOrderStatus(orderCode, 'COMPLETED');
+          if (updatedOrder) {
+            await updateOrderLogMessage(interaction.guild, updatedOrder).catch(() => null);
+          }
+
+          // Gửi DM thông báo bảo hành thành công cho khách hàng
+          const customer = await interaction.client.users.fetch(ticket.customer_id).catch(() => null);
+          if (customer) {
+            await customer.send({
+              content: `🎉 Đơn hàng \`${orderCode}\` của bạn đã được bảo hành thành công! Vui lòng kiểm tra hộp thư gmail của bạn để tham gia vào nhóm gia đình nhé!`
+            }).catch(() => null);
+          }
+
+          // Gửi tin nhắn vào kênh ticket của khách hàng
+          const ticketChannel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+          if (ticketChannel?.isTextBased()) {
+            await ticketChannel.send({
+              content: `<@${ticket.customer_id}> 🎉 Yêu cầu bảo hành cho đơn hàng \`${orderCode}\` của bạn đã được bảo hành thành công! Vui lòng kiểm tra hộp thư gmail của bạn để tham gia vào nhóm gia đình nhé!`
+            }).catch(() => null);
+          }
+
+          // Cập nhật tin nhắn trong kênh duyệt
+          const { EmbedBuilder } = await import('discord.js');
+          const oldEmbed = interaction.message.embeds[0];
+          const embed = EmbedBuilder.from(oldEmbed)
+            .setColor(0x57F287)
+            .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ DUYỆT]')
+            .setDescription((oldEmbed.description || '') + `\n\n✅ **Đã duyệt bảo hành bởi:** <@${interaction.user.id}>`);
+
+          await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+        } catch (err) {
+          console.error('[YTB-APPROVE] Error:', err);
+          await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
+        }
+        return;
+      }
+
+      // Xử lý duyệt bảo hành YouTube Premium - Từ Chối
+      if (interaction.customId.startsWith('ytb:reject:')) {
+        const parts = interaction.customId.split(':');
+        const ticketId = parseInt(parts[2], 10);
+
+        const E = createEmojiResolver(interaction.guildId);
+        const guildConfig = getGuildConfig(interaction.guildId);
+        const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        
+        if (!isStaffMember(member, guildConfig)) {
+          await interaction.reply({ content: E('status_cross') + ' Chỉ Staff mới có quyền từ chối bảo hành.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        try {
+          const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(ticketId);
+          if (!ticket) {
+            await interaction.reply({ content: E('status_cross') + ' Không tìm thấy ticket bảo hành tương ứng trong database.', ephemeral: true }).catch(() => null);
+            return;
+          }
+
+          const orderCode = ticket.related_order_code;
+          const order = getOrderByCode(orderCode);
+          if (!order) {
+            await interaction.reply({ content: E('status_cross') + ` Không tìm thấy đơn hàng \`${orderCode}\` tương ứng.`, ephemeral: true }).catch(() => null);
+            return;
+          }
+
+          // Cập nhật trạng thái đơn hàng về COMPLETED
+          const updatedOrder = setOrderStatus(orderCode, 'COMPLETED');
+          if (updatedOrder) {
+            await updateOrderLogMessage(interaction.guild, updatedOrder).catch(() => null);
+          }
+
+          // Gửi DM từ chối bảo hành cho khách hàng
+          const customer = await interaction.client.users.fetch(ticket.customer_id).catch(() => null);
+          if (customer) {
+            await customer.send({
+              content: `❌ Yêu cầu bảo hành cho đơn hàng \`${orderCode}\` của bạn đã bị từ chối. Vui lòng liên hệ staff trong ticket để biết thêm chi tiết.`
+            }).catch(() => null);
+          }
+
+          // Gửi tin nhắn vào kênh ticket của khách hàng
+          const ticketChannel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+          if (ticketChannel?.isTextBased()) {
+            await ticketChannel.send({
+              content: `<@${ticket.customer_id}> ❌ Yêu cầu bảo hành cho đơn hàng \`${orderCode}\` của bạn đã bị từ chối. Vui lòng liên hệ staff trong ticket để biết thêm chi tiết.`
+            }).catch(() => null);
+          }
+
+          // Cập nhật tin nhắn trong kênh duyệt
+          const { EmbedBuilder } = await import('discord.js');
+          const oldEmbed = interaction.message.embeds[0];
+          const embed = EmbedBuilder.from(oldEmbed)
+            .setColor(0xED4245)
+            .setTitle((oldEmbed.title || 'YÊU CẦU BẢO HÀNH YOUTUBE PREMIUM') + ' [ĐÃ TỪ CHỐI]')
+            .setDescription((oldEmbed.description || '') + `\n\n❌ **Đã từ chối bảo hành bởi:** <@${interaction.user.id}>`);
+
+          await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
+        } catch (err) {
+          console.error('[YTB-REJECT] Error:', err);
+          await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
+        }
+        return;
+      }
+
       // Xử lý khi khách bấm nút sao feedback đơn boost
       if (interaction.customId.startsWith('boost:feedback:start:')) {
         const parts = interaction.customId.split(':');
