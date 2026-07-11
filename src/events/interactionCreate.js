@@ -4206,7 +4206,7 @@ export function registerInteractionHandler(client, commands) {
 
           await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
         } catch (err) {
-          console.error('[YTB-APPROVE] Error:', err);
+          console.error('[YTB-APPROVE] Error:', err.stack || err);
           await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
         }
         return;
@@ -4272,7 +4272,7 @@ export function registerInteractionHandler(client, commands) {
 
           await interaction.update({ embeds: [embed], components: [] }).catch(() => null);
         } catch (err) {
-          console.error('[YTB-REJECT] Error:', err);
+          console.error('[YTB-REJECT] Error:', err.stack || err);
           await interaction.reply({ content: E('status_cross') + ' Lỗi xử lý: ' + err.message, ephemeral: true }).catch(() => null);
         }
         return;
