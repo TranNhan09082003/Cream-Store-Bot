@@ -39,25 +39,25 @@ export async function execute(member) {
 
     const joinedDaysAgo = member.joinedAt
       ? Math.floor((Date.now() - member.joinedAt.getTime()) / 86400000)
-      : null;
+      : 0;
 
-    const statusLine = hadVipRole
-      ? `> ${E('icon_gem')} *Đây là thành viên VIP — nên liên hệ để giữ chân họ*`
+    const roleName = hadVipRole
+      ? 'Thành Viên VIP'
       : hadVerifiedRole
-        ? `> ${E('status_check')} *Thành viên đã xác minh*`
-        : `> ${E('ticket_close')} *Thành viên chưa xác minh*`;
+        ? 'Thành Viên Đã Xác Minh'
+        : 'Thành Viên Mới';
 
     const lines = [
-      `## ${E('icon_block')} Tạm Biệt!`,
-      `**${user.tag}** vừa rời khỏi **${brandName}**.`,
+      `### <a:tsm_fire:1327553120842158111> **TẠM BIỆT THÀNH VIÊN!**`,
+      `**${user.tag}** đã rời máy chủ. Hy vọng sẽ được gặp lại bạn vào một ngày gần nhất!`,
       '',
-      `> ${E('icon_group')} Server còn lại: **${memberCount.toLocaleString('vi-VN')} thành viên**`,
-      joinedDaysAgo !== null
-        ? `> ${E('icon_calendar')} Đã gắn bó: **${joinedDaysAgo} ngày**`
-        : null,
-      statusLine,
+      `<a:Arrow2:1367139234833498113> **Thông tin thành viên:**`,
+      `> <a:Dotyellow:1481134440725090315> **Số lượng còn lại:** \`${memberCount.toLocaleString('vi-VN')} thành viên\``,
+      `> <a:Dotyellow:1481134440725090315> **Đã gắn bó cùng shop:** \`${joinedDaysAgo} ngày\``,
+      `> <a:Dotyellow:1481134440725090315> **Vai trò:** \`${roleName}\``,
       '',
-      `-# ${E('icon_heart_purple')} ${brandName} — Hẹn gặp lại bạn ở những hành trình tiếp theo`,
+      `---`,
+      `-# <:purple_heart_glow:1327541911749263360> *Hẹn gặp lại bạn ở những hành trình tiếp theo!*`
     ].filter(Boolean);
 
     const container = new ContainerBuilder().setAccentColor(isServer1 ? 0x6366F1 : 0xF472B6);
