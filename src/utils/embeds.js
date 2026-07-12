@@ -145,10 +145,12 @@ export function buildTicketPanelV2(customConfig = {}) {
 
   // Buttons row 2
   const btnWarranty = new ButtonBuilder().setCustomId('ticket:warranty:panel').setLabel('Bảo Hành Sản Phẩm').setStyle(ButtonStyle.Secondary);
+  const btnAppeal = new ButtonBuilder().setCustomId('ytb:appeal:apply').setLabel('Kháng 12 Tháng YT').setStyle(ButtonStyle.Primary);
   const btnEdit = new ButtonBuilder().setCustomId('ticket:panel:edit').setLabel('Sửa Panel').setStyle(ButtonStyle.Secondary);
   const e5 = ec(em, 'panel_warranty'); if (e5) btnWarranty.setEmoji(e5);
+  btnAppeal.setEmoji('🛡️');
   const e6 = ec(em, 'panel_edit'); if (e6) btnEdit.setEmoji(e6);
-  const row2 = new ActionRowBuilder().addComponents(btnWarranty, btnEdit);
+  const row2 = new ActionRowBuilder().addComponents(btnWarranty, btnAppeal, btnEdit);
 
   return { container, rows: [row1, row2], flags: MessageFlags.IsComponentsV2 };
 }
@@ -212,6 +214,17 @@ const TICKET_TYPE_META = {
       '**Mô tả lỗi** — Gặp lỗi gì? Xảy ra khi nào?',
       '**Gửi bằng chứng** — Ảnh/video lỗi giúp staff xử lý nhanh hơn',
       '**Thời gian xử lý** — Thường từ 5–30 phút tùy mức độ',
+    ],
+  },
+  APPEAL: {
+    titleSlot: 'panel_warranty',
+    title: 'Ticket Kháng 12 Tháng YouTube Premium',
+    color: () => 0x5865F2,
+    intro: 'Yêu cầu kháng cáo giới hạn 12 tháng gia đình YouTube của bạn đã được tiếp nhận. Vui lòng đọc kỹ các quy định sau và chuẩn bị phối hợp cùng Admin.',
+    steps: [
+      '⚠️ **1. Luôn online**: Bạn cần duy trì online. Khi Admin/Chủ shop tag tên, bạn cần phản hồi ngay lập tức để tiến hành kháng.',
+      '⏳ **2. Kế hoạch dự phòng**: Nếu không kháng được, bắt buộc phải đổi email khác hoặc chờ 7 - 15 ngày để bắt đầu lượt kháng thứ 2.',
+      '💳 **3. Phí dịch vụ (Khách vãng lai)**: Miễn phí nếu mua YouTube tại shop. Phí 20,000đ/lượt thành công đối với khách vãng lai.',
     ],
   },
 };
@@ -1611,7 +1624,7 @@ export function buildCustomerProfileV2(user, profile, orders, points, guildId = 
       new TextDisplayBuilder().setContent(joinLines(
         `### ${E('icon_history', '📜')} Lịch Sử Đơn Hàng`,
         ...orders.map(o =>
-          `> \`${o.order_code}\` — ${formatOrderProduct(o.quantity, o.product_name)} — ${fmt.b(getOrderStatusLabel(o.status))}`,
+          `> \`${o.order_code}\` — ${formatOrderProduct(o.quantity, o.product_name)} — ${fmt.b(getOrderStatusLabel(o.status, guildId))}`,
         ),
       ))
     );
