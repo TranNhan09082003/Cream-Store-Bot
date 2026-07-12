@@ -4463,6 +4463,29 @@ export function registerInteractionHandler(client, commands) {
             await updateOrderLogMessage(interaction.guild, updatedOrder).catch(() => null);
           }
 
+          // Gửi log vào kênh log bảo hành chung
+          if (guildConfig.warranty_log_channel_id) {
+            const logChannel = await interaction.guild.channels.fetch(guildConfig.warranty_log_channel_id).catch(() => null);
+            if (logChannel?.isTextBased()) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0x57F287) // Success green
+                .setTitle(`${E('status_check')} ĐÃ DUYỆT BẢO HÀNH YOUTUBE`)
+                .setDescription([
+                  `> ${E('icon_sparkle')} **Trạng thái:** Duyệt thành công bởi <@${interaction.user.id}>`,
+                  '',
+                  `${E('ticket_user')} **Khách Hàng:** <@${ticket.customer_id}>`,
+                  `${E('order_id')} **Mã Đơn Hàng:** \`${orderCode}\``,
+                  `${E('order_product')} **Sản Phẩm:** ${order.product_name || 'YouTube Premium'}`,
+                  `${E('ticket_open')} **Kênh Hỗ Trợ:** <#${ticket.channel_id}>`,
+                  `${E('icon_clock')} **Thời Gian:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                ].join('\n'))
+                .setTimestamp()
+                .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+              await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+            }
+          }
+
           // Gửi DM thông báo bảo hành thành công cho khách hàng
           const { EmbedBuilder } = await import('discord.js');
           const customer = await interaction.client.users.fetch(ticket.customer_id).catch(() => null);
@@ -4698,6 +4721,29 @@ export function registerInteractionHandler(client, commands) {
               .setTimestamp();
 
             await ticketChannel.send({ content: `<@${ticket.customer_id}>`, embeds: [embedTicket] }).catch(() => null);
+          }
+
+          // Gửi log vào kênh log bảo hành chung
+          if (guildConfig.warranty_log_channel_id) {
+            const logChannel = await interaction.guild.channels.fetch(guildConfig.warranty_log_channel_id).catch(() => null);
+            if (logChannel?.isTextBased()) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0xED4245) // Danger red
+                .setTitle(`${E('status_cross')} TỪ CHỐI BẢO HÀNH YOUTUBE`)
+                .setDescription([
+                  `> ${E('status_cross')} **Trạng thái:** Từ chối bởi <@${interaction.user.id}>`,
+                  '',
+                  `${E('ticket_user')} **Khách Hàng:** <@${ticket.customer_id}>`,
+                  `${E('order_id')} **Mã Đơn Hàng:** \`${orderCode}\``,
+                  `${E('order_product')} **Sản Phẩm:** ${order.product_name || 'YouTube Premium'}`,
+                  `${E('ticket_open')} **Kênh Hỗ Trợ:** <#${ticket.channel_id}>`,
+                  `${E('icon_clock')} **Thời Gian:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                ].join('\n'))
+                .setTimestamp()
+                .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() });
+
+              await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+            }
           }
 
           // Cập nhật tin nhắn trong kênh duyệt
