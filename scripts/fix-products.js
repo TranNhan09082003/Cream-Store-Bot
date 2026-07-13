@@ -3,74 +3,71 @@ import fs from 'fs';
 import path from 'path';
 
 console.log('=== Running Database Migration: Fix Products ===');
-const dbPath = path.resolve(process.cwd(), 'data/shopbot.sqlite');
+const cwd = process.cwd();
+const dbPath = path.resolve(cwd, process.env.DATABASE_PATH || 'data/shopbot.sqlite');
+console.log('CWD:', cwd);
+console.log('DB Path:', dbPath);
+
 if (!fs.existsSync(dbPath)) {
   console.error('Database file not found:', dbPath);
+  console.log('Listing data/ directory:');
+  const dataDir = path.resolve(cwd, 'data');
+  if (fs.existsSync(dataDir)) {
+    fs.readdirSync(dataDir).forEach(f => console.log('  ', f));
+  } else {
+    console.log('  data/ directory not found');
+  }
   process.exit(1);
 }
 
 const db = new Database(dbPath);
 
 try {
+  // Check current state
+  const totalBefore = db.prepare('SELECT COUNT(*) as cnt FROM product_catalog WHERE is_active = 1').get();
+  console.log('Active products BEFORE migration:', totalBefore.cnt);
+
+  const guildId = process.env.GUILD_ID || '1282637033340403754';
+  console.log('Target Guild ID:', guildId);
+
+  const guildProducts = db.prepare('SELECT COUNT(*) as cnt FROM product_catalog WHERE guild_id = ? AND is_active = 1').get(guildId);
+  console.log('Products for guild BEFORE:', guildProducts.cnt);
+
+  // Show current service_type distribution
+  const types = db.prepare('SELECT service_type, COUNT(*) as cnt FROM product_catalog WHERE is_active = 1 GROUP BY service_type').all();
+  console.log('Service type distribution:');
+  types.forEach(t => console.log(`  ${t.service_type}: ${t.cnt}`));
+
   db.transaction(() => {
-    // 1. Deactivate stale duplicate products (IDs 1 to 15)
-    db.prepare('UPDATE product_catalog SET is_active = 0 WHERE id >= 1 AND id <= 15').run();
-    console.log('Deactivated stale products 1-15.');
+    // 1. Deactivate stale duplicate products (IDs 1 to 15) — these have service_type 'other' and are duplicates
+    const r1 = db.prepare('UPDATE product_catalog SET is_active = 0 WHERE id >= 1 AND id <= 15').run();
+    console.log(`Deactivated ${r1.changes} stale products (IDs 1-15).`);
 
-    // 2. Assign and activate correct products (IDs 16 to 99) to Store 1 guild
-    const guildId = '1282637033340403754';
-    db.prepare('UPDATE product_catalog SET guild_id = ?, is_active = 1 WHERE id >= 16 AND id <= 99').run();
-    console.log('Assigned and activated products 16-99 for guild:', guildId);
+    // 2. Assign correct products (IDs 16+) to Store 1 guild and activate them
+    const r2 = db.prepare('UPDATE product_catalog SET guild_id = ?, is_active = 1 WHERE id >= 16 AND id <= 99').run(guildId);
+    console.log(`Assigned ${r2.changes} products (IDs 16-99) to guild ${guildId}.`);
 
-    // 3. Update Discord Nitro 3 Tháng Trail (ID 24)
-    db.prepare(`
-      UPDATE product_catalog 
-      SET price = 65000, 
-          description = 'Chỉ áp dụng cho các bạn chưa xài nitro lần nào và tạo tài khoản trên 1 tháng. Có hàng ngay!',
-          emoji = 'brand_nitro'
-      WHERE id = 24
-    `).run();
-    console.log('Updated Nitro 3 Month Trail (ID 24) price and description.');
-
-    // 4. Check if Gemini Pro 18 Tháng exists, if not insert it
-    const gemini18 = db.prepare('SELECT id FROM product_catalog WHERE LOWER(name) LIKE \'%gemini pro%18%\'').get();
-    if (gemini18) {
-      db.prepare(`
-        UPDATE product_catalog 
-        SET price = 180000, 
-            duration_months = 18, 
-            service_type = 'AI',
-            emoji = 'icon_brain',
-            is_active = 1,
-            guild_id = ?
-        WHERE id = ?
-      `).run(guildId, gemini18.id);
-      console.log('Updated existing Gemini Pro 18 Tháng product.');
-    } else {
-      // Find max sort_order
-      const maxSort = db.prepare('SELECT MAX(sort_order) AS mx FROM product_catalog WHERE guild_id = ?').get(guildId);
-      const sortOrder = (maxSort?.mx ?? 0) + 1;
-      const now = new Date().toISOString();
-      db.prepare(`
-        INSERT INTO product_catalog (guild_id, name, description, price, duration_months, service_type, emoji, sort_order, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-      `).run(
-        guildId,
-        'Gemini Pro Nâng Cấp Chính Chủ (18 Tháng)',
-        'Tài khoản chính chủ nâng cấp cực kỳ mượt mà, bảo hành trọn đời dịch vụ!',
-        180000,
-        18,
-        'AI',
-        'icon_brain',
-        sortOrder,
-        now,
-        now
-      );
-      console.log('Inserted new Gemini Pro 18 Tháng product.');
-    }
+    // 3. Update Discord Nitro 3 Tháng Trail (ID 24) price to 65000
+    const r3 = db.prepare('UPDATE product_catalog SET price = 65000 WHERE id = 24').run();
+    console.log(`Updated product ID 24 price: ${r3.changes} rows affected.`);
   })();
+
+  // Verify
+  const totalAfter = db.prepare('SELECT COUNT(*) as cnt FROM product_catalog WHERE is_active = 1').get();
+  console.log('Active products AFTER migration:', totalAfter.cnt);
+
+  const guildAfter = db.prepare('SELECT COUNT(*) as cnt FROM product_catalog WHERE guild_id = ? AND is_active = 1').get(guildId);
+  console.log('Products for guild AFTER:', guildAfter.cnt);
+
+  // Show first 5 products  
+  const sample = db.prepare('SELECT id, name, service_type, guild_id FROM product_catalog WHERE guild_id = ? AND is_active = 1 ORDER BY id LIMIT 5').all(guildId);
+  console.log('Sample products:');
+  sample.forEach(p => console.log(`  [${p.id}] ${p.name} (type: ${p.service_type})`));
+
+  console.log('=== Migration completed successfully ===');
 } catch (e) {
-  console.error('Migration failed:', e.message);
+  console.error('Migration error:', e.message);
+  console.error(e.stack);
   process.exit(1);
 } finally {
   db.close();
