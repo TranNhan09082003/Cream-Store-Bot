@@ -309,6 +309,52 @@ export function registerDashboardRoutes(app) {
     }
   });
 
+  app.get('/api/public/vps-debug', async (req, res) => {
+    try {
+      const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
+      const expectedKey = process.env.BOT_API_KEY;
+      if (!providedKey || providedKey !== expectedKey) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized' });
+      }
+
+      const { db } = await import('../database/db.js');
+      const fs = await import('fs');
+      const path = await import('path');
+
+      const info = {
+        cwd: process.cwd(),
+        databasePath: config.databasePath,
+        resolvedDbPath: path.resolve(process.cwd(), config.databasePath),
+        env: {
+          GUILD_ID: process.env.GUILD_ID,
+          DATABASE_PATH: process.env.DATABASE_PATH,
+          ENV_FILE: process.env.ENV_FILE,
+          HTTP_PORT: process.env.HTTP_PORT,
+        },
+        db_tables: db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all(),
+      };
+
+      try {
+        info.product_count = db.prepare('SELECT COUNT(*) as cnt FROM product_catalog').get().cnt;
+        info.active_products = db.prepare('SELECT id, name, guild_id, service_type, is_active FROM product_catalog WHERE is_active = 1').all();
+      } catch (dbErr) {
+        info.db_error = dbErr.message;
+      }
+
+      try {
+        if (fs.existsSync('send_price_log.txt')) {
+          info.send_price_log = fs.readFileSync('send_price_log.txt', 'utf8').slice(-2000);
+        }
+      } catch (logErr) {
+        info.log_error = logErr.message;
+      }
+
+      res.json({ ok: true, info });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message, stack: e.stack });
+    }
+  });
+
   // Redirect root '/' and '/payment' to the official website 'https://cenarstore.xyz'
   app.get('/', (req, res) => {
     res.redirect('https://cenarstore.xyz');
