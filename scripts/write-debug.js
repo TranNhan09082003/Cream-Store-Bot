@@ -44,7 +44,7 @@ try {
 }
 
 try {
-  fs.writeFileSync('/home/nhan98-889566.163b8276/public_html/debug_log.json', JSON.stringify(log, null, 2));
+  fs.writeFileSync('/home/nhan98-889566.163b8276/public_html/public/debug_log.json', JSON.stringify(log, null, 2));
 } catch (e) {
   console.error('Failed to write debug log file:', e.message);
 }
