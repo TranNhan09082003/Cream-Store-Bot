@@ -15,7 +15,7 @@ export async function processPendingPaymentTickets(client) {
       SELECT * FROM orders 
       WHERE guild_id = ?
         AND status = 'PENDING_PAYMENT' 
-        AND payment_status = 'UNPAID'
+        and payment_status IN ('UNPAID', 'CANCELLED')
     `).all(config.guildId);
 
     const now = Date.now();
@@ -26,8 +26,8 @@ export async function processPendingPaymentTickets(client) {
 
       // Nếu không có kênh ticket Discord, tự động hủy đơn sau 15 phút
       if (!order.ticket_channel_id) {
-        if (ageMinutes >= 15) {
-          cancelOrder(order.order_code, 'Tự động hủy đơn hàng không có kênh ticket sau 15 phút');
+        if (ageMinutes >= 15 || order.payment_status === 'CANCELLED') {
+          cancelOrder(order.order_code, order.payment_cancel_reason || 'Tự động hủy đơn hàng không có kênh ticket');
         }
         continue;
       }
@@ -56,6 +56,62 @@ export async function processPendingPaymentTickets(client) {
       }
 
       const E = createEmojiResolver(order.guild_id);
+
+      // Nếu trạng thái thanh toán đã bị hủy hoặc hết hạn, xử lý hủy đơn và đóng ticket ngay lập tức
+      if (order.payment_status === 'CANCELLED') {
+        const embed = new EmbedBuilder()
+          .setColor(0xED4245) // Red
+          .setTitle(`❌ ĐƠN HÀNG BỊ HỦY`)
+          .setDescription([
+            `<a:tick_red51:1384069065626222632> Đơn hàng **${order.order_code}** đã bị hủy do liên kết thanh toán đã hết hạn hoặc bị hủy.`,
+            '<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>',
+            '',
+            `🔒 **Ticket này sẽ tự động đóng và xóa kênh sau 5 giây.**`
+          ].join('\n'))
+          .setTimestamp();
+
+        await channel.send({
+          embeds: [embed]
+        }).catch(() => null);
+
+        const cancelled = cancelOrder(order.order_code, order.payment_cancel_reason || 'Thanh toán bị hủy hoặc hết hạn');
+        if (cancelled) {
+          await updateOrderLogMessage(channel.guild, cancelled).catch(() => null);
+        }
+
+        setTimeout(async () => {
+          try {
+            const ticket = db.prepare('SELECT * FROM tickets WHERE related_order_code = ?').get(order.order_code);
+            if (ticket) {
+              const transcriptResult = await exportTicketTranscript(channel).catch(() => null);
+              closeTicket(ticket.id, client.user.id);
+
+              await emitStaffLog(client, {
+                guildId: order.guild_id,
+                actorId: client.user.id,
+                targetId: order.customer_id,
+                action: 'TICKET_CLOSE',
+                detail: `Auto-close ticket do thanh toán bị hủy/hết hạn`,
+                relatedTicketCode: ticket.ticket_code,
+                relatedOrderCode: order.order_code,
+              });
+
+              if (transcriptResult) {
+                await deliverTranscript({
+                  guild: channel.guild,
+                  ticket,
+                  transcriptResult,
+                  closedById: client.user.id,
+                });
+              }
+            }
+            await channel.delete('Auto-close ticket do thanh toán bị hủy/hết hạn').catch(() => null);
+          } catch (err) {
+            console.error('[AUTO CLOSE TICKET ERR CANCELLED]', err);
+          }
+        }, 5000);
+        continue;
+      }
 
       // CASE 1: Chưa gửi nhắc nhở lần 1
       if (!order.payment_reminder_sent_at) {
