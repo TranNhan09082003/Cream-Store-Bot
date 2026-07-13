@@ -94,6 +94,39 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
   // Create reverse proxy server for webhooks and dashboard
   const server = http.createServer(async (req, res) => {
+    // Expose deploy/diagnostics logs with authorization
+    if (req.url.startsWith('/api/public/logs/')) {
+      try {
+        const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+        const providedKey = req.headers['x-bot-api-key'] || urlParams.get('api_key');
+        const expectedKey = process.env.BOT_API_KEY;
+        if (!providedKey || providedKey !== expectedKey) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+          return;
+        }
+
+        const fs = await import('fs');
+        const path = await import('path');
+        const isDebug = req.url.includes('/logs/debug');
+        const filename = isDebug ? 'debug_log.json' : 'send_price_log.txt';
+        const filePath = path.join(process.cwd(), filename);
+        
+        if (fs.existsSync(filePath)) {
+          const contentType = isDebug ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8';
+          res.writeHead(200, { 'Content-Type': contentType });
+          res.end(fs.readFileSync(filePath));
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end(`File ${filename} not found`);
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(e.message);
+      }
+      return;
+    }
+
     // Intercept deployment endpoint directly in the launcher to allow deploying even when child bot processes are crashed
     if (req.url.startsWith('/api/public/deploy')) {
       try {
@@ -127,10 +160,10 @@ if (process.env.IS_CHILD_BOT === 'true') {
             `git reset --hard origin/main`,
             `npm install --omit=dev --prefer-offline`,
             `node scripts/write-debug.js`,
-            `node scripts/send-price-panel.js > /home/nhan98-889566.163b8276/public_html/public/send_price_log.txt 2>&1`
+            `node scripts/send-price-panel.js > send_price_log.txt 2>&1`
           ].join(' && ');
         } else {
-          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/write-debug.js && node scripts/send-price-panel.js > /home/nhan98-889566.163b8276/public_html/public/send_price_log.txt 2>&1`;
+          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/write-debug.js && node scripts/send-price-panel.js > send_price_log.txt 2>&1`;
         }
 
         exec(cmd, { cwd }, (err, stdout, stderr) => {
