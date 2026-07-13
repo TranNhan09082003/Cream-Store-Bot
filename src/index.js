@@ -160,10 +160,12 @@ if (process.env.IS_CHILD_BOT === 'true') {
             `git reset --hard origin/main`,
             `npm install --omit=dev --prefer-offline`,
             `node scripts/fix-products.js`,
-            `node scripts/send-price-panel.js > send_price_log.txt 2>&1`
+            `node scripts/send-price-panel.js > send_price_log.txt 2>&1`,
+            `mkdir -p tmp`,
+            `touch tmp/restart.txt`
           ].join(' && ');
         } else {
-          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/fix-products.js && node scripts/send-price-panel.js > send_price_log.txt 2>&1`;
+          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/fix-products.js && node scripts/send-price-panel.js > send_price_log.txt 2>&1 && mkdir -p tmp && touch tmp/restart.txt`;
         }
 
         exec(cmd, { cwd }, (err, stdout, stderr) => {

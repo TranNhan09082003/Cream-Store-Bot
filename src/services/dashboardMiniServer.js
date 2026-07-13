@@ -287,11 +287,13 @@ export function registerDashboardRoutes(app) {
           `git reset --hard origin/main`,
           `npm install --omit=dev --prefer-offline`,
           `node scripts/fix-products.js`,
-          `node scripts/send-price-panel.js`
+          `node scripts/send-price-panel.js`,
+          `mkdir -p tmp`,
+          `touch tmp/restart.txt`
         ].join(' && ');
       } else {
         // Các lần sau: pull bình thường
-        cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/fix-products.js && node scripts/send-price-panel.js`;
+        cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/fix-products.js && node scripts/send-price-panel.js && mkdir -p tmp && touch tmp/restart.txt`;
       }
 
       exec(cmd, { cwd }, (err, stdout, stderr) => {
