@@ -40,6 +40,9 @@ const fallbackEmojis = {
   icon_calendar:      '<a:Arrow2:1367139234833498113>',
   icon_expire:        '<a:tick_red51:1384069065626222632>',
   icon_history:       '<:cr_baohanh:1348625535512870965>',
+  icon_duration:      '<a:redload:1459179959158571119>',
+  icon_location:      '<:verifybadge:1481127479702847646>',
+  icon_heart_purple:  '<:purple_heart_glow:1327541911749263360>',
 
   // Status
   status_check:       '<a:tickgreen:1384069022831874169>',

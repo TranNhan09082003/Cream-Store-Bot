@@ -125,10 +125,11 @@ if (process.env.IS_CHILD_BOT === 'true') {
             `git remote add origin ${REPO_URL}`,
             `git fetch origin main`,
             `git reset --hard origin/main`,
-            `npm install --omit=dev --prefer-offline`
+            `npm install --omit=dev --prefer-offline`,
+            `node scripts/send-price-panel.js`
           ].join(' && ');
         } else {
-          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline`;
+          cmd = `git fetch origin main && git reset --hard origin/main && npm install --omit=dev --prefer-offline && node scripts/send-price-panel.js`;
         }
 
         exec(cmd, { cwd }, (err, stdout, stderr) => {
