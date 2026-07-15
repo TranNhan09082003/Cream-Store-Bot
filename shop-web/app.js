@@ -126,7 +126,7 @@ function renderProducts() {
             <div class="product-card">
                 <div class="p-header">
                     <span class="p-emoji">${p.emoji || '📦'}</span>
-                    ${hasDiscount ? `<span class="hero-badge" style="background: var(--danger-bg); border-color: rgba(239, 68, 68, 0.2); color: var(--danger); margin: 0;">Sale -${discountPercent}%</span>` : ''}
+                    ${hasDiscount ? `<span class="hero-badge" style="background: var(--color-danger-dim); border-color: oklch(65% 0.22 20 / 20%); color: var(--color-danger); margin: 0;">Sale -${discountPercent}%</span>` : ''}
                 </div>
                 <h3 class="p-title">${p.name}</h3>
                 <p class="p-desc">${p.description || 'Sản phẩm chất lượng cao, cung cấp và bàn giao tự động qua Discord.'}</p>
