@@ -1,52 +1,120 @@
-import 'dotenv/config';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
+import Database from 'better-sqlite3';
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config();
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
-const content = `@everyone
-<a:tsm_fire:1327553120842158111> **THÔNG BÁO QUAN TRỌNG VỀ CHÍNH SÁCH BẢO HÀNH & NGUỒN CUNG DỊCH VỤ** <a:tsm_fire:1327553120842158111>
-<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
+const guildId = '1282637033340403754';
 
-Chào các bạn thành viên của **Cenar Store**, dưới đây là cập nhật mới nhất về quy định bảo hành, quy trình gia hạn dịch vụ Nitro, YouTube Premium cùng một số lưu ý quan trọng. Vui lòng đọc kỹ để đảm bảo quyền lợi tốt nhất khi mua sắm tại cửa hàng.
+// Fallback emojis mapped to custom ones from the store
+const fallbackEmojis = {
+  icon_announce:      '📢',
+  icon_sparkle:       '<a:starxoay:1481141954346483845>',
+  icon_settings:      '<:gearup:1515216203453432002>',
+  icon_warn:          '<a:Dotyellow:1481134440725090315>',
+  icon_check:         '<a:tickgreen:1384069022831874169>',
+  icon_gift:          '<a:starxoay:1481141954346483845>',
+  icon_crown:         '<:Platinum:1485905566130765908>',
+  icon_heart:         '❤️'
+};
 
----
+function getEmoji(guild, key) {
+  const fallback = fallbackEmojis[key] || '';
+  const match = fallback.match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+  if (match) {
+    const emojiId = match[2];
+    const emoji = guild.emojis.cache.get(emojiId);
+    if (emoji) return emoji.toString();
+  }
+  return fallback;
+}
 
-### <:verifybadge:1481127479702847646> 1. QUY ĐỊNH BẢO HÀNH & GIA HẠN DISCORD NITRO
-* **Discord Nitro 2 tháng (Mua mới):**
-  * <a:chamxanh:1481124932447371374> Shop chỉ chấp nhận bảo hành nếu Gmail của bạn **còn hoạt động bình thường**.
-  * <a:chamxanh:1481124932447371374> Trường hợp bạn để Gmail bị khóa/chết, shop xin phép **miễn trừ trách nhiệm** (vì shop đã có hướng dẫn chi tiết cách bảo quản Gmail).
-* **Discord Nitro 12 tháng (Gia hạn):**
-  * <a:chamxanh:1481124932447371374> Bảo hành đầy đủ nếu tài khoản Gmail của bạn còn sống.
-  * <a:chamxanh:1481124932447371374> Nếu Gmail bị mất/khóa, tùy vào mức độ cứu hộ Gmail mà thời gian bảo hành có thể bị khấu trừ từ **1 - 2 tháng**.
-* **Quy trình Gia hạn Nitro:**
-  * <a:chamxanh:1481124932447371374> **Gia hạn ngay lập tức:** Khách hàng thực hiện gia hạn ngay sau khi gói cũ vừa hết hạn. Tỷ lệ hoàn thành **100% chỉ trong 5 - 10 phút**.
-  * <a:chamxanh:1481124932447371374> **Quá hạn trên 1 tháng:** Nếu gói Nitro đã hết hạn quá 1 tháng, Gmail cũ sẽ không thể gia hạn tiếp. Bạn buộc phải chuyển sang **mua mới**.
-* **Tình trạng Nitro 2 tháng mua mới:**
-  * <a:chamxanh:1481124932447371374> Hiện tại nguồn cung Gmail trên thị trường đang cực kỳ khan hiếm. Vì vậy, đơn hàng Nitro 2 tháng mua mới sẽ cần **đợi một khoảng thời gian đến khi có Gmail**. Mong các bạn thông cảm và lưu ý trước khi lên đơn.
+client.once('ready', async () => {
+  try {
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+    if (!guild) {
+      console.error('❌ Guild not found!');
+      client.destroy();
+      return;
+    }
+    console.log(`✅ Logged in as ${client.user.tag} for announcement.`);
+    const E = (key) => getEmoji(guild, key);
 
----
+    // Find announcements channel
+    let announceChannel = guild.channels.cache.find(c => 
+      c.name.includes('thông-báo') || 
+      c.name.includes('announcement') || 
+      c.name.includes('news')
+    );
 
-### <:verifybadge:1481127479702847646> 2. QUY ĐỊNH DỊCH VỤ YOUTUBE PREMIUM
-* **YouTube Premium (Mua mới):**
-  * <a:chamxanh:1481124932447371374> Bạn chỉ cần gửi địa chỉ Gmail của mình cho shop, sau đó kiểm tra hòm thư và bấm đồng ý tham gia Family. Cam kết gia đình **riêng tư 100%**, không chia sẻ bất kỳ dữ liệu cá nhân nào của bạn.
-* **YouTube Premium (Bảo hành):**
-  * <a:chamxanh:1481124932447371374> Để được hỗ trợ nhanh nhất khi cần bảo hành, vui lòng cung cấp đầy đủ: **Tên Gmail chủ Family đang tham gia** và **Địa chỉ Gmail của bạn**.
+    if (!announceChannel) {
+      // Fallback ID from config
+      const db = new Database('data/shopbot.sqlite');
+      const row = db.prepare('SELECT value FROM guild_settings WHERE guild_id = ? AND key = ?').get(guildId, 'ANNOUNCE_CHANNEL_ID');
+      db.close();
+      if (row?.value) {
+        announceChannel = await guild.channels.fetch(row.value).catch(() => null);
+      }
+    }
 
----
+    if (!announceChannel) {
+      console.error('❌ Announcement channel not found!');
+      client.destroy();
+      return;
+    }
 
-### <:verifybadge:1481127479702847646> 3. CHÍNH SÁCH BẢO HÀNH CHUNG & CAM KẾT CỦA CỬA HÀNG
-* **Điều kiện bắt buộc nhận bảo hành:**
-  * <a:chamxanh:1481124932447371374> **Không out Server:** Khách hàng rời khỏi Server của chúng tôi sau khi mua hàng sẽ bị **từ chối bảo hành hoàn toàn**.
-  * <a:chamxanh:1481124932447371374> **Yêu cầu phản hồi (Feedback):** Khách hàng mua hàng bắt buộc phải gửi feedback đánh giá. Những trường hợp không feedback (hoặc chỉ feedback khi cần bảo hành) sẽ **bị từ chối hỗ trợ bảo hành**.
-* **Về tiến độ trả đơn hàng:**
-  * <a:chamxanh:1481124932447371374> Cenar Store cam kết **không bao giờ giữ (hold) đơn hàng của khách**. Mọi sự chậm trễ hoàn toàn do tình trạng khan hiếm nguyên liệu chung của thị trường.
-  * <a:chamxanh:1481124932447371374> Hiện tại ngoài dòng Nitro 2 tháng đang biến động, các dịch vụ khác như **Spotify, YouTube, Netflix** đang chạy rất mượt mà và trả đơn cực nhanh. Các bạn có thể yên tâm lên đơn nhé!
+    console.log(`Found announcement channel: #${announceChannel.name} (${announceChannel.id})`);
 
-<a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
-<a:starxoay:1481141954346483845> **Chúc các bạn mua sắm vui vẻ cùng Cenar Store!** <a:starxoay:1481141954346483845>
+    // Build the gorgeous Embed
+    const embed = new EmbedBuilder()
+      .setColor('#00e676') // Neon emerald green
+      .setTitle(`${E('icon_announce')} THÔNG BÁO CẬP NHẬT HỆ THỐNG & XỬ LÝ BẢO HÀNH YOUTUBE`)
+      .setDescription([
+        `Chào các thành viên thân yêu của **Cenar Store** ${E('icon_heart')},`,
+        `Nhằm nâng cao chất lượng dịch vụ và tối ưu hóa trải nghiệm mua sắm của quý khách hàng, đội ngũ kỹ thuật của shop vừa hoàn tất đợt bảo trì và nâng cấp lớn toàn bộ hệ thống!`,
+        `────────────────────────────────────────`
+      ].join('\n'))
+      .addFields(
+        {
+          name: `${E('icon_settings')} 1. ĐỢT CẬP NHẬT HỆ THỐNG MỚI`,
+          value: [
+            `* **Rebuild Website Storefront:** Nâng cấp toàn diện trang web **[cenarstore.xyz](https://cenarstore.xyz)** với giao diện *Midnight Green* hiện đại, tăng tốc độ tải trang cực nhanh và tối ưu hóa giỏ hàng.`,
+            `* **Kênh Dịch Vụ Mới:** Chính thức ra mắt 2 kênh mới **<#1514607141523427388>** và **<#1514607158778531952>** để phục vụ các dự án thiết kế Bot Discord và Website chuyên nghiệp trọn gói.`
+          ].join('\n')
+        },
+        {
+          name: `${E('icon_warn')} 2. TIẾN ĐỘ BẢO HÀNH & XỬ LÝ ĐƠN HÀNG YOUTUBE`,
+          value: [
+            `* Do sự cố kỹ thuật ngoài ý muốn từ phía nhà cung cấp, một số đơn hàng YouTube Premium và yêu cầu bảo hành đã bị gián đoạn.`,
+            `* Đội ngũ kỹ thuật của shop sẽ **tiến hành xử lý và bảo hành hàng loạt vào tối nay** để hoàn thành toàn bộ các yêu cầu còn tồn đọng.`
+          ].join('\n')
+        },
+        {
+          name: `${E('icon_gift')} 3. QUÀ TẶNG TRI ÂN & ĐỀN BÙ VOUCHER 10%`,
+          value: [
+            `* Để chân thành cáo lỗi vì sự chờ đợi lâu của quý khách, Cenar Store gửi tặng mã giảm giá **\`CENAR10\`** (giảm 10% áp dụng cho toàn bộ sản phẩm trên hệ thống) cho các lần mua hàng tiếp theo.`,
+            `* **Đặc biệt:** Hệ thống sẽ tự động rà soát các đơn hàng bị trễ lâu để add thêm voucher ưu đãi đặc biệt trực tiếp vào tài khoản của quý khách.`
+          ].join('\n')
+        }
+      )
+      .setFooter({ text: 'Cenar Store — Chất Lượng & Uy Tín Đặt Lên Hàng Đầu', iconURL: guild.iconURL() })
+      .setTimestamp();
+
+    // Send announcement and tag everyone
+    await announceChannel.send({
+      content: `@everyone`,
+      embeds: [embed]
+    });
+
+    console.log('✅ Announcement posted successfully!');
+  } catch (err) {
+    console.error('Error sending announcement:', err.message);
+  }
+  client.destroy();
+});
+
+client.login(process.env.BOT_TOKEN).catch(console.error);
