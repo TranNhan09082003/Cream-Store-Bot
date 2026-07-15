@@ -13,7 +13,7 @@ try {
     NODE_ENV: process.env.NODE_ENV,
   };
   
-  const db1Path = '/home/nhan98-889566.163b8276/Cream-Store-Bot-main/data/shopbot.sqlite';
+  const db1Path = path.resolve(process.cwd(), 'data/shopbot.sqlite');
   if (fs.existsSync(db1Path)) {
     const db1 = new Database(db1Path);
     log.db1 = {
@@ -26,7 +26,7 @@ try {
     log.db1 = { exists: false };
   }
   
-  const db2Path = '/home/nhan98-889566.163b8276/Cream-Store-Bot-main/data/shopbot-store2.sqlite';
+  const db2Path = path.resolve(process.cwd(), 'data/shopbot-store2.sqlite');
   if (fs.existsSync(db2Path)) {
     const db2 = new Database(db2Path);
     log.db2 = {
@@ -44,7 +44,8 @@ try {
 }
 
 try {
-  fs.writeFileSync('/home/nhan98-889566.163b8276/public_html/public/debug_log.json', JSON.stringify(log, null, 2));
+  fs.writeFileSync(path.resolve(process.cwd(), 'debug_log.json'), JSON.stringify(log, null, 2));
 } catch (e) {
   console.error('Failed to write debug log file:', e.message);
 }
+
