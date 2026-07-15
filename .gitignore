@@ -45,9 +45,7 @@ scripts/*
 !scripts/smoke-test.js
 !scripts/send-combo-announcement.js
 !scripts/send-service-panel.js
-!scripts/setup_channels_auto.js
-
-
+!scripts/setup-dev-channels.js
 
 .github/workflows/deploy-cpanel.yml
 
