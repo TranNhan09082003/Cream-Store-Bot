@@ -50,6 +50,33 @@ try {
     // 3. Update Discord Nitro 3 Tháng Trail (ID 24) price to 65000
     const r3 = db.prepare('UPDATE product_catalog SET price = 65000 WHERE id = 24').run();
     console.log(`Updated product ID 24 price: ${r3.changes} rows affected.`);
+
+    // 4. Ensure Gemini Pro 18m exists (ID 101 or auto-inserted)
+    const existingGemini = db.prepare('SELECT id FROM product_catalog WHERE name = ? AND guild_id = ?').get('Gemini Pro Nâng Cấp Chính Chủ (18 Tháng)', guildId);
+    if (existingGemini) {
+      db.prepare(`
+        UPDATE product_catalog 
+        SET price = 180000, duration_months = 18, service_type = 'AI', emoji = 'brand_gemini', is_active = 1 
+        WHERE id = ?
+      `).run(existingGemini.id);
+      console.log('Updated existing Gemini Pro 18m.');
+    } else {
+      const maxSort = db.prepare('SELECT MAX(sort_order) AS mx FROM product_catalog WHERE guild_id = ?').get(guildId);
+      const sortOrder = (maxSort?.mx ?? 0) + 1;
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO product_catalog (guild_id, name, description, price, duration_months, service_type, emoji, sort_order, is_active, created_at, updated_at)
+        VALUES (?, 'Gemini Pro Nâng Cấp Chính Chủ (18 Tháng)', 'Nâng cấp chính chủ tài khoản của bạn, bảo hành trọn thời gian sử dụng, trải nghiệm AI thông minh nhất từ Google!', 180000, 18, 'AI', 'brand_gemini', ?, 1, ?, ?)
+      `).run(guildId, sortOrder, now, now);
+      console.log('Inserted new Gemini Pro 18m.');
+    }
+
+    // 5. Ensure CENAR10 10% discount coupon exists
+    db.prepare(`
+      INSERT OR REPLACE INTO coupons (guild_id, code, type, value, min_order, max_uses, max_per_user, is_active)
+      VALUES (?, 'CENAR10', 'percent', 10, 0, 0, 1, 1)
+    `).run(guildId);
+    console.log('Ensured CENAR10 coupon exists.');
   })();
 
   // Verify
