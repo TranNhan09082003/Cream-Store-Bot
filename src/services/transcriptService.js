@@ -621,14 +621,23 @@ export async function exportTicketTranscript(channel) {
   let lastId;
   const allMessages = [];
   let fetchCount = 0;
+  let fetchError = null;
 
+  // Bọc từng lần fetch: nếu Discord API lỗi giữa chừng, vẫn giữ những tin đã lấy
+  // được (transcript một phần) thay vì để cả hàm ném và caller nuốt lỗi thành null.
   while (fetchCount < 15) { // Giới hạn tối đa 15 lần fetch (1500 tin nhắn) để tránh lặp vô hạn/treo bot
-    const batch = await channel.messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
-    if (!batch.size) break;
-    allMessages.push(...batch.values());
-    lastId = batch.last().id;
-    fetchCount++;
-    if (batch.size < 100) break;
+    try {
+      const batch = await channel.messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
+      if (!batch.size) break;
+      allMessages.push(...batch.values());
+      lastId = batch.last().id;
+      fetchCount++;
+      if (batch.size < 100) break;
+    } catch (err) {
+      fetchError = err;
+      console.error(`[TRANSCRIPT] Lỗi khi tải tin nhắn (#${channel?.name ?? '?'}) sau ${allMessages.length} tin:`, err.message);
+      break;
+    }
   }
 
   allMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
@@ -648,12 +657,19 @@ export async function exportTicketTranscript(channel) {
   const htmlFileName = `transcript_${channel.name}_${Date.now()}.html`;
   const textFileName = `${channel.name}-transcript.txt`;
 
+  // savedToDisk cho caller biết bản lưu trữ trên đĩa có ghi được không (buffer để
+  // gửi Discord vẫn luôn có, nhưng archive nội bộ có thể thất bại nếu đĩa lỗi).
+  let savedToDisk = false;
+  let savedHtmlPath = null;
   try {
     const transcriptsDir = path.join(process.cwd(), 'data', 'transcripts');
     if (!fs.existsSync(transcriptsDir)) fs.mkdirSync(transcriptsDir, { recursive: true });
-    fs.writeFileSync(path.join(transcriptsDir, htmlFileName), transcriptHtml, 'utf8');
+    savedHtmlPath = path.join(transcriptsDir, htmlFileName);
+    fs.writeFileSync(savedHtmlPath, transcriptHtml, 'utf8');
+    savedToDisk = true;
   } catch (error) {
-    console.error('[TRANSCRIPT] Không thể lưu file html:', error);
+    savedHtmlPath = null;
+    console.error('[TRANSCRIPT] Không thể lưu file html:', error.message);
   }
 
   return {
@@ -662,5 +678,10 @@ export async function exportTicketTranscript(channel) {
     htmlFileName,
     textFileName,
     messageCount: allMessages.length,
+    // Cờ chẩn đoán: caller có thể phân biệt "xuất thành công" với "xuất được một phần".
+    savedToDisk,
+    savedHtmlPath,
+    partial: fetchError !== null,
+    fetchErrorMessage: fetchError ? fetchError.message : null,
   };
 }

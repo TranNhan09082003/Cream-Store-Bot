@@ -1,7 +1,7 @@
 import {
   PermissionFlagsBits, SlashCommandBuilder, ChannelType,
   ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize,
-  MessageFlags,
+  MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle,
 } from 'discord.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
 import { getGuildConfig } from '../services/guildConfigService.js';
@@ -184,10 +184,24 @@ export async function execute(interaction) {
         )
       );
 
-      await channel.send({
+      // Riêng kênh YouTube: gắn nút "Yêu Cầu Bảo Hành" (customId khớp handler ytb:warranty:apply)
+      const guidePayload = {
         components: [contentContainer],
         flags: MessageFlags.IsComponentsV2,
-      }).catch(e => console.error(`[SETUP-GUIDE] Gửi nội dung ${ch.key} thất bại:`, e.message));
+      };
+
+      if (ch.key === 'youtube') {
+        const btnWarranty = new ButtonBuilder()
+          .setCustomId('ytb:warranty:apply')
+          .setLabel('Yêu Cầu Bảo Hành')
+          .setStyle(ButtonStyle.Success);
+        const warrantyEmoji = E.component('panel_warranty');
+        if (warrantyEmoji) btnWarranty.setEmoji(warrantyEmoji);
+        guidePayload.components.push(new ActionRowBuilder().addComponents(btnWarranty));
+      }
+
+      await channel.send(guidePayload)
+        .catch(e => console.error(`[SETUP-GUIDE] Gửi nội dung ${ch.key} thất bại:`, e.message));
 
       createdChannels.push(channel);
     }

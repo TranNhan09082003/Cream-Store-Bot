@@ -85,9 +85,12 @@ export async function execute(interaction) {
   const E = createEmojiResolver(interaction?.guildId);
   const customer = interaction.options.getUser('khach_hang');
   const payload = buildCongnoPanel(interaction.guildId, customer?.id ?? null, 1);
-  // Merge IsComponentsV2 (32768) with Ephemeral (64)
+  // Chỉ gắn cờ IsComponentsV2 khi payload thực sự có components.
+  // Trường hợp không có đơn nợ, payload chỉ có `content` — kết hợp với
+  // IsComponentsV2 sẽ bị Discord từ chối (không dùng chung content + flag V2).
+  const flags = payload.components ? (MessageFlags.IsComponentsV2 | 64) : 64;
   await interaction.reply({
     ...payload,
-    flags: MessageFlags.IsComponentsV2 | 64,
+    flags,
   });
 }

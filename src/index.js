@@ -235,21 +235,41 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
       await new Promise(resolve => req.on('end', resolve));
 
-      try {
-        const payload = JSON.parse(bodyData);
-        const payosOrderCode = payload?.data?.orderCode;
-        if (payosOrderCode) {
-          const Database = (await import('better-sqlite3')).default;
-          const db = new Database(path.join(process.cwd(), 'data', 'shopbot.sqlite'), { readonly: true });
-          const order = db.prepare("SELECT guild_id FROM orders WHERE payos_order_code = ?").get(Number(payosOrderCode));
-          db.close();
+      // Chỉ dò định tuyến khi URL chưa xác định rõ store (URL /webhooks/payos-store2
+      // đã được ép targetPort=8080 ở trên — không cần tra DB nữa).
+      if (targetPort !== 8080) {
+        try {
+          const payload = JSON.parse(bodyData);
+          const payosOrderCode = payload?.data?.orderCode;
+          if (payosOrderCode) {
+            const Database = (await import('better-sqlite3')).default;
+            const code = Number(payosOrderCode);
 
-          if (order && order.guild_id === '1070676180103086132') { // Store 2 Guild ID
-            targetPort = 8080;
+            // Tra CẢ HAI database: order nằm ở DB nào thì route về đúng store đó.
+            // (Trước đây chỉ tra DB Store 1 nên order Store 2 dùng chung URL bị route nhầm.)
+            const dbFiles = [
+              { path: path.join(process.cwd(), 'data', 'shopbot.sqlite'), port: 2753 },
+              { path: path.join(process.cwd(), 'data', 'shopbot-store2.sqlite'), port: 8080 },
+            ];
+
+            for (const { path: dbPath, port } of dbFiles) {
+              try {
+                const db = new Database(dbPath, { readonly: true });
+                const order = db.prepare("SELECT guild_id FROM orders WHERE payos_order_code = ?").get(code);
+                db.close();
+                if (order) {
+                  targetPort = port;
+                  break;
+                }
+              } catch (dbErr) {
+                // DB store 2 có thể chưa tồn tại nếu chưa dùng — bỏ qua, thử DB kế
+                console.error(`[LAUNCHER] Không đọc được ${dbPath}:`, dbErr.message);
+              }
+            }
           }
+        } catch (err) {
+          console.error('[LAUNCHER] Error parsing/routing PayOS webhook:', err.message);
         }
-      } catch (err) {
-        console.error('[LAUNCHER] Error parsing/routing PayOS webhook:', err.message);
       }
 
       const connector = http.request({

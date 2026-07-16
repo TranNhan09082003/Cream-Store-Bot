@@ -17,6 +17,7 @@ import { config } from '../config.js';
 import { getAiKnowledge } from './aiKnowledgeService.js';
 import { applyCors } from '../utils/cors.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
+import { safeEqual } from '../utils/crypto.js';
 
 /**
  * Middleware xác thực API key
@@ -31,7 +32,7 @@ function requireApiKey(req, res, next) {
     }
 
     const providedKey = (req.header('x-bot-api-key') || req.header('X-Bot-Api-Key') || '').trim();
-    if (providedKey !== expectedKey) {
+    if (!safeEqual(providedKey, expectedKey)) {
         return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
 

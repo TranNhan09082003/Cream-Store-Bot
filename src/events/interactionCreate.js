@@ -1091,14 +1091,16 @@ async function handlePriceListAdminEditPortalButton(interaction) {
 
 async function handlePriceListAdminEditPortalModal(interaction) {
   const E = createEmojiResolver(interaction.guildId);
+  // Defer NGAY để tránh vượt timeout 3 giây của Discord trước khi gọi members.fetch()
+  await interaction.deferReply({ ephemeral: true });
+
   const guildConfig = getGuildConfig(interaction.guildId);
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   const isAdmin = member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || isManager(member, guildConfig));
 
   if (!isAdmin) {
-    await interaction.reply({
+    await interaction.editReply({
       content: `${E('status_cross')} Bạn không có quyền chỉnh sửa bảng giá này!`,
-      ephemeral: true
     });
     return;
   }
@@ -1106,8 +1108,6 @@ async function handlePriceListAdminEditPortalModal(interaction) {
   const title = interaction.fields.getTextInputValue('title');
   const description = interaction.fields.getTextInputValue('description');
   const imageUrl = interaction.fields.getTextInputValue('image_url') || null;
-
-  await interaction.deferReply({ ephemeral: true });
 
   const updated = upsertGuildConfig({
     guild_id: interaction.guildId,
@@ -2022,7 +2022,9 @@ async function handleTicketClose(interaction, ticketId) {
         `> ${E('ticket_user')} **Đóng bởi:** <@${interaction.user.id}>`,
         `> ${E('icon_clock')} Channel sẽ **tự xóa sau 1.5 giây**.`,
         transcriptResult
-          ? `> ${E('icon_clipboard')} Transcript đã được lưu và gửi cho khách.`
+          ? (transcriptResult.partial
+              ? `> ${E('status_warn')} Transcript xuất **một phần** (tải tin nhắn bị gián đoạn) nhưng vẫn đã gửi cho khách.`
+              : `> ${E('icon_clipboard')} Transcript đã được lưu và gửi cho khách.`)
           : `> ${E('status_warn')} Không thể xuất transcript lần này.`,
       ].filter(Boolean).join('\n'))
     );
@@ -4175,9 +4177,10 @@ export function registerInteractionHandler(client, commands) {
         import('../commands/congno.js').then(async ({ buildCongnoPanel }) => {
           import('discord.js').then(async ({ MessageFlags }) => {
             const payload = buildCongnoPanel(interaction.guildId, customerId, page);
+            // Chỉ gắn IsComponentsV2 khi payload có components — tránh xung đột content + flag V2
             await interaction.update({
               ...payload,
-              flags: MessageFlags.IsComponentsV2,
+              ...(payload.components ? { flags: MessageFlags.IsComponentsV2 } : {}),
             }).catch(() => null);
           });
         });
@@ -5532,6 +5535,66 @@ export function registerInteractionHandler(client, commands) {
       if (interaction.customId.startsWith('boost:warranty_req:')) {
         const code = interaction.customId.split(':').slice(2).join(':');
         await handleBoostWarrantyReq(interaction, code);
+        return;
+      }
+
+      // Nút bảo hành cũ (panel đời trước) — customId đã đổi, chuyển hướng sang luồng mới
+      if (
+        interaction.customId === 'ytb:warranty' ||
+        interaction.customId === 'youtube:warranty' ||
+        interaction.customId === 'warranty:apply' ||
+        interaction.customId === 'warranty:request' ||
+        interaction.customId.startsWith('warranty:') ||
+        (interaction.customId.includes('warranty') && interaction.customId.includes('apply'))
+      ) {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = await import('discord.js');
+        const E_lw = createEmojiResolver(interaction.guildId);
+        try {
+          const modal = new ModalBuilder()
+            .setCustomId('ytb:warranty:modal')
+            .setTitle('Yêu Cầu Bảo Hành YouTube');
+          const orderInput = new TextInputBuilder()
+            .setCustomId('warranty_order_code')
+            .setLabel('Mã đơn hàng (ví dụ: CN_123456)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder('CN_xxxxxx hoặc BST_xxxxxx')
+            .setMaxLength(20);
+          const gmailInput = new TextInputBuilder()
+            .setCustomId('warranty_customer_gmail')
+            .setLabel('Gmail cần bảo hành của bạn')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder('gmailcua-ban@gmail.com')
+            .setMaxLength(100);
+          const familyInput = new TextInputBuilder()
+            .setCustomId('warranty_family_owner_gmail')
+            .setLabel('Gmail chủ Family cũ (nếu có)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setPlaceholder('gmail-chu-family@gmail.com')
+            .setMaxLength(100);
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(orderInput),
+            new ActionRowBuilder().addComponents(gmailInput),
+            new ActionRowBuilder().addComponents(familyInput)
+          );
+          await interaction.showModal(modal);
+        } catch (err) {
+          console.error('[WARRANTY-LEGACY-CLICK] Error:', err.message);
+          await interaction.reply({ content: `${E_lw('status_cross')} Không thể mở form bảo hành: ${err.message}`, ephemeral: true }).catch(() => null);
+        }
+        return;
+      }
+
+      // Fallback cho mọi nút không khớp handler — ACK để tránh "Tương tác này không thành công"
+      {
+        const E_fb = createEmojiResolver(interaction.guildId);
+        console.warn(`[INTERACTION] Nút không có handler: ${interaction.customId} (user ${interaction.user.tag})`);
+        await interaction.reply({
+          content: `${E_fb('status_warn')} Nút này thuộc bảng cũ và không còn hoạt động. Vui lòng dùng bảng mới hoặc lệnh tương ứng. Nếu cần hỗ trợ, hãy mở ticket.`,
+          ephemeral: true,
+        }).catch(() => null);
         return;
       }
 

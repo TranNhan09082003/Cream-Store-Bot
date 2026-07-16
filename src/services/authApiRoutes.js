@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { db } from '../database/db.js';
 import { authLimiter, checkLoginLock, recordLoginFailure, clearLoginAttempts } from './rateLimitMiddleware.js';
 import { sanitizeString, isValidEmail, errorResponse, successResponse } from '../utils/inputValidator.js';
+import { safeEqual } from '../utils/crypto.js';
 
 // Utils hash password
 function hashPassword(password) {
@@ -15,7 +16,7 @@ function verifyPassword(password, storedHash) {
   const [salt, key] = storedHash.split(':');
   if (!salt || !key) return false;
   const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return key === hash;
+  return safeEqual(key, hash);
 }
 
 export function registerAuthRoutes(app) {
@@ -26,7 +27,7 @@ export function registerAuthRoutes(app) {
       return res.status(503).json({ ok: false, error: 'BOT_API_KEY chưa cấu hình' });
     }
     const providedKey = (req.header('x-bot-api-key') || req.header('X-Bot-Api-Key') || '').trim();
-    if (providedKey !== expectedKey) {
+    if (!safeEqual(providedKey, expectedKey)) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
     next();

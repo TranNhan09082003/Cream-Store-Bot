@@ -23,6 +23,17 @@ export function isEncrypted(value) {
   return typeof value === 'string' && value.startsWith(PREFIX);
 }
 
+/**
+ * So sánh chuỗi (API key/token) theo kiểu constant-time để chống timing attack.
+ * Trả về true nếu hai chuỗi bằng nhau. An toàn với null/undefined.
+ */
+export function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a ?? ''), 'utf8');
+  const bufB = Buffer.from(String(b ?? ''), 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 export function encrypt(plaintext) {
   if (plaintext === null || plaintext === undefined) return plaintext;
   const str = String(plaintext);
