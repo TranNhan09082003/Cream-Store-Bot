@@ -245,7 +245,7 @@ export function registerDashboardRoutes(app) {
     try {
       const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
       const expectedKey = process.env.BOT_API_KEY;
-      if (providedKey !== expectedKey) {
+      if (!expectedKey || !providedKey || !safeEqual(providedKey, expectedKey)) {
         return res.status(401).json({ ok: false, error: 'Unauthorized' });
       }
       const { db } = await import('../database/db.js');
@@ -261,7 +261,7 @@ export function registerDashboardRoutes(app) {
     try {
       const providedKey = req.headers['x-bot-api-key'] || req.headers['x-github-deploy-secret'] || req.query.api_key;
       const expectedKey = process.env.BOT_API_KEY;
-      if (!providedKey || providedKey !== expectedKey) {
+      if (!expectedKey || !providedKey || !safeEqual(providedKey, expectedKey)) {
         return res.status(401).json({ ok: false, error: 'Unauthorized' });
       }
 
@@ -316,7 +316,7 @@ export function registerDashboardRoutes(app) {
     try {
       const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
       const expectedKey = process.env.BOT_API_KEY;
-      if (!providedKey || providedKey !== expectedKey) {
+      if (!expectedKey || !providedKey || !safeEqual(providedKey, expectedKey)) {
         return res.status(401).json({ ok: false, error: 'Unauthorized' });
       }
 
@@ -354,7 +354,8 @@ export function registerDashboardRoutes(app) {
 
       res.json({ ok: true, info });
     } catch (e) {
-      res.status(500).json({ ok: false, error: e.message, stack: e.stack });
+      console.error('[VPS-DEBUG]', e);
+      res.status(500).json({ ok: false, error: e.message });
     }
   });
 

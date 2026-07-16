@@ -2,6 +2,17 @@ import { config } from '../config.js';
 import { db } from '../database/db.js';
 import { EmbedBuilder } from 'discord.js';
 import { createEmojiResolver } from '../utils/emojiHelper.js';
+import { timingSafeEqual } from 'node:crypto';
+
+// So sánh key an toàn theo thời gian (chống timing attack), fail-closed nếu thiếu key.
+function safeKeyMatch(provided) {
+  const expected = process.env.BOT_API_KEY;
+  if (!expected || !provided) return false;
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 export function registerOauthRoutes(app) {
   
@@ -211,6 +222,10 @@ export function registerOauthRoutes(app) {
 
   // 3. Check if a Discord user is verified (used by admin API)
   app.get('/oauth/status/:discordId', (req, res) => {
+    const providedKey = req.headers['x-bot-api-key'] || req.query.api_key;
+    if (!safeKeyMatch(providedKey)) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
     const { discordId } = req.params;
     const row = db.prepare('SELECT discord_id, username, verified_at FROM oauth_backups WHERE discord_id = ? LIMIT 1').get(discordId);
     if (row) {

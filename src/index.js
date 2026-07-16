@@ -2,9 +2,19 @@ import { fork } from 'child_process';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { timingSafeEqual } from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// So sánh key an toàn theo thời gian (chống timing attack), fail-closed nếu thiếu key.
+function safeKeyMatch(provided, expected) {
+  if (!expected || !provided) return false;
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 if (process.env.IS_CHILD_BOT === 'true') {
   // --- CHILD PROCESS MODE ---
@@ -100,7 +110,7 @@ if (process.env.IS_CHILD_BOT === 'true') {
         const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
         const providedKey = req.headers['x-bot-api-key'] || urlParams.get('api_key');
         const expectedKey = process.env.BOT_API_KEY;
-        if (!providedKey || providedKey !== expectedKey) {
+        if (!safeKeyMatch(providedKey, expectedKey)) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
           return;
@@ -133,7 +143,7 @@ if (process.env.IS_CHILD_BOT === 'true') {
         const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
         const providedKey = req.headers['x-bot-api-key'] || req.headers['x-github-deploy-secret'] || urlParams.get('api_key');
         const expectedKey = process.env.BOT_API_KEY;
-        if (!providedKey || providedKey !== expectedKey) {
+        if (!safeKeyMatch(providedKey, expectedKey)) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
           return;
@@ -228,12 +238,27 @@ if (process.env.IS_CHILD_BOT === 'true') {
 
     if (targetUrl.startsWith('/webhooks/payos')) {
       // PayOS Webhook: Buffer body to inspect payosOrderCode
+      // Giới hạn 2MB để tránh payload khổng lồ gây tràn RAM tiến trình launcher.
+      const MAX_WEBHOOK_BODY = 2 * 1024 * 1024;
       let bodyData = '';
+      let bodyTooLarge = false;
       req.on('data', chunk => {
+        if (bodyTooLarge) return;
         bodyData += chunk;
+        if (bodyData.length > MAX_WEBHOOK_BODY) {
+          bodyTooLarge = true;
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: 'Payload too large' }));
+          req.destroy();
+        }
       });
 
-      await new Promise(resolve => req.on('end', resolve));
+      await new Promise(resolve => {
+        req.on('end', resolve);
+        req.on('close', resolve);
+        req.on('error', resolve);
+      });
+      if (bodyTooLarge) return;
 
       // Chỉ dò định tuyến khi URL chưa xác định rõ store (URL /webhooks/payos-store2
       // đã được ép targetPort=8080 ở trên — không cần tra DB nữa).

@@ -421,14 +421,14 @@ export function registerInteractionHandler(client, commands) {
 
       // ═══════ Price List Admin Edit Category Modal Submit ═══════
       if (interaction.isModalSubmit() && interaction.customId.startsWith('price_list:admin:edit_category_modal:')) {
-        const category = interaction.customId.split(':')[4];
+        const category = interaction.customId.split(':')[3];
         await handlePriceListAdminEditCategoryModal(interaction, category);
         return;
       }
 
       // ═══════ Price List Admin Select Product to Edit Menu ═══════
       if (interaction.isStringSelectMenu() && interaction.customId.startsWith('price_list:admin:select_product_to_edit:')) {
-        const category = interaction.customId.split(':')[4];
+        const category = interaction.customId.split(':')[3];
         await handlePriceListAdminSelectProductToEdit(interaction, category);
         return;
       }
@@ -913,6 +913,65 @@ export function registerInteractionHandler(client, commands) {
       // Warranty product select menu
       if (interaction.isAnySelectMenu() && interaction.customId === 'warranty:product:select') {
         await handleWarrantyProductSelect(interaction);
+        return;
+      }
+
+      // ═══════ Boost Server Feedback Modal Submit ═══════
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('boost:feedback:modal:')) {
+        const parts = interaction.customId.split(':');
+        const orderCode = parts[3];
+        const stars = parseInt(parts[4], 10) || 5;
+        const content = interaction.fields.getTextInputValue('feedback_content')?.trim() || 'Không có ý kiến';
+
+        const E = createEmojiResolver(interaction.guildId);
+        const { getBoostOrderByCode, updateBoostOrderStatus } = await import('../services/boostServerService.js');
+        const order = getBoostOrderByCode(orderCode);
+
+        if (!order) {
+          await interaction.reply({ content: E('status_cross') + ' Không tìm thấy đơn hàng boost.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        if (order.customer_id !== interaction.user.id) {
+          await interaction.reply({ content: E('status_cross') + ' Bạn không phải chủ sở hữu đơn hàng này.', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        if (order.note && order.note.includes('[FEEDBACK_SUBMITTED]')) {
+          await interaction.reply({ content: E('status_info') + ' Đơn hàng này đã được đánh giá rồi. Cảm ơn bạn!', ephemeral: true }).catch(() => null);
+          return;
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Đánh dấu đơn đã feedback (giữ nguyên trạng thái hiện tại, chỉ nối cờ vào ghi chú)
+        const noteFlag = `[FEEDBACK_SUBMITTED] ${stars}/5`;
+        const newNote = order.note ? `${order.note} ${noteFlag}` : noteFlag;
+        try {
+          updateBoostOrderStatus(order.order_code, order.status, { note: newNote });
+        } catch (e) {
+          console.error('[BOOST FEEDBACK] Không cập nhật được ghi chú đơn:', e);
+        }
+
+        // Đăng feedback vào kênh feedback của server (nếu có)
+        const guildConfig = getGuildConfig(interaction.guildId);
+        if (guildConfig?.feedback_channel_id) {
+          const feedbackChannel = await interaction.guild.channels.fetch(guildConfig.feedback_channel_id).catch(() => null);
+          const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+          if (feedbackChannel?.isTextBased() && member) {
+            const { buildFeedbackV2 } = await import('../utils/embeds.js');
+            const pseudoOrder = {
+              order_code: order.order_code,
+              guild_id: order.guild_id,
+              product_name: `Boost Server — ${order.package}`,
+              quantity: 1,
+            };
+            const { container, flags } = buildFeedbackV2({ member, order: pseudoOrder, stars, content });
+            await feedbackChannel.send({ components: [container], flags }).catch(() => null);
+          }
+        }
+
+        await interaction.editReply({ content: E('status_check') + ` Cảm ơn bạn đã đánh giá ${stars}/5 sao cho đơn boost \`${order.order_code}\`!` }).catch(() => null);
         return;
       }
 

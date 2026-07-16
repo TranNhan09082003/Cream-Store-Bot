@@ -108,14 +108,14 @@ Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các đi
 
 ---
 
-### 🛡️ 1. CHÍNH SÁCH BẢO HÀNH CHUNG
+### <:verifybadge:1481127479702847646> 1. CHÍNH SÁCH BẢO HÀNH CHUNG
 * **Không out Server:** Khách hàng tự ý out (rời) khỏi Server Discord của shop sau khi mua hàng sẽ bị **từ chối hỗ trợ bảo hành** cho mọi đơn hàng trước đó.
 * **Feedback đánh giá:** Việc gửi feedback sau khi hoàn tất đơn hàng là bắt buộc để kích hoạt quyền lợi bảo hành. Khách hàng không feedback (hoặc chỉ gửi feedback khi cần bảo hành) sẽ **bị từ chối bảo hành**.
 * **Bảo hành YouTube Premium:** Khi cần hỗ trợ bảo hành, vui lòng cung cấp đầy đủ: **Tên Gmail chủ Family** và **Gmail cá nhân của bạn** để shop xử lý nhanh nhất.
 
 ---
 
-### 💎 2. CHÍNH SÁCH ĐỐI VỚI DISCORD NITRO
+### <:verifybadge:1481127479702847646> 2. CHÍNH SÁCH ĐỐI VỚI DISCORD NITRO
 * **Discord Nitro 2 tháng (Mua mới):**
   * <a:chamxanh:1481124932447371374> Chỉ bảo hành khi tài khoản Gmail liên kết còn hoạt động bình thường.
   * <a:chamxanh:1481124932447371374> Nếu bạn để Gmail bị khóa/chết, shop xin phép **miễn trừ trách nhiệm bảo hành**.
@@ -128,18 +128,27 @@ Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các đi
 
 ---
 
-### 📺 3. CHÍNH SÁCH YOUTUBE PREMIUM
+### <:verifybadge:1481127479702847646> 3. CHÍNH SÁCH YOUTUBE PREMIUM
 * **YouTube Premium mua mới:** Bạn chỉ cần cung cấp địa chỉ Gmail cá nhân, sau đó check hòm thư để đồng ý gia nhập Family.
 * **Bảo mật thông tin:** Cam kết nhóm gia đình **riêng tư 100%**, tuyệt đối không chia sẻ bất kỳ dữ liệu cá nhân nào giữa các thành viên.
 
 ---
 
-### ⚙️ 4. CAM KẾT TRẢ ĐƠN & TIẾN ĐỘ
+### <:Netflix:1481133651319328789> 4. CHÍNH SÁCH & QUY ĐỊNH NETFLIX
+Để tài khoản dùng chung luôn ổn định và không bị lỗi truy cập, khách hàng vui lòng tuân thủ:
+* <a:tick_red51:1384069065626222632> **KHÔNG ĐƯỢC:** Đổi mật khẩu tài khoản Netflix.
+* <a:tick_red51:1384069065626222632> **KHÔNG ĐƯỢC:** Xóa, vào hoặc đổi tên profile của người khác.
+* <a:tickgreen:1384069022831874169> **ĐƯỢC PHÉP:** Xem trên nhiều thiết bị, nhưng **chỉ được xem cùng lúc trên 1 thiết bị**.
+* <a:tickgreen:1384069022831874169> **ĐƯỢC PHÉP:** Đổi tên profile và đặt mã PIN. Nếu đổi tên profile, vui lòng **gửi lại tên mới** cho shop để tiện quản lý.
+
+---
+
+### <:verifybadge:1481127479702847646> 5. CAM KẾT TRẢ ĐƠN & TIẾN ĐỘ
 * <a:chamxanh:1481124932447371374> Cenar Store cam kết **không bao giờ hold (giữ) đơn hàng** của khách.
 * <a:chamxanh:1481124932447371374> Mọi sự chậm trễ giao hàng (đặc biệt đối với gói Nitro 2 tháng) hoàn toàn do tình trạng khan hiếm nguyên liệu chung của thị trường. Các gói dịch vụ khác như Spotify, YouTube, Netflix... trả đơn cực kỳ nhanh chóng.
 
 <a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059><a:ccjdeobt:1481142015994495059>
--# *Điều khoản có thể được cập nhật theo thời gian để phù hợp với chính sách của các nhà cung cấp gốc. Cảm ơn sự tin tưởng của bạn!*` 
+-# *Điều khoản có thể được cập nhật theo thời gian để phù hợp với chính sách của các nhà cung cấp gốc. Cảm ơn sự tin tưởng của bạn!*`
 : `Chào mừng các bạn đến với **Cenar Store 2**. Dưới đây là các điều khoản sử dụng và chính sách bảo hành chính thức. Khi thực hiện giao dịch mua hàng, bạn mặc định đồng ý với các quy định sau:
 
 ---
@@ -170,7 +179,16 @@ Chào mừng các bạn đến với **Cenar Store**. Dưới đây là các đi
 
 ---
 
-### 4. CAM KẾT TRẢ ĐƠN & TIẾN ĐỘ
+### 4. CHÍNH SÁCH & QUY ĐỊNH NETFLIX
+Để tài khoản dùng chung luôn ổn định và không bị lỗi truy cập, khách hàng vui lòng tuân thủ:
+* **KHÔNG ĐƯỢC:** Đổi mật khẩu tài khoản Netflix.
+* **KHÔNG ĐƯỢC:** Xóa, vào hoặc đổi tên profile của người khác.
+* **ĐƯỢC PHÉP:** Xem trên nhiều thiết bị, nhưng **chỉ được xem cùng lúc trên 1 thiết bị**.
+* **ĐƯỢC PHÉP:** Đổi tên profile và đặt mã PIN. Nếu đổi tên profile, vui lòng **gửi lại tên mới** cho shop để tiện quản lý.
+
+---
+
+### 5. CAM KẾT TRẢ ĐƠN & TIẾN ĐỘ
 * Cenar Store cam kết **không bao giờ hold (giữ) đơn hàng** của khách.
 * Mọi sự chậm trễ giao hàng (đặc biệt đối với gói Nitro 2 tháng) hoàn toàn do tình trạng khan hiếm nguyên liệu chung của thị trường. Các gói dịch vụ khác như Spotify, YouTube, Netflix... trả đơn cực kỳ nhanh chóng.
 
