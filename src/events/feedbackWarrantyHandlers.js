@@ -1,0 +1,316 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  MessageFlags,
+  ModalBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
+import { config } from '../config.js';
+import { emitStaffLog } from '../services/staffLogService.js';
+import { getOrderByCode } from '../services/orderService.js';
+import { publishFeedback } from '../services/feedbackService.js';
+import { openWarrantyTicket, buildWarrantyCustomerConfirmV2 } from '../services/warrantyService.js';
+import { updateOrderLogMessage } from '../services/notificationService.js';
+import { getTicketByChannelId, getTicketById, scheduleTicketAutoClose } from '../services/ticketService.js';
+import { buildQuickFeedbackAckV2 } from '../utils/embeds.js';
+import { createEmojiResolver } from '../utils/emojiHelper.js';
+import { safeReply, buildFeedbackModal, FEEDBACK_TEXT_INPUT_ID } from './shared.js';
+
+export async function handleFeedbackButton(interaction, orderCode, starsRaw) {
+  const E = createEmojiResolver(interaction.guildId);
+  const stars = Number.parseInt(starsRaw, 10);
+  const order = getOrderByCode(orderCode);
+
+  if (!order) {
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng để feedback.`, ephemeral: true });
+    return;
+  }
+
+  if (order.customer_id !== interaction.user.id) {
+    await safeReply(interaction, { content: `${E('status_warn')} Bạn không phải chủ đơn hàng này.`, ephemeral: true });
+    return;
+  }
+
+  if (order.guild_id && order.guild_id !== interaction.guildId) {
+    await safeReply(interaction, { content: `${E('status_warn')} Đơn này không thuộc server hiện tại.`, ephemeral: true });
+    return;
+  }
+
+  if (order.status !== 'COMPLETED') {
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ có thể feedback cho đơn đã hoàn thành.`, ephemeral: true });
+    return;
+  }
+
+  if (order.feedback_submitted_at) {
+    await safeReply(interaction, { content: `${E('status_info')} Đơn này đã feedback rồi.`, ephemeral: true });
+    return;
+  }
+
+  await interaction.showModal(buildFeedbackModal(orderCode, stars));
+}
+
+
+// Xử lý khi khách đã chọn sản phẩm từ dropdown bảo hành
+export async function handleWarrantyProductSelect(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  const orderCode = interaction.values?.[0];
+  if (!orderCode) {
+    await safeReply(interaction, { content: `${E('status_warn')} Không nhận được lựa chọn. Vui lòng thử lại.`, ephemeral: true });
+    return;
+  }
+
+  const order = getOrderByCode(orderCode);
+  if (!order || order.customer_id !== interaction.user.id) {
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng hoặc bạn không phải chủ sở hữu.`, ephemeral: true });
+    return;
+  }
+
+  // Hiện modal nhập thông tin bảo hành đầy đủ
+  const modal = new ModalBuilder()
+    .setCustomId(`warranty:reason:modal:${orderCode}`)
+    .setTitle(`Bảo Hành — ${orderCode}`);
+
+  const productTypeInput = new TextInputBuilder()
+    .setCustomId('warranty_product_type')
+    .setLabel('Loại sản phẩm cần bảo hành')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('VD: Netflix Profile, Spotify Personal, ChatGPT Plus...')
+    .setMaxLength(100);
+
+  const accountInput = new TextInputBuilder()
+    .setCustomId('warranty_account_info')
+    .setLabel('Email / Tài khoản (đang dùng)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('VD: example@gmail.com hoặc username')
+    .setMaxLength(200);
+
+  const passwordInput = new TextInputBuilder()
+    .setCustomId('warranty_password')
+    .setLabel('Mật khẩu hiện tại')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('Mật khẩu bạn đang dùng để đăng nhập')
+    .setMaxLength(200);
+
+  const purchaseDateInput = new TextInputBuilder()
+    .setCustomId('warranty_purchase_date')
+    .setLabel('Ngày mua hàng')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('DD/MM/YYYY — VD: 01/06/2025')
+    .setMaxLength(20);
+
+  const expiredDateInput = new TextInputBuilder()
+    .setCustomId('warranty_expired_date')
+    .setLabel('Ngày mất / hết hạn / gặp lỗi')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('DD/MM/YYYY — VD: 15/06/2025')
+    .setMaxLength(20);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(productTypeInput),
+    new ActionRowBuilder().addComponents(accountInput),
+    new ActionRowBuilder().addComponents(passwordInput),
+    new ActionRowBuilder().addComponents(purchaseDateInput),
+    new ActionRowBuilder().addComponents(expiredDateInput),
+  );
+  await interaction.showModal(modal);
+}
+
+// Xử lý modal bảo hành đầy đủ → tạo ticket
+export async function handleWarrantyReasonModalSubmit(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
+
+  // Đọc 5 trường từ modal mới (tương thích cả modal cũ 1 trường)
+  const productType   = interaction.fields.getTextInputValue('warranty_product_type')?.trim() || null;
+  const accountInfo   = interaction.fields.getTextInputValue('warranty_account_info')?.trim() || null;
+  const password      = interaction.fields.getTextInputValue('warranty_password')?.trim() || null;
+  const purchaseDate  = interaction.fields.getTextInputValue('warranty_purchase_date')?.trim() || null;
+  const dateExpired   = interaction.fields.getTextInputValue('warranty_expired_date')?.trim() || null;
+  // Legacy fallback
+  const legacyReason  = interaction.fields.getTextInputValue('warranty_reason')?.trim() || null;
+
+  const formData = (productType || accountInfo || password || purchaseDate || dateExpired)
+    ? { productType, accountInfo, password, purchaseDate, dateExpired }
+    : null;
+
+  const result = await openWarrantyTicket({
+    guild: interaction.guild,
+    customerId: interaction.user.id,
+    actorId: interaction.user.id,
+    orderCode: orderCode.toUpperCase(),
+    reason: legacyReason ?? 'Khách mở ticket bảo hành từ panel.',
+    formData,
+  });
+
+  await updateOrderLogMessage(interaction.guild, result.order);
+  await emitStaffLog(interaction.client, {
+    guildId: interaction.guildId,
+    actorId: interaction.user.id,
+    targetId: interaction.user.id,
+    action: 'WARRANTY_OPEN',
+    detail: productType ? `Loại SP: ${productType}` : (legacyReason ?? 'Mở bảo hành từ panel'),
+    relatedOrderCode: orderCode,
+    relatedTicketCode: result.ticket.ticket_code,
+  });
+
+  if (result.reused) {
+    await interaction.reply({
+      content: `${E('status_info')} Đơn **${orderCode}** đã có ticket bảo hành tại ${result.channel}.`,
+      ephemeral: true,
+    }).catch(() => null);
+    return;
+  }
+
+  // Gửi xác nhận Components V2 đẹp cho khách
+  const { components, flags } = buildWarrantyCustomerConfirmV2({
+    order: result.order,
+    channel: result.channel,
+    guildId: interaction.guildId,
+  });
+  await interaction.reply({
+    components,
+    flags: flags | MessageFlags.Ephemeral,
+  }).catch(() => null);
+}
+
+
+export async function handleFeedbackModalSubmit(interaction, orderCode, starsRaw) {
+  const stars = Number.parseInt(starsRaw, 10);
+  const content = interaction.fields.getTextInputValue(FEEDBACK_TEXT_INPUT_ID)?.trim() || 'Không có ý kiến';
+
+  try {
+    const result = await publishFeedback({
+      guild: interaction.guild,
+      userId: interaction.user.id,
+      orderCode,
+      stars,
+      content,
+    });
+
+    const ticket = getTicketByChannelId(result.order.ticket_channel_id) || getTicketById(result.order.ticket_id);
+    if (ticket) {
+      const scheduled = scheduleTicketAutoClose(ticket.id, config.autoCloseCompletedTicketMinutes);
+      const channel = await interaction.guild.channels.fetch(ticket.channel_id).catch(() => null);
+      if (channel?.isTextBased()) {
+        const E_ch = createEmojiResolver(interaction.guildId);
+        const starEmoji = E_ch('icon_star');
+        const starBar = starEmoji ? starEmoji.repeat(Math.max(1, Math.min(5, stars))) : `${stars}/5 sao`;
+        const fbContainer = new ContainerBuilder().setAccentColor(0xF3A6D7);
+        fbContainer.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent([
+            `## ${E_ch('payment_success')} Feedback Đã Ghi Nhận!`.trim(),
+            `> ${E_ch('order_id')} **Mã đơn:** \`${result.order.order_code}\``.trim(),
+            `> ${E_ch('icon_star')} **Đánh giá:** **${stars}/5 sao**`.trim(),
+            `> ${starBar}`,
+          ].join('\n'))
+        );
+        fbContainer.addSeparatorComponents(
+          new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+        );
+        fbContainer.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `-# ${E_ch('icon_clock')} Ticket sẽ tự đóng sau **${config.autoCloseCompletedTicketMinutes} phút**. Bấm nút bên dưới nếu muốn giữ ticket mở.`.trim()
+          )
+        );
+        const keepOpenBtn = new ButtonBuilder()
+          .setCustomId(`ticket:keepopen:${scheduled.id}`)
+          .setStyle(ButtonStyle.Secondary)
+          .setLabel('Giữ Ticket Mở');
+        const keepOpenBtnEmoji = E_ch.component('icon_lock');
+        if (keepOpenBtnEmoji) keepOpenBtn.setEmoji(keepOpenBtnEmoji);
+        await channel.send({
+          components: [fbContainer, new ActionRowBuilder().addComponents(keepOpenBtn)],
+          flags: MessageFlags.IsComponentsV2,
+        }).catch(() => null);
+      }
+    }
+    {
+      const { container, flags } = buildQuickFeedbackAckV2(result.order, stars);
+      await interaction.reply({
+        components: [container],
+        flags: flags | MessageFlags.Ephemeral,
+      });
+    }
+  } catch (error) {
+    const E_err = createEmojiResolver(interaction.guildId);
+    await interaction.reply({ content: `${E_err('status_warn')} ${error.message}`, ephemeral: true }).catch(() => null);
+  }
+}
+
+export async function handleWarrantyButton(interaction, orderCode) {
+  const E = createEmojiResolver(interaction.guildId);
+  const order = getOrderByCode(orderCode);
+  if (!order) {
+    await safeReply(interaction, { content: `${E('status_warn')} Không tìm thấy đơn hàng.`, ephemeral: true });
+    return;
+  }
+
+  if (order.customer_id !== interaction.user.id) {
+    await safeReply(interaction, { content: `${E('status_warn')} Chỉ chủ đơn hàng mới có thể mở ticket bảo hành.`, ephemeral: true });
+    return;
+  }
+
+  // Hiện modal điền thông tin bảo hành đầy đủ
+  const modal = new ModalBuilder()
+    .setCustomId(`warranty:reason:modal:${orderCode}`)
+    .setTitle(`Bảo Hành — ${orderCode}`);
+
+  const productTypeInput = new TextInputBuilder()
+    .setCustomId('warranty_product_type')
+    .setLabel('Loại sản phẩm cần bảo hành')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('VD: Netflix Profile, Spotify Personal, ChatGPT Plus...')
+    .setMaxLength(100);
+
+  const accountInput = new TextInputBuilder()
+    .setCustomId('warranty_account_info')
+    .setLabel('Email / Tài khoản (đang dùng)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('VD: example@gmail.com hoặc username')
+    .setMaxLength(200);
+
+  const passwordInput = new TextInputBuilder()
+    .setCustomId('warranty_password')
+    .setLabel('Mật khẩu hiện tại')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('Mật khẩu bạn đang dùng để đăng nhập')
+    .setMaxLength(200);
+
+  const purchaseDateInput = new TextInputBuilder()
+    .setCustomId('warranty_purchase_date')
+    .setLabel('Ngày mua hàng')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('DD/MM/YYYY — VD: 01/06/2025')
+    .setMaxLength(20);
+
+  const expiredDateInput = new TextInputBuilder()
+    .setCustomId('warranty_expired_date')
+    .setLabel('Ngày mất / hết hạn / gặp lỗi')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('DD/MM/YYYY — VD: 15/06/2025')
+    .setMaxLength(20);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(productTypeInput),
+    new ActionRowBuilder().addComponents(accountInput),
+    new ActionRowBuilder().addComponents(passwordInput),
+    new ActionRowBuilder().addComponents(purchaseDateInput),
+    new ActionRowBuilder().addComponents(expiredDateInput),
+  );
+  await interaction.showModal(modal);
+}
