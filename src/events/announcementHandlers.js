@@ -2,7 +2,7 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'disc
 
 /**
  * Xử lý sự kiện khi người dùng chọn một mục trong String Select Menu của bản tin thông báo
- * Phản hồi dưới dạng Discord Component V2 Embed + Action Row Buttons
+ * Phản hồi dưới dạng Discord Component V2 Embed + Action Row Buttons sử dụng Custom Emoji chính thức của máy chủ
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 export async function handleAnnouncementSelect(interaction) {
@@ -13,28 +13,40 @@ export async function handleAnnouncementSelect(interaction) {
     let description = '';
     let priceText = '';
     let highlightText = '';
+    let emojiId = '';
+    let emojiName = '';
 
     if (selectedValue === 'item_gemini_pro') {
-      title = 'Gemini Pro 18 Tháng + 5TB Google Drive';
+      emojiId = '1481157054210248864';
+      emojiName = 'tsm_gemini';
+      title = '<:tsm_gemini:1481157054210248864> Gemini Pro 18 Tháng + 5TB Google Drive';
       description = 'Gói nâng cấp tài khoản Gemini Pro chính chủ đi kèm 5TB lưu trữ Google One Drive.';
       priceText = '`80.000đ` / 18 Tháng';
       highlightText = '> - **Hình thức:** Nâng cấp trực tiếp tài khoản chính chủ 100%\n> - **Lưu ý:** Shop ngưng bán Claude do bị đẩy giá ảo. Cách xài AI hiệu quả hay không do tư duy người dùng.';
     } else if (selectedValue === 'item_nitro_2m') {
-      title = 'Discord Nitro 2 Tháng';
+      emojiId = '1384901794475282523';
+      emojiName = '10194purpleween';
+      title = '<:10194purpleween:1384901794475282523> Discord Nitro 2 Tháng';
       description = 'Tài khoản/Code Discord Nitro 2 tháng gia hạn mượt mà, đầy đủ tính năng Custom Emojis, HD Streaming & Boosts.';
       priceText = '`99.000đ` / 2 Tháng';
       highlightText = '> - **Hàng mới về:** Sẵn kho ngập tràn, xuất kho tự động 24/7\n> - **Bảo hành:** 1 đổi 1 trọn thời gian sử dụng.';
     } else if (selectedValue === 'item_nitro_1y') {
-      title = 'Discord Nitro 1 Năm (Chính Chủ)';
+      emojiId = '1384901794475282523';
+      emojiName = '10194purpleween';
+      title = '<:10194purpleween:1384901794475282523> Discord Nitro 1 Năm (Chính Chủ)';
       description = 'Gói Discord Nitro 1 Năm chính chủ giá siêu rẻ, giới hạn số lượng slot có sẵn.';
       priceText = '`600.000đ` / 1 Năm';
       highlightText = '> - **Số lượng:** Restock gấp đúng **3 - 4 slot** duy nhất\n> - **Tiết kiệm:** Giảm hơn 60% so với giá gốc.';
     } else if (selectedValue === 'item_khang_mail') {
-      title = 'Dịch Vụ Kháng Mail 2M (A - Z)';
+      emojiId = '1348625535512870965';
+      emojiName = 'cr_baohanh';
+      title = '<:cr_baohanh:1348625535512870965> Dịch Vụ Kháng Mail 2M (A - Z)';
       description = 'Dịch vụ xử lý kháng mở khoá Mail 2M trọn gói dành cho anh em cày MMO.';
       priceText = '`5.000đ` / Mail';
       highlightText = '> - **Lý do có phí:** Shop phải **thuê SĐT OTP thực tế** nhận mã giải mã\n> - **Cam kết:** Kháng từ A - Z, hỗ trợ tận tình cho anh em làm MMO.';
     } else {
+      emojiId = '1481127479702847646';
+      emojiName = 'verifybadge';
       title = 'Thông Tin Chi Tiết Sản Phẩm';
       description = 'Sản phẩm thuộc hệ thống Cenar Store AI 2.0.';
       priceText = '`Báo giá theo hệ thống`';
@@ -61,11 +73,13 @@ export async function handleAnnouncementSelect(interaction) {
     const buyBtn = new ButtonBuilder()
       .setLabel('Đặt Mua Ngay (PayOS 3s)')
       .setStyle(ButtonStyle.Link)
+      .setEmoji({ id: '1348626032747614268', name: 'cr_carttt' })
       .setURL('https://cenarstore.xyz/#products');
 
     const ticketBtn = new ButtonBuilder()
       .setLabel('Mở Ticket Hỗ Trợ 24/7')
       .setStyle(ButtonStyle.Link)
+      .setEmoji({ id: '1348625535512870965', name: 'cr_baohanh' })
       .setURL('https://discord.com/channels/1282637033340403754/1514607020098191393');
 
     const row = new ActionRowBuilder().addComponents(buyBtn, ticketBtn);
