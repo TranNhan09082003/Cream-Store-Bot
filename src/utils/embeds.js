@@ -1842,4 +1842,51 @@ export function buildBlacklistEmbed(user, flag) {
   );
 }
 
+// ═══════════════════════════════════════════════
+// Credit Offer (Ví Trả Sau / Vay Hạn Mức)
+// ═══════════════════════════════════════════════
+export function buildCreditOfferV2(creditInfo, customerId, guildId = null) {
+  const brand = brandConfig('store');
+  const em = guildId ? getEmojiMap(guildId) : {};
+  const E = (slot, fallback = '') => em[slot] || fallback;
+
+  const container = new ContainerBuilder().setAccentColor(0x57F287); // Emerald Green
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(joinLines(
+      `## <:verifybadge:1481127479702847646> BẠN ĐỦ ĐIỀU KIỆN KÍCH HOẠT VÍ TRẢ SAU (BNPL)`,
+      `> ${E('icon_heart_purple')} **Xin chúc mừng!** Dựa trên lịch sử tín nhiệm, bạn đã được cấp hạn mức mua trước trả sau 0% lãi suất.`,
+      `> <:cr_cardd:1348624271437463552> ${fmt.b('Hạn mức được cấp:')} ${fmt.code(vnd(creditInfo.limit))}`,
+      `> <:money:1442876095442714748> ${fmt.b('Có thể dùng:')} ${fmt.code(vnd(creditInfo.available))}`,
+      '',
+      `### ${E('status_info')}  ${fmt.b('Quyền lợi & Yêu cầu:')}`,
+      `> - Nhận tài khoản/dịch vụ **ngay lập tức**, thanh toán phần còn lại sau 7 - 14 ngày.`,
+      `> - Có thể cần trả trước/cọc (30% - 50%) tùy theo loại sản phẩm.`,
+      `> - Quá hạn 14 ngày không thanh toán sẽ bị thu hồi tài khoản & vào Blacklist.`,
+      '',
+      `Bấm nút bên dưới nếu bạn muốn sử dụng đặc quyền này cho đơn hàng hiện tại.`
+    ))
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small)
+  );
+
+  const btnApply = new ButtonBuilder()
+    .setCustomId('ticket:credit_apply')
+    .setLabel('Sử Dụng Ví Trả Sau')
+    .setStyle(ButtonStyle.Success)
+    .setEmoji(ec(em, 'payment_payos') || { id: '1348624271437463552', name: 'cr_cardd' });
+
+  const btnRules = new ButtonBuilder()
+    .setCustomId('ticket:credit_rules')
+    .setLabel('Xem Quy Chế')
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji(ec(em, 'icon_doc') || { id: '1481127479702847646', name: 'verifybadge' });
+
+  const row = new ActionRowBuilder().addComponents(btnApply, btnRules);
+
+  return { container, row, flags: MessageFlags.IsComponentsV2 };
+}
+
 // END OF FILE

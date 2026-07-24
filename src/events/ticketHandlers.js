@@ -44,6 +44,7 @@ import {
   buildCredentialEmbeds,
   buildDeliveryLoginComponents,
   buildQueueStatusText,
+  buildCreditOfferV2,
 } from '../utils/embeds.js';
 import {
   safeReply,
@@ -307,6 +308,26 @@ export async function handleTicketCreate(interaction, ticketType = 'ORDER', gmai
         welcomeV2,
         ...buildTicketControlComponents(ticket.id, interaction.user.id)
       ];
+
+      if (normalizedType === 'ORDER') {
+        const profile = db.prepare('SELECT * FROM customer_profiles WHERE guild_id = ? AND customer_id = ?').get(interaction.guildId, interaction.user.id);
+        if (profile && profile.total_completed_orders >= 5 && profile.total_spent >= 1000000) {
+          if (!profile.credit_limit || profile.credit_limit === 0) {
+            db.prepare('UPDATE customer_profiles SET credit_limit = 500000 WHERE guild_id = ? AND customer_id = ?').run(interaction.guildId, interaction.user.id);
+            profile.credit_limit = 500000;
+          }
+          const availableCredit = profile.credit_limit - (profile.credit_used || 0);
+          if (availableCredit > 0 && (profile.credit_status || 'ACTIVE') === 'ACTIVE') {
+            const creditOffer = buildCreditOfferV2(
+              { limit: profile.credit_limit, available: availableCredit },
+              interaction.user.id,
+              interaction.guildId
+            );
+            components.push(creditOffer.container);
+            components.push(creditOffer.row);
+          }
+        }
+      }
 
       await channel.send({
         components: components,
@@ -700,4 +721,30 @@ export async function handleKeepOpen(interaction, ticketId) {
     return;
   }
   await safeReply(interaction, { content: `${E('status_check')} Bot sẽ giữ ticket mở, không tự đóng nữa.`, ephemeral: true });
+}
+
+export async function handleCreditApply(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  const guildConfig = getGuildConfig(interaction.guildId);
+
+  const mentionParts = [];
+  if (guildConfig.manager_role_id) mentionParts.push(`<@&${guildConfig.manager_role_id}>`);
+  if (guildConfig.support_role_id) mentionParts.push(`<@&${guildConfig.support_role_id}>`);
+  
+  await interaction.reply({
+    content: `${E('payment_payos')} **XÁC NHẬN SỬ DỤNG VÍ TRẢ SAU / TRẢ GÓP**\n> Khách hàng <@${interaction.user.id}> đã yêu cầu kích hoạt thanh toán bằng Ví Trả Sau cho đơn hàng này.\n> Vui lòng Admin vào kiểm tra đơn, báo mức cọc (nếu có) và khởi tạo đơn cho khách.\n\n${mentionParts.join(' ')}`,
+    allowedMentions: { roles: [guildConfig.manager_role_id, guildConfig.support_role_id].filter(Boolean) }
+  });
+}
+
+export async function handleCreditRules(interaction) {
+  const E = createEmojiResolver(interaction.guildId);
+  await interaction.reply({
+    content: `${E('icon_doc')} **QUY CHẾ VÍ TRẢ SAU (BNPL) & TRẢ GÓP 0%:**\n` +
+      `> 1. **Dùng trước trả sau:** Khách hàng được nhận tài khoản dùng ngay, thanh toán số dư trong 7 - 14 ngày.\n` +
+      `> 2. **Trả góp 0%:** Áp dụng gói lớn 12T (Nitro, Adobe, CapCut), trả trước 30-50%, còn lại chia 2-3 kỳ.\n` +
+      `> 3. **Phạt vi phạm:** Trễ 1-3 ngày phạt 5%/ngày. Trễ 7-14 ngày thu hồi tài khoản, đưa ID vào Blacklist MMO.\n` +
+      `> 4. **Bảo hành:** Vẫn được hỗ trợ bảo hành 1 đổi 1 trong thời gian chưa tất toán.`,
+    ephemeral: true
+  });
 }

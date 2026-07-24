@@ -143,6 +143,8 @@ import {
   handleOrderCancel,
   handleOrderClaim,
   handleKeepOpen,
+  handleCreditApply,
+  handleCreditRules,
 } from "./ticketHandlers.js";
 import {
   handleFeedbackButton,
@@ -1964,6 +1966,14 @@ export function registerInteractionHandler(client, commands) {
         const [, , ticketType] = interaction.customId.split(':');
         await handleTicketCreate(interaction, ticketType);
         return;
+      }
+      
+      if (interaction.customId === 'ticket:credit_apply') {
+        return await handleCreditApply(interaction);
+      }
+
+      if (interaction.customId === 'ticket:credit_rules') {
+        return await handleCreditRules(interaction);
       }
 
       if (interaction.customId === 'ticket:create') {

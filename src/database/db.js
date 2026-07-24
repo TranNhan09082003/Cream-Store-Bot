@@ -718,6 +718,10 @@ export function initDatabase() {
   ensureColumn('customer_profiles', 'is_ctv', 'INTEGER DEFAULT 0');
   ensureColumn('customer_profiles', 'ctv_joined_at', 'TEXT');
   ensureColumn('product_catalog', 'ctv_price', 'INTEGER DEFAULT NULL');
+  ensureColumn('customer_profiles', 'credit_limit', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('customer_profiles', 'credit_used', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('customer_profiles', 'credit_status', "TEXT NOT NULL DEFAULT 'ACTIVE'");
+
 }
 
 export function nowIso() {
