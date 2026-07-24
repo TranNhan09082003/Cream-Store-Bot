@@ -147,17 +147,8 @@ export async function runAutoVinhDanh(client) {
         console.log(`[Vinh Danh] Guild ${guild.name} đã cập nhật bảng vinh danh live`);
       } else {
         // Đăng tin nhắn mới
-        // Trước tiên xóa bớt tin nhắn cũ của bot trong kênh để tránh rối mắt (nếu có tin live cũ)
-        try {
-          const old = await vinhdanhChan.messages.fetch({ limit: 15 }).catch(() => null);
-          if (old) {
-            for (const m of old.filter(m => m.author.id === client.user.id).values()) {
-              await m.delete().catch(() => null);
-              await new Promise(r => setTimeout(r, 300));
-            }
-          }
-        } catch {}
-
+        // Bỏ logic tự động xóa tất cả tin nhắn cũ của bot để tránh xóa nhầm các panel (như Bảng Giá) 
+        // nếu người dùng đặt chung một kênh.
         const newMsg = await vinhdanhChan.send(payloadCurr).catch(() => null);
         if (newMsg) {
           db.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)').run(currentMonthKey, newMsg.id);
